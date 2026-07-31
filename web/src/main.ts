@@ -5,7 +5,6 @@ import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
-import { i18n } from '@/plugins/i18n'
 import { setupPermissionGuard } from '@/permission'
 import '@/styles/index.css'
 

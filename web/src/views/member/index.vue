@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Document, FirstAidKit, ShoppingBag, Promotion, Headset } from '@element-plus/icons-vue'
-import type { FunctionalComponent } from 'vue'
+import type { Component } from 'vue'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
@@ -11,7 +11,7 @@ const userStore = useUserStore()
 const userInfo = ref(userStore.userInfo)
 
 interface MenuItem {
-  icon: FunctionalComponent
+  icon: Component
   title: string
   path: string
 }

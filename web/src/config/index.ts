@@ -1,11 +1,11 @@
 export const appConfig = {
-  title: 'AI中医健康管理平台',
-  shortName: '中医商城',
+  title: import.meta.env.VITE_APP_TITLE || 'AI中医健康管理平台',
+  shortName: import.meta.env.VITE_APP_SHORT_NAME || '中医商城',
   version: '1.0.0',
 
   // API
-  apiBaseURL: '/api/v1',
-  timeout: 30000,
+  apiBaseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT) || 30000,
 
   // Pagination
   defaultPageSize: 10,
@@ -19,7 +19,7 @@ export const appConfig = {
   themeKey: 'app_theme',
 
   // Upload
-  uploadMaxSize: 2 * 1024 * 1024, // 2MB
+  uploadMaxSize: Number(import.meta.env.VITE_UPLOAD_MAX_SIZE) || 2 * 1024 * 1024, // 2MB
   uploadAccept: 'image/*',
 
   // Date

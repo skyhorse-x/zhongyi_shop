@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElDialog, ElRadioGroup, ElRadioButton, ElButton } from 'element-plus'
-import { List, Check, InfoFilled, ShoppingBag, Fire, Star, Trophy } from '@element-plus/icons-vue'
+import { List, Check, InfoFilled, ShoppingBag, Sunny, Star, Trophy } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -19,7 +19,7 @@ const remainingTimes = computed(() => Number(userInfo.value?.analysis_times ?? 0
 
 // icon 名称 → 组件映射（后端只传 icon 名称，前端解析）
 const iconMap: Record<string, any> = {
-  Fire: markRaw(Fire),
+  Sunny: markRaw(Sunny),
   Star: markRaw(Star),
   Trophy: markRaw(Trophy),
   ShoppingBag: markRaw(ShoppingBag),
@@ -80,8 +80,9 @@ const handlePurchase = async (pkg: any) => {
   if (paying.value) return
 
   // 1. 先选择支付方式
-  payType.value = await selectPayType().catch(() => null)
-  if (!payType.value) return
+  const chosen = await selectPayType().catch(() => null)
+  if (!chosen) return
+  payType.value = chosen
 
   // 2. 确认订单
   try {

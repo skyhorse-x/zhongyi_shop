@@ -340,9 +340,9 @@ const handleDownloadImage = async () => {
     // 转换为图片并下载
     const imageUrl = canvas.toDataURL('image/png', 1.0)
     const link = document.createElement('a')
-    const taskNo = result.value.details[2]?.value || taskNo.value
+    const fileName = result.value.details[2]?.value || taskNo.value
     link.href = imageUrl
-    link.download = `${result.value.title}-${taskNo}.png`
+    link.download = `${result.value.title}-${fileName}.png`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)

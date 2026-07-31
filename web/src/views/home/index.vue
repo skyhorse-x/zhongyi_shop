@@ -2,12 +2,12 @@
 import { ref, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Avatar, User, List, ChatLineRound, FirstAidKit, Money } from '@element-plus/icons-vue'
-import type { FunctionalComponent } from 'vue'
+import type { Component } from 'vue'
 
 const router = useRouter()
 
 interface FeatureItem {
-  icon: FunctionalComponent
+  icon: Component
   title: string
   desc: string
   path: string
