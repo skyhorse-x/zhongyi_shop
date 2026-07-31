@@ -1,0 +1,6 @@
+export { default as BaseTable } from './BaseTable.vue'
+export { default as BaseForm } from './BaseForm.vue'
+export { default as BaseDialog } from './BaseDialog.vue'
+export { default as BaseSearch } from './BaseSearch.vue'
+export { default as BasePagination } from './BasePagination.vue'
+export { default as BaseCard } from './BaseCard.vue'

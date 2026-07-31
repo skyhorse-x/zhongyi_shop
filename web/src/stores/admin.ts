@@ -1,0 +1,38 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import type { MenuItem } from '@/types'
+import { TrendCharts, UserFilled, Tickets, Cpu, Promotion, Money, Document, Setting, Avatar } from '@element-plus/icons-vue'
+
+export const useAdminStore = defineStore('admin', () => {
+  const token = ref(localStorage.getItem('admin_token') || '')
+  const adminInfo = ref<any>(null)
+  const permissions = ref<string[]>([])
+
+  const menuItems = ref<MenuItem[]>([
+    { title: '仪表盘', icon: 'TrendCharts', path: '/admin/dashboard' },
+    { title: '用户管理', icon: 'UserFilled', path: '/admin/users' },
+    { title: '管理员管理', icon: 'Avatar', path: '/admin/admins' },
+    { title: '订单管理', icon: 'Tickets', path: '/admin/orders' },
+    { title: 'AI管理', icon: 'Cpu', path: '/admin/ai' },
+    { title: '推广管理', icon: 'Promotion', path: '/admin/promoters' },
+    { title: '提现审核', icon: 'Money', path: '/admin/withdraws' },
+    { title: '文章管理', icon: 'Document', path: '/admin/articles' },
+    { title: '系统设置', icon: 'Setting', path: '/admin/settings' },
+  ])
+
+  const isLoggedIn = () => !!token.value
+
+  const setToken = (t: string) => {
+    token.value = t
+    localStorage.setItem('admin_token', t)
+  }
+
+  const logout = () => {
+    token.value = ''
+    adminInfo.value = null
+    permissions.value = []
+    localStorage.removeItem('admin_token')
+  }
+
+  return { token, adminInfo, permissions, menuItems, isLoggedIn, setToken, logout }
+})
