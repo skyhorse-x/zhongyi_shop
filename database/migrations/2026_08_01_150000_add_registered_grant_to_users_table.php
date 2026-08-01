@@ -16,7 +16,6 @@ return new class extends Migration
             if (!Schema::hasColumn('users', 'user_registered_granted')) {
                 $table->boolean('user_registered_granted')
                     ->default(false)
-                    ->after('user_type')
                     ->comment('是否已发放过注册试用次数（防重复）');
             }
         });
