@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document, List, Clock, CircleCheck, CircleClose, ShoppingBag, Refresh } from '@element-plus/icons-vue'
+import { toMoney } from '@/utils'
 
 const router = useRouter()
 const loading = ref(false)
@@ -291,7 +292,7 @@ onMounted(() => {
             </div>
           </div>
           <div class="item-amount">
-            <div class="amount-value">¥{{ order.amount.toFixed(2) }}</div>
+            <div class="amount-value">¥{{ toMoney(order.amount) }}</div>
             <div class="amount-label">订单金额</div>
           </div>
         </div>

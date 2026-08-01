@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Share } from '@element-plus/icons-vue'
+import { Money, Wallet, Refresh } from '@element-plus/icons-vue'
+import { toMoney } from '@/utils'
 
 const router = useRouter()
 
@@ -30,13 +31,7 @@ const posterUrl = ref('')
 
 const getToken = (): string => localStorage.getItem('token') || ''
 
-// 加载推广员信息
-// 工具：安全转字符串数字
-const toMoney = (v: any): string => {
-  const n = Number(v ?? 0)
-  return isNaN(n) ? '0.00' : n.toFixed(2)
-}
-
+// 工具：安全转字符串数字（@/utils 已有同名函数）
 const loadPromoterInfo = async () => {
   loading.value = true
   try {

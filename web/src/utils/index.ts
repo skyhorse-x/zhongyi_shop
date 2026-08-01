@@ -21,6 +21,17 @@ export function formatMoney(amount: number | string, prefix = '¥'): string {
   return `${prefix}${num.toFixed(2)}`
 }
 
+/**
+ * 安全金额转字符串（无前缀），处理后端可能返回的字符串/数字/null
+ * - null/undefined/非数字 → '0.00'
+ * - 字符串数字如 "9.90" → '9.90'
+ * - 数字 → 保留 2 位小数
+ */
+export function toMoney(v: any): string {
+  const n = Number(v ?? 0)
+  return isNaN(n) ? '0.00' : n.toFixed(2)
+}
+
 // 脱敏手机号
 export function maskMobile(mobile: string): string {
   if (!mobile || mobile.length < 7) return mobile
