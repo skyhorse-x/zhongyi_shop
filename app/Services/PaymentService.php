@@ -48,7 +48,7 @@ class PaymentService
      * @param User $user
      * @param string $type 订单类型: analysis, package
      * @param string $relationId 关联ID
-     * @param string $payType 支付方式: wechat, alipay
+     * @param string $payType 支付方式: wechat, alipay, balance
      * @param float $amount 支付金额
      * @return array
      * @throws \Exception
@@ -62,6 +62,14 @@ class PaymentService
             'pay_type' => $payType,
             'amount' => $amount,
         ]);
+
+        // 校验支付方式是否已开启
+        $this->guardPayType($payType);
+
+        // 余额支付：单事务内完成「创建订单 → 扣减余额 → 标记已支付 → 发货」
+        if ($payType === 'balance') {
+            return $this->createOrderWithBalance($user, $type, $relationId, $amount);
+        }
 
         // 创建订单
         $order = Order::create([
@@ -88,9 +96,135 @@ class PaymentService
 
         return [
             'order_no' => $order->order_no,
-            'pay_amount' => $order->amount,
+            'pay_amount' => (float) $order->amount,
+            'pay_type' => $payType,
             'pay_params' => $payParams,
         ];
+    }
+
+    /**
+     * 余额支付下单（单事务）
+     */
+    protected function createOrderWithBalance(User $user, string $type, string $relationId, float $amount): array
+    {
+        if ((float) $user->balance < $amount) {
+            throw new \Exception(
+                '余额不足，当前余额 ¥' . number_format((float) $user->balance, 2)
+                . '，需要 ¥' . number_format($amount, 2)
+            );
+        }
+
+        return DB::transaction(function () use ($user, $type, $relationId, $amount) {
+            // 重新加行锁读最新余额（防并发）
+            $locked = User::where('id', $user->id)->lockForUpdate()->first();
+            if ((float) $locked->balance < $amount) {
+                throw new \Exception('余额不足，支付失败');
+            }
+
+            // 1. 创建已支付订单
+            $order = Order::create([
+                'order_no' => $this->generateOrderNo(),
+                'user_id' => $user->id,
+                'type' => $type,
+                'relation_id' => $relationId,
+                'amount' => $amount,
+                'pay_type' => 'balance',
+                'status' => 1, // 已支付
+                'transaction_id' => 'BALANCE_' . Str::random(16),
+                'paid_at' => now(),
+            ]);
+
+            // 2. 扣减余额 + 写流水
+            $before = (float) $locked->balance;
+            $after = round($before - $amount, 2);
+            $locked->balance = $after;
+            $locked->save();
+
+            \App\Models\UserBalanceLog::create([
+                'user_id'     => $locked->id,
+                'change'      => -$amount,
+                'before'      => $before,
+                'after'       => $after,
+                'type'        => 'consume',
+                'remark'      => '购买次数包，订单号 ' . $order->order_no,
+                'operator_id' => null,
+            ]);
+
+            // 3. 发货（与第三方支付成功走同一逻辑）
+            $this->fulfillOrder($order);
+
+            Log::info('Balance payment order created and fulfilled', [
+                'order_no' => $order->order_no,
+                'amount' => $amount,
+                'balance_after' => $after,
+            ]);
+
+            return [
+                'order_no'     => $order->order_no,
+                'pay_amount'   => (float) $order->amount,
+                'pay_type'     => 'balance',
+                'paid'         => true,
+                'balance_after' => $after,
+                'pay_params'   => [
+                    'method' => 'balance',
+                    'message' => '余额支付成功',
+                ],
+            ];
+        });
+    }
+
+    /**
+     * 发货（订单类型对应的服务解锁）
+     */
+    protected function fulfillOrder(Order $order): void
+    {
+        switch ($order->type) {
+            case 'analysis':
+                AnalysisTask::where('task_no', $order->relation_id)
+                    ->update(['is_paid' => true]);
+                Log::info('Analysis report unlocked', ['task_no' => $order->relation_id]);
+                break;
+            case 'package':
+                $this->addUserAnalysisTimes($order->user_id, $order->relation_id);
+                Log::info('User analysis times added', [
+                    'user_id' => $order->user_id,
+                    'package_id' => $order->relation_id,
+                ]);
+                break;
+        }
+        // 计算推广佣金
+        $this->calculateCommission($order);
+    }
+
+    /**
+     * 校验支付方式开关
+     */
+    public function guardPayType(string $payType): void
+    {
+        $key = match ($payType) {
+            'wechat'  => 'payment_wechat_enabled',
+            'alipay'  => 'payment_alipay_enabled',
+            'balance' => 'payment_balance_enabled',
+            default => throw new \InvalidArgumentException("Unsupported payment type: {$payType}"),
+        };
+        $enabled = \App\Models\SystemConfig::getValue($key, '1');
+        if ($enabled !== '1') {
+            throw new \Exception('该支付方式已关闭，请选择其他支付方式');
+        }
+    }
+
+    /**
+     * 获取当前可用的支付方式列表
+     * 前台套餐页用：余额永远返回（即便关闭也返回，方便显示"已关闭"），但 is_enabled 字段
+     */
+    public function getAvailablePayTypes(): array
+    {
+        $list = [
+            ['code' => 'balance', 'name' => '余额支付', 'icon' => '💰', 'is_enabled' => true],
+            ['code' => 'wechat',  'name' => '微信支付', 'icon' => '💚', 'is_enabled' => \App\Models\SystemConfig::getValue('payment_wechat_enabled', '1') === '1'],
+            ['code' => 'alipay',  'name' => '支付宝',   'icon' => '💙', 'is_enabled' => \App\Models\SystemConfig::getValue('payment_alipay_enabled', '1') === '1'],
+        ];
+        return $list;
     }
 
     /**
@@ -558,6 +692,22 @@ class PaymentService
         // TODO: 生产环境必须实现真正的签名验证，参考微信支付文档
         Log::info('微信支付签名验证暂时跳过，生产环境请实现 verifyWechatSign');
         return true;
+    }
+
+    /**
+     * 重新生成支付宝支付参数（已有订单换支付方式）
+     */
+    public function regenerateAlipayParams(Order $order): array
+    {
+        return $this->createAlipayParams($order);
+    }
+
+    /**
+     * 重新生成微信支付参数（已有订单换支付方式）
+     */
+    public function regenerateWechatParams(Order $order): array
+    {
+        return $this->createWechatParams($order);
     }
 
     /**

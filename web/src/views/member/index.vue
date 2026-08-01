@@ -59,6 +59,10 @@ onMounted(async () => {
         <div class="nickname">{{ userInfo?.nickname || '用户' }}</div>
         <div class="mobile">{{ userInfo?.mobile || '' }}</div>
         <div class="badges">
+          <div v-if="userInfo?.is_new_user_gift" class="gift-badge">
+            <span class="gift-icon">🎁</span>
+            <span>新人礼 · 已赠送 {{ userInfo?.gift_times ?? 0 }} 次</span>
+          </div>
           <div class="badge-item">
             <span class="badge-num">¥{{ formatBalance(userInfo?.balance) }}</span>
             <span class="badge-label">余额</span>
@@ -184,6 +188,30 @@ onMounted(async () => {
 .badge-label {
   font-size: 11px;
   opacity: 0.85;
+}
+
+/* 新人礼徽章 */
+.gift-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #fff5a0 0%, #ffd700 100%);
+  color: #8b6914;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(255, 215, 0, 0.3);
+  animation: gift-pulse 2s ease-in-out infinite;
+}
+
+.gift-icon {
+  font-size: 13px;
+}
+
+@keyframes gift-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
 /* 菜单组 - 小程序风格 */

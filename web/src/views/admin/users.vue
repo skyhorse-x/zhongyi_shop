@@ -445,6 +445,10 @@ const loadLogs = async (row?: any) => {
         },
       }
     )
+    const ct = res.headers.get('content-type') || ''
+    if (!ct.includes('application/json')) {
+      throw new Error(`接口返回非 JSON（status=${res.status}）`)
+    }
     const data = await res.json()
     if (data.code === 0) {
       logsList.value = data.data.logs?.data ?? []

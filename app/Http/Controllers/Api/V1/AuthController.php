@@ -108,6 +108,7 @@ class AuthController extends Controller
                     'parent_id' => $parentId,
                 ]);
                 $this->autoActivatePromoter($user);
+                $user->grantInitialAnalysisTimes();
 
                 DB::commit();
             } catch (\Exception $e) {

@@ -66,7 +66,7 @@ class PackageController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'package_id' => 'required|integer|exists:product_packages,id',
-            'pay_type' => 'required|in:wechat,alipay',
+            'pay_type' => 'required|in:wechat,alipay,balance',
         ]);
 
         if ($validator->fails()) {
@@ -85,18 +85,25 @@ class PackageController extends Controller
             ], 400);
         }
 
-        // 通过 PaymentService 统一处理：创建订单 + 生成支付参数
-        $result = $this->paymentService->createOrder(
-            $request->user(),
-            'package',
-            (string) $package->id,
-            $request->pay_type,
-            (float) $package->price
-        );
+        try {
+            // 通过 PaymentService 统一处理：创建订单 + 生成支付参数
+            $result = $this->paymentService->createOrder(
+                $request->user(),
+                'package',
+                (string) $package->id,
+                $request->pay_type,
+                (float) $package->price
+            );
+        } catch (\Throwable $e) {
+            return response()->json([
+                'code' => 400,
+                'message' => $e->getMessage() ?: '订单创建失败',
+            ], 400);
+        }
 
         return response()->json([
             'code' => 0,
-            'message' => '订单创建成功',
+            'message' => $result['paid'] ?? false ? '支付成功' : '订单创建成功',
             'data' => $result,
         ]);
     }

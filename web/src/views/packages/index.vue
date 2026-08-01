@@ -1,21 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox, ElDialog, ElRadioGroup, ElRadioButton, ElButton } from 'element-plus'
-import { List, Check, InfoFilled, ShoppingBag, Sunny, Star, Trophy } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox, ElDialog, ElRadioGroup, ElRadio, ElButton } from 'element-plus'
+import { List, Check, InfoFilled, ShoppingBag, Sunny, Star, Trophy, Wallet, Money, ChatLineSquare } from '@element-plus/icons-vue'
+import { toMoney } from '@/utils'
 
 const router = useRouter()
 const loading = ref(false)
 const packages = ref<any[]>([])
 const selectedId = ref<number | null>(null)
 const paying = ref(false)
-const payType = ref<'wechat' | 'alipay'>('wechat')
 const userInfo = ref<any>(null)
+const userBalance = ref(0)
 
 const getToken = (): string => localStorage.getItem('token') || ''
-
-// 剩余分析次数（从用户信息获取）
-const remainingTimes = computed(() => Number(userInfo.value?.analysis_times ?? 0))
 
 // icon 名称 → 组件映射（后端只传 icon 名称，前端解析）
 const iconMap: Record<string, any> = {
@@ -25,15 +23,15 @@ const iconMap: Record<string, any> = {
   ShoppingBag: markRaw(ShoppingBag),
 }
 
-// 从后端加载套餐（不带任何兜底）
+// 剩余分析次数
+const remainingTimes = computed(() => Number(userInfo.value?.analysis_times ?? 0))
+
+// 从后端加载套餐
 const fetchPackages = async () => {
   loading.value = true
   try {
     const res = await fetch('/api/v1/packages', {
-      headers: {
-        'Authorization': `Bearer ${getToken()}`,
-        'Accept': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${getToken()}`, Accept: 'application/json' },
     })
     const data = await res.json()
     if (data.code === 0) {
@@ -50,7 +48,6 @@ const fetchPackages = async () => {
         iconComp: iconMap[p.icon] || iconMap.Star,
         discount: p.discount || 0,
       }))
-      // 默认选中推荐套餐或第一个
       const recommend = packages.value.find(p => p.isRecommend)
       selectedId.value = recommend?.id ?? packages.value[0]?.id ?? null
     } else {
@@ -75,44 +72,140 @@ const getTagStyle = (isRecommend: boolean) => {
 
 const getDiscount = (pkg: any) => pkg.discount || 0
 
-// 购买流程：选择套餐 → 确认支付方式 → 调用后端
+// ===== 支付方式选择弹窗 =====
+const showPayDialog = ref(false)
+let payDialogResolve: ((value: string | null) => void) | null = null
+let currentPkg: any = null
+
+// 支付方式列表（从后端拉取，含余额）
+const paymentMethods = ref<{ code: string; name: string; icon: string; is_enabled: boolean }[]>([])
+const selectedPayType = ref('')
+
+// 拉取支付方式
+const fetchPaymentMethods = async () => {
+  try {
+    const res = await fetch('/api/v1/payment/methods', {
+      headers: { Authorization: `Bearer ${getToken()}`, Accept: 'application/json' },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      paymentMethods.value = data.data?.list || []
+      userBalance.value = Number(data.data?.user_balance ?? 0)
+    }
+  } catch (e) {
+    console.error('拉取支付方式失败', e)
+  }
+}
+
+// 可点击的支付方式（admin 关闭 + 余额不足的不能选）
+const usableMethods = computed(() => {
+  const price = Number(currentPkg?.price ?? 0)
+  return paymentMethods.value.filter((m) => {
+    if (!m.is_enabled) return false
+    if (m.code === 'balance' && userBalance.value < price) return false
+    return true
+  })
+})
+
+const payTypeName = (code: string) =>
+  paymentMethods.value.find((m) => m.code === code)?.name || code
+
+const balanceEnough = (price: number) => userBalance.value >= price
+
+// 打开支付方式选择
+const openPayDialog = (pkg: any): Promise<string | null> => {
+  currentPkg = pkg
+  // 预选第一个可用方式
+  const first = usableMethods.value[0]
+  selectedPayType.value = first?.code || ''
+  showPayDialog.value = true
+  return new Promise((resolve) => {
+    payDialogResolve = resolve
+  })
+}
+
+const confirmPayType = () => {
+  if (!selectedPayType.value) {
+    ElMessage.warning('请选择支付方式')
+    return
+  }
+  showPayDialog.value = false
+  payDialogResolve?.(selectedPayType.value)
+  payDialogResolve = null
+}
+
+const cancelPayType = () => {
+  showPayDialog.value = false
+  payDialogResolve?.(null)
+  payDialogResolve = null
+}
+
+// ===== 购买主流程 =====
 const handlePurchase = async (pkg: any) => {
   if (paying.value) return
 
-  // 1. 先选择支付方式
-  const chosen = await selectPayType().catch(() => null)
+  // 1. 选择支付方式
+  const chosen = await openPayDialog(pkg)
   if (!chosen) return
-  payType.value = chosen
 
-  // 2. 确认订单
+  // 2. 余额支付：直接下单
+  if (chosen === 'balance') {
+    if (!balanceEnough(Number(pkg.price))) {
+      ElMessage.error('余额不足')
+      return
+    }
+    try {
+      paying.value = true
+      const res = await fetch('/api/v1/packages/buy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`,
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ package_id: pkg.id, pay_type: 'balance' }),
+      })
+      const data = await res.json()
+      if (data.code === 0) {
+        // 刷新余额
+        await fetchPaymentMethods()
+        await fetchUserInfo()
+        ElMessage.success(`余额支付成功！购买 ${pkg.count} 次分析`)
+        setTimeout(() => {
+          router.push(`/member/orders?highlight=${data.data.order_no}`)
+        }, 600)
+      } else {
+        ElMessage.error(data.message || '支付失败')
+      }
+    } catch (e: any) {
+      ElMessage.error(e?.message || '支付失败')
+    } finally {
+      paying.value = false
+    }
+    return
+  }
+
+  // 3. 第三方支付：弹确认 → 创建订单 → 走支付参数
   try {
     await ElMessageBox.confirm(
-      `您选择购买：${pkg.name}，金额：¥${pkg.price}，支付方式：${payType.value === 'wechat' ? '微信支付' : '支付宝'}`,
+      `您选择购买：${pkg.name}，金额：¥${toMoney(pkg.price)}，支付方式：${payTypeName(chosen)}`,
       '确认订单',
-      {
-        confirmButtonText: '立即支付',
-        cancelButtonText: '取消',
-        type: 'info',
-      }
+      { confirmButtonText: '立即支付', cancelButtonText: '取消', type: 'info' }
     )
   } catch {
     return
   }
 
-  // 3. 发起支付
   paying.value = true
   try {
     const res = await fetch('/api/v1/packages/buy', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getToken()}`,
-        'Accept': 'application/json',
+        Authorization: `Bearer ${getToken()}`,
+        Accept: 'application/json',
       },
-      body: JSON.stringify({
-        package_id: pkg.id,
-        pay_type: payType.value,
-      }),
+      body: JSON.stringify({ package_id: pkg.id, pay_type: chosen }),
     })
     const data = await res.json()
 
@@ -131,56 +224,27 @@ const handlePurchase = async (pkg: any) => {
   }
 }
 
-const selectPayType = (): Promise<'wechat' | 'alipay' | null> => {
-  return new Promise((resolve) => {
-    payType.value = 'wechat'
-    showPayDialog.value = true
-    payDialogResolve = resolve
-  })
-}
-
-// 支付对话框状态（安全替代 dangerouslyUseHTMLString）
-const showPayDialog = ref(false)
-let payDialogResolve: ((value: 'wechat' | 'alipay' | null) => void) | null = null
-
-const confirmPayType = () => {
-  showPayDialog.value = false
-  if (payDialogResolve) {
-    payDialogResolve(payType.value)
-    payDialogResolve = null
-  }
-}
-
-const cancelPayType = () => {
-  showPayDialog.value = false
-  if (payDialogResolve) {
-    payDialogResolve(null)
-    payDialogResolve = null
+// 拉取用户信息
+const fetchUserInfo = async () => {
+  try {
+    const res = await fetch('/api/v1/user/info', {
+      headers: { Authorization: `Bearer ${getToken()}`, Accept: 'application/json' },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      userInfo.value = data.data
+      userBalance.value = Number(data.data?.balance ?? userBalance.value)
+    }
+  } catch {
+    // 静默失败
   }
 }
 
 onMounted(() => {
   fetchPackages()
   fetchUserInfo()
+  fetchPaymentMethods()
 })
-
-// 获取用户信息（用于显示剩余次数）
-const fetchUserInfo = async () => {
-  try {
-    const res = await fetch('/api/v1/user/info', {
-      headers: {
-        Authorization: `Bearer ${getToken()}`,
-        Accept: 'application/json',
-      },
-    })
-    const data = await res.json()
-    if (data.code === 0) {
-      userInfo.value = data.data
-    }
-  } catch {
-    // 静默失败
-  }
-}
 </script>
 
 <template>
@@ -190,14 +254,17 @@ const fetchUserInfo = async () => {
       <div class="banner-content">
         <div class="banner-icon">🌿</div>
         <div class="banner-text">
-        <h1 class="banner-title">购买次数包</h1>
-        <p class="banner-subtitle">选择适合您的分析套餐，享受智能中医健康服务</p>
-        <div class="banner-times">
-          <span class="times-label">剩余分析次数</span>
-          <span class="times-value">{{ remainingTimes }}</span>
-          <span class="times-unit">次</span>
+          <h1 class="banner-title">购买次数包</h1>
+          <p class="banner-subtitle">选择适合您的分析套餐，享受智能中医健康服务</p>
+          <div class="banner-times">
+            <span class="times-label">剩余分析次数</span>
+            <span class="times-value">{{ remainingTimes }}</span>
+            <span class="times-unit">次</span>
+            <span class="times-divider">·</span>
+            <span class="times-label">余额</span>
+            <span class="times-value">¥{{ toMoney(userBalance) }}</span>
+          </div>
         </div>
-      </div>
       </div>
       <div class="banner-decoration">
         <div class="deco-circle deco-circle-1"></div>
@@ -214,7 +281,6 @@ const fetchUserInfo = async () => {
         :class="{ 'package-card--active': selectedId === pkg.id }"
         @click="selectPackage(pkg.id)"
       >
-        <!-- 标签 -->
         <div
           v-if="pkg.isRecommend"
           class="package-tag"
@@ -222,14 +288,10 @@ const fetchUserInfo = async () => {
         >
           推荐
         </div>
-
-        <!-- 选中标记 -->
         <div class="package-check" v-if="selectedId === pkg.id">
           <el-icon><Check /></el-icon>
         </div>
-
         <div class="package-content">
-          <!-- 左侧信息 -->
           <div class="package-info">
             <div class="package-header">
               <div class="package-icon">
@@ -237,9 +299,7 @@ const fetchUserInfo = async () => {
               </div>
               <div class="package-title">
                 <div class="package-name">{{ pkg.name }}</div>
-                <div class="package-desc">
-                  含 {{ pkg.count }} 次分析 · 永久有效
-                </div>
+                <div class="package-desc">含 {{ pkg.count }} 次分析 · 永久有效</div>
               </div>
             </div>
             <div class="package-count">
@@ -247,8 +307,6 @@ const fetchUserInfo = async () => {
               <span>共 {{ pkg.count }} 次分析机会</span>
             </div>
           </div>
-
-          <!-- 右侧价格 -->
           <div class="package-price">
             <div class="price-row">
               <span class="price-symbol">¥</span>
@@ -258,8 +316,6 @@ const fetchUserInfo = async () => {
             <div v-if="getDiscount(pkg) > 0" class="price-discount">省{{ getDiscount(pkg) }}%</div>
           </div>
         </div>
-
-        <!-- 购买按钮 -->
         <div class="package-footer">
           <el-button
             class="buy-btn"
@@ -273,75 +329,109 @@ const fetchUserInfo = async () => {
           </el-button>
         </div>
       </div>
-
-      <!-- 空状态 -->
-      <el-empty
-        v-if="!loading && packages.length === 0"
-        description="暂无可用套餐"
-      />
+      <el-empty v-if="!loading && packages.length === 0" description="暂无可用套餐" />
     </div>
 
-    <!-- 底部说明卡片 -->
     <div class="info-card">
       <div class="info-header">
         <el-icon class="info-icon"><InfoFilled /></el-icon>
         <span>购买须知</span>
       </div>
       <div class="info-list">
-        <div class="info-item">
-          <span class="info-dot"></span>
-          <span>购买后次数永久有效，不会过期</span>
-        </div>
-        <div class="info-item">
-          <span class="info-dot"></span>
-          <span>可用于舌诊、面诊、体质测试等所有分析服务</span>
-        </div>
-        <div class="info-item">
-          <span class="info-dot"></span>
-          <span>支持多种支付方式，安全便捷</span>
-        </div>
-        <div class="info-item">
-          <span class="info-dot"></span>
-          <span>如有问题，请联系客服获取帮助</span>
-        </div>
+        <div class="info-item"><span class="info-dot"></span><span>购买后次数永久有效，不会过期</span></div>
+        <div class="info-item"><span class="info-dot"></span><span>可用于舌诊、面诊、体质测试等所有分析服务</span></div>
+        <div class="info-item"><span class="info-dot"></span><span>支持余额/微信/支付宝支付，安全便捷</span></div>
+        <div class="info-item"><span class="info-dot"></span><span>如有问题，请联系客服获取帮助</span></div>
       </div>
     </div>
 
-    <!-- 底部安全提示 -->
     <div class="security-tips">
       <span class="shield-icon">🛡️</span>
       <span>支付安全有保障 · 放心购买</span>
     </div>
 
-    <!-- 支付方式选择对话框（安全替代 dangerouslyUseHTMLString） -->
-    <ElDialog v-model="showPayDialog" title="选择支付方式" width="90%" :max-width="400" :close-on-click-modal="false">
-      <div class="pay-options">
-        <label class="pay-option" :class="{ active: payType === 'wechat' }">
-          <ElRadioGroup v-model="payType" style="width: 100%">
-            <ElRadioButton value="wechat">
-              <span class="pay-icon">💚</span>
-              <div class="pay-info">
-                <div class="pay-name">微信支付</div>
-                <div class="pay-desc">推荐使用</div>
-              </div>
-            </ElRadioButton>
-          </ElRadioGroup>
-        </label>
-        <label class="pay-option" :class="{ active: payType === 'alipay' }">
-          <ElRadioGroup v-model="payType" style="width: 100%">
-            <ElRadioButton value="alipay">
-              <span class="pay-icon">💙</span>
-              <div class="pay-info">
-                <div class="pay-name">支付宝</div>
-                <div class="pay-desc">快捷安全</div>
-              </div>
-            </ElRadioButton>
-          </ElRadioGroup>
-        </label>
+    <!-- 支付方式选择对话框（修复：单 RadioGroup + 后端拉取） -->
+    <ElDialog
+      v-model="showPayDialog"
+      title="选择支付方式"
+      width="90%"
+      :max-width="420"
+      :close-on-click-modal="false"
+      @close="cancelPayType"
+    >
+      <div v-if="currentPkg" class="pay-summary">
+        <div class="summary-label">订单金额</div>
+        <div class="summary-amount">¥{{ toMoney(currentPkg.price) }}</div>
+        <div class="summary-desc">{{ currentPkg.name }} · {{ currentPkg.count }} 次</div>
       </div>
+
+      <ElRadioGroup v-model="selectedPayType" class="pay-options">
+        <template v-for="m in paymentMethods" :key="m.code">
+          <!-- 余额选项 -->
+          <div
+            v-if="m.code === 'balance'"
+            class="pay-option"
+            :class="{
+              active: selectedPayType === m.code,
+              disabled: !m.is_enabled || !balanceEnough(Number(currentPkg?.price ?? 0))
+            }"
+            @click="(m.is_enabled && balanceEnough(Number(currentPkg?.price ?? 0))) && (selectedPayType = m.code)"
+          >
+            <ElRadio :value="m.code" :disabled="!m.is_enabled || !balanceEnough(Number(currentPkg?.price ?? 0))">
+              <div class="pay-option-content">
+                <div class="pay-icon-box pay-icon-balance">💰</div>
+                <div class="pay-info">
+                  <div class="pay-name-row">
+                    <span class="pay-name">{{ m.name }}</span>
+                    <span class="pay-tag pay-tag-success" v-if="balanceEnough(Number(currentPkg?.price ?? 0))">推荐</span>
+                  </div>
+                  <div class="pay-desc">
+                    当前余额：<span class="balance-num">¥{{ toMoney(userBalance) }}</span>
+                    <span v-if="!balanceEnough(Number(currentPkg?.price ?? 0))" class="pay-tag-warn">
+                      余额不足
+                    </span>
+                  </div>
+                </div>
+                <el-icon class="pay-check"><Check /></el-icon>
+              </div>
+            </ElRadio>
+          </div>
+          <!-- 微信/支付宝选项 -->
+          <div
+            v-else
+            class="pay-option"
+            :class="{ active: selectedPayType === m.code, disabled: !m.is_enabled }"
+            @click="m.is_enabled && (selectedPayType = m.code)"
+          >
+            <ElRadio :value="m.code" :disabled="!m.is_enabled">
+              <div class="pay-option-content">
+                <div class="pay-icon-box" :class="m.code === 'wechat' ? 'pay-icon-wechat' : 'pay-icon-alipay'">
+                  {{ m.icon }}
+                </div>
+                <div class="pay-info">
+                  <div class="pay-name-row">
+                    <span class="pay-name">{{ m.name }}</span>
+                    <span v-if="!m.is_enabled" class="pay-tag-disabled">已关闭</span>
+                  </div>
+                  <div class="pay-desc">
+                    <span v-if="m.code === 'wechat'">推荐使用微信支付</span>
+                    <span v-else>安全快捷</span>
+                  </div>
+                </div>
+                <el-icon class="pay-check"><Check /></el-icon>
+              </div>
+            </ElRadio>
+          </div>
+        </template>
+      </ElRadioGroup>
+
+      <div v-if="usableMethods.length === 0" class="pay-empty">
+        暂无可用支付方式，请联系客服
+      </div>
+
       <template #footer>
         <ElButton @click="cancelPayType">取消</ElButton>
-        <ElButton type="primary" @click="confirmPayType">下一步</ElButton>
+        <ElButton type="primary" :loading="paying" @click="confirmPayType">确认支付</ElButton>
       </template>
     </ElDialog>
   </div>
@@ -365,396 +455,204 @@ const fetchUserInfo = async () => {
   position: relative;
   overflow: hidden;
 }
-
-.banner-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  position: relative;
-  z-index: 1;
-}
-
-.banner-icon {
-  font-size: 48px;
-  flex-shrink: 0;
-}
-
-.banner-text {
-  flex: 1;
-}
-
-.banner-title {
-  font-size: 22px;
-  font-weight: 700;
-  margin: 0 0 6px;
-  letter-spacing: 1px;
-}
-
-.banner-subtitle {
-  font-size: 13px;
-  opacity: 0.9;
-  margin: 0;
-  line-height: 1.5;
-}
-
+.banner-content { display: flex; align-items: center; gap: 16px; position: relative; z-index: 1; }
+.banner-icon { font-size: 48px; flex-shrink: 0; }
+.banner-text { flex: 1; }
+.banner-title { font-size: 22px; font-weight: 700; margin: 0 0 6px; letter-spacing: 1px; }
+.banner-subtitle { font-size: 13px; opacity: 0.9; margin: 0; line-height: 1.5; }
 .banner-times {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-top: 10px;
-  padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
-  width: fit-content;
-  backdrop-filter: blur(4px);
+  display: flex; align-items: baseline; gap: 6px; margin-top: 10px;
+  padding: 6px 14px; background: rgba(255, 255, 255, 0.2);
+  border-radius: 20px; width: fit-content; backdrop-filter: blur(4px); flex-wrap: wrap;
 }
+.times-label { font-size: 12px; opacity: 0.85; }
+.times-value { font-size: 24px; font-weight: 700; line-height: 1; }
+.times-unit { font-size: 12px; opacity: 0.85; }
+.times-divider { font-size: 14px; opacity: 0.6; margin: 0 2px; }
 
-.times-label {
-  font-size: 12px;
-  opacity: 0.85;
+/* 支付弹窗 */
+.pay-summary {
+  text-align: center;
+  padding: 12px 0 16px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 12px;
 }
+.summary-label { font-size: 12px; color: #909399; margin-bottom: 4px; }
+.summary-amount { font-size: 28px; font-weight: 700; color: #ee0a24; }
+.summary-desc { font-size: 12px; color: #969799; margin-top: 4px; }
 
-/* 支付对话框样式 */
 .pay-options {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 8px 0;
+  gap: 10px;
+  width: 100%;
 }
 
 .pay-option {
-  display: flex;
+  display: block;
   padding: 14px;
   border: 2px solid #e9ecef;
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s;
+  background: #fff;
 }
-
 .pay-option.active {
   border-color: #07c160;
   background: #f6ffed;
 }
-
-.pay-option .el-radio-button__inner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 0;
-  border: none;
-  background: transparent;
-  box-shadow: none;
+.pay-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f5f5f5;
 }
 
-.pay-icon {
-  font-size: 28px;
-}
-
-.pay-info {
-  text-align: left;
-}
-
-.pay-name {
-  font-weight: 600;
-  font-size: 15px;
-}
-
-.pay-desc {
-  font-size: 12px;
-  color: #999;
-}
-
-.times-value {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.times-unit {
-  font-size: 12px;
-  opacity: 0.85;
-}
-
-.banner-decoration {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.deco-circle {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.deco-circle-1 {
-  width: 100px;
-  height: 100px;
-  top: -30px;
-  right: -20px;
-}
-
-.deco-circle-2 {
-  width: 60px;
-  height: 60px;
-  bottom: -15px;
-  right: 40px;
-}
-
-/* 套餐列表 */
-.package-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-bottom: 20px;
-}
-
-.package-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 18px;
-  position: relative;
-  border: 2px solid transparent;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-  transition: all 0.3s ease;
-  overflow: hidden;
-}
-
-.package-card:active {
-  transform: scale(0.98);
-}
-
-.package-card--active {
-  border-color: #07c160;
-  box-shadow: 0 4px 20px rgba(7, 193, 96, 0.15);
-}
-
-/* 标签 */
-.package-tag {
-  position: absolute;
-  top: 0;
-  right: 0;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-bottom-left-radius: 12px;
-  color: #fff;
-  letter-spacing: 0.5px;
-}
-
-/* 选中标记 */
-.package-check {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #07c160;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  box-shadow: 0 2px 8px rgba(7, 193, 96, 0.3);
-}
-
-/* 套餐内容 */
-.package-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.package-info {
-  flex: 1;
-  margin-right: 16px;
-}
-
-.package-header {
+.pay-option-content {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
+  width: 100%;
 }
 
-.package-icon {
+.pay-option :deep(.el-radio) {
+  width: 100%;
+  margin-right: 0;
+}
+.pay-option :deep(.el-radio__label) {
+  flex: 1;
+  padding-left: 8px;
+}
+
+.pay-icon-box {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #e8f7ef 0%, #d4f0e0 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 22px;
-  color: #07c160;
   flex-shrink: 0;
 }
-
-.package-title {
-  flex: 1;
-}
-
-.package-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: #323233;
-  margin-bottom: 4px;
-}
-
-.package-desc {
-  font-size: 12px;
-  color: #969799;
-  line-height: 1.4;
-}
-
-.package-count {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #646566;
-  padding: 8px 12px;
-  background: #f7f8fa;
-  border-radius: 8px;
-  width: fit-content;
-}
-
-.count-icon {
-  color: #07c160;
-  font-size: 14px;
-}
-
-/* 价格区域 */
-.package-price {
-  text-align: right;
-  flex-shrink: 0;
-}
-
-.price-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-}
-
-.price-symbol {
-  font-size: 16px;
-  font-weight: 600;
-  color: #ee0a24;
-}
-
-.price-value {
-  font-size: 32px;
-  font-weight: 700;
-  color: #ee0a24;
-  line-height: 1;
-}
-
-.price-original {
-  font-size: 12px;
-  color: #c8c9cc;
-  text-decoration: line-through;
-  margin-top: 2px;
-}
-
-.price-discount {
-  display: inline-block;
-  font-size: 11px;
-  color: #ee0a24;
-  background: #fef0f0;
-  padding: 2px 8px;
-  border-radius: 10px;
-  margin-top: 4px;
-  font-weight: 500;
-}
-
-/* 购买按钮 */
-.package-footer {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.buy-btn {
-  min-width: 120px;
-  height: 38px;
-  font-weight: 500;
-}
-
-.buy-btn.el-button--primary {
+.pay-icon-balance {
   background: linear-gradient(135deg, #07c160 0%, #04a152 100%);
-  border: none;
+  color: #fff;
+}
+.pay-icon-wechat {
+  background: linear-gradient(135deg, #07c160 0%, #04a152 100%);
+  color: #fff;
+}
+.pay-icon-alipay {
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+  color: #fff;
 }
 
-.buy-btn.el-button--primary:hover {
-  box-shadow: 0 4px 12px rgba(7, 193, 96, 0.3);
-}
-
-/* 信息卡片 */
-.info-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 18px;
-  margin-bottom: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-}
-
-.info-header {
+.pay-info { flex: 1; min-width: 0; }
+.pay-name-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #323233;
-  margin-bottom: 14px;
+  gap: 6px;
+  margin-bottom: 2px;
 }
+.pay-name { font-weight: 600; font-size: 15px; color: #323233; }
+.pay-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+.pay-tag-success { background: #e8f7ef; color: #07c160; }
+.pay-tag-warn { background: #fef0f0; color: #ee0a24; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; }
+.pay-tag-disabled { background: #f0f0f0; color: #969799; font-size: 10px; padding: 1px 6px; border-radius: 8px; }
+.pay-desc { font-size: 12px; color: #646566; }
+.balance-num { color: #07c160; font-weight: 600; }
 
-.info-icon {
-  color: #07c160;
+.pay-check {
+  color: #c8c9cc;
   font-size: 18px;
-}
-
-.info-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.info-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 13px;
-  color: #646566;
-  line-height: 1.5;
-}
-
-.info-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #07c160;
-  margin-top: 6px;
   flex-shrink: 0;
 }
+.pay-option.active .pay-check { color: #07c160; }
 
-/* 安全提示 */
-.security-tips {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 12px;
+.pay-empty {
+  text-align: center;
+  padding: 20px;
   color: #969799;
-  padding: 12px;
+  font-size: 13px;
 }
 
-.shield-icon {
-  font-size: 14px;
+/* 套餐列表 */
+.package-list { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+.package-card {
+  background: #fff; border-radius: 16px; padding: 18px;
+  position: relative; border: 2px solid transparent;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease; overflow: hidden;
 }
+.package-card:active { transform: scale(0.98); }
+.package-card--active { border-color: #07c160; box-shadow: 0 4px 20px rgba(7, 193, 96, 0.15); }
+
+.package-tag {
+  position: absolute; top: 0; right: 0; font-size: 11px; font-weight: 600;
+  padding: 4px 12px; border-bottom-left-radius: 12px; color: #fff; letter-spacing: 0.5px;
+}
+.package-check {
+  position: absolute; top: 14px; left: 14px; width: 24px; height: 24px;
+  border-radius: 50%; background: #07c160; color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+  box-shadow: 0 2px 8px rgba(7, 193, 96, 0.3);
+}
+.package-content { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.package-info { flex: 1; margin-right: 16px; }
+.package-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.package-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: linear-gradient(135deg, #e8f7ef 0%, #d4f0e0 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: #07c160; flex-shrink: 0;
+}
+.package-title { flex: 1; }
+.package-name { font-size: 18px; font-weight: 700; color: #323233; margin-bottom: 4px; }
+.package-desc { font-size: 12px; color: #969799; line-height: 1.4; }
+.package-count {
+  display: flex; align-items: center; gap: 6px; font-size: 13px; color: #646566;
+  padding: 8px 12px; background: #f7f8fa; border-radius: 8px; width: fit-content;
+}
+.count-icon { color: #07c160; font-size: 14px; }
+
+.package-price { text-align: right; flex-shrink: 0; }
+.price-row { display: flex; align-items: baseline; justify-content: flex-end; }
+.price-symbol { font-size: 16px; font-weight: 600; color: #ee0a24; }
+.price-value { font-size: 32px; font-weight: 700; color: #ee0a24; line-height: 1; }
+.price-original { font-size: 12px; color: #c8c9cc; text-decoration: line-through; margin-top: 2px; }
+.price-discount {
+  display: inline-block; font-size: 11px; color: #ee0a24; background: #fef0f0;
+  padding: 2px 8px; border-radius: 10px; margin-top: 4px; font-weight: 500;
+}
+
+.package-footer { display: flex; justify-content: flex-end; }
+.buy-btn { min-width: 120px; height: 38px; font-weight: 500; }
+.buy-btn.el-button--primary { background: linear-gradient(135deg, #07c160 0%, #04a152 100%); border: none; }
+.buy-btn.el-button--primary:hover { box-shadow: 0 4px 12px rgba(7, 193, 96, 0.3); }
+
+.info-card {
+  background: #fff; border-radius: 16px; padding: 18px;
+  margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+.info-header { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #323233; margin-bottom: 14px; }
+.info-icon { color: #07c160; font-size: 18px; }
+.info-list { display: flex; flex-direction: column; gap: 10px; }
+.info-item { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #646566; line-height: 1.5; }
+.info-dot { width: 6px; height: 6px; border-radius: 50%; background: #07c160; margin-top: 6px; flex-shrink: 0; }
+
+.security-tips {
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; font-size: 12px; color: #969799; padding: 12px;
+}
+.shield-icon { font-size: 14px; }
+
+/* 横幅装饰 */
+.banner-decoration { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; }
+.deco-circle { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.1); }
+.deco-circle-1 { width: 100px; height: 100px; top: -30px; right: -20px; }
+.deco-circle-2 { width: 60px; height: 60px; bottom: -15px; right: 40px; }
 </style>

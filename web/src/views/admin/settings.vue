@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Connection, Setting, Money, Promotion, Cpu, ChatDotRound, Message, Wallet } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Connection, Setting, Money, Promotion, Cpu, ChatDotRound, Message, Wallet, Switch } from '@element-plus/icons-vue'
 
 const form = ref({
   // 基本设置
@@ -12,6 +12,8 @@ const form = ref({
   analysisMode: 'paid',
   analysisPrice: 9.99,
   aiCostPerTime: 0.05,
+  // 新用户注册赠送
+  freeAnalysisTimes: 3,
   // 推广返利设置
   commissionRate: 15,
   commissionMinAmount: 1,
@@ -43,6 +45,70 @@ const form = ref({
 const loading = ref(false)
 const testingLlm = ref(false)
 const activeTab = ref('basic')
+
+// 支付方式开关状态
+const paymentLoading = ref(false)
+const savingPayment = ref(false)
+const paymentConfig = ref({
+  balance: { name: '余额支付', enabled: true },
+  wechat: { name: '微信支付', enabled: true },
+  alipay: { name: '支付宝', enabled: true },
+})
+
+const loadPaymentConfig = async () => {
+  paymentLoading.value = true
+  try {
+    const res = await fetch('/api/v1/admin/config/payment', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}`, Accept: 'application/json' },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      paymentConfig.value = data.data
+    }
+  } catch {
+    // 静默
+  } finally {
+    paymentLoading.value = false
+  }
+}
+
+const togglePayment = async (type: 'balance' | 'wechat' | 'alipay') => {
+  const target = paymentConfig.value[type]
+  const newVal = !target.enabled
+  const action = newVal ? '开启' : '关闭'
+  try {
+    await ElMessageBox.confirm(
+      `确认要「${action}」${target.name}吗？`,
+      `${action}支付方式`,
+      { type: newVal ? 'success' : 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  savingPayment.value = true
+  try {
+    const res = await fetch('/api/v1/admin/config/payment-toggle', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('admin_token')}`,
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ type, enabled: newVal ? 1 : 0 }),
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      paymentConfig.value = data.data
+      ElMessage.success(data.message || '已保存')
+    } else {
+      ElMessage.error(data.message || '操作失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '操作失败')
+  } finally {
+    savingPayment.value = false
+  }
+}
 
 // 测试大模型连接
 const testLlmConnection = async () => {
@@ -88,6 +154,7 @@ const loadConfigs = async () => {
             analysis_mode: 'analysisMode',
             analysis_price: 'analysisPrice',
             ai_cost_per_time: 'aiCostPerTime',
+            user_free_analysis_times: 'freeAnalysisTimes',
             commission_rate: 'commissionRate',
             commission_min_amount: 'commissionMinAmount',
             commission_settle_days: 'commissionSettleDays',
@@ -133,6 +200,7 @@ const handleSave = async () => {
       analysis_mode: form.value.analysisMode,
       analysis_price: form.value.analysisPrice,
       ai_cost_per_time: form.value.aiCostPerTime,
+      user_free_analysis_times: form.value.freeAnalysisTimes,
       commission_rate: form.value.commissionRate,
       commission_min_amount: form.value.commissionMinAmount,
       commission_settle_days: form.value.commissionSettleDays,
@@ -179,6 +247,7 @@ const handleSave = async () => {
 
 onMounted(() => {
   loadConfigs()
+  loadPaymentConfig()
 })
 </script>
 
@@ -232,9 +301,62 @@ onMounted(() => {
             <span class="form-unit">元</span>
             <span class="form-tip">用户单次AI分析收费</span>
           </el-form-item>
-          <el-form-item label="AI分析成本">
-            <el-input-number v-model="form.aiCostPerTime" :min="0" :precision="2" style="width: 200px" />
-            <span class="form-unit">元/次</span>
+          <el-form-item label="新用户注册赠送">
+            <el-input-number v-model="form.freeAnalysisTimes" :min="0" :max="1000" style="width: 200px" />
+            <span class="form-unit">次</span>
+            <span class="form-tip">每个新注册用户自动获得的免费分析次数（0 = 不赠送）</span>
+          </el-form-item>
+        </el-form>
+      </el-tab-pane>
+
+      <!-- 支付方式开关 -->
+      <el-tab-pane label="支付方式" name="payment">
+        <template #label>
+          <span class="tab-label">
+            <el-icon><Switch /></el-icon>
+            <span>支付方式</span>
+          </span>
+        </template>
+        <el-form :model="paymentConfig" label-width="160px" class="settings-form" v-loading="paymentLoading">
+          <el-alert
+            type="info"
+            show-icon
+            :closable="false"
+            title="关闭后，前台用户购买套餐时将看不到对应支付方式。已创建的待支付订单仍可使用其他方式继续支付。"
+            style="margin-bottom: 20px"
+          />
+          <el-form-item label="余额支付">
+            <el-switch
+              :model-value="paymentConfig.balance.enabled"
+              :loading="savingPayment"
+              inline-prompt
+              active-text="开"
+              inactive-text="关"
+              @click="togglePayment('balance')"
+            />
+            <span class="form-tip">使用用户账户余额支付（推荐开启）</span>
+          </el-form-item>
+          <el-form-item label="微信支付">
+            <el-switch
+              :model-value="paymentConfig.wechat.enabled"
+              :loading="savingPayment"
+              inline-prompt
+              active-text="开"
+              inactive-text="关"
+              @click="togglePayment('wechat')"
+            />
+            <span class="form-tip">需先在上方"微信配置"中填写 AppID / 商户号 / 密钥</span>
+          </el-form-item>
+          <el-form-item label="支付宝">
+            <el-switch
+              :model-value="paymentConfig.alipay.enabled"
+              :loading="savingPayment"
+              inline-prompt
+              active-text="开"
+              inactive-text="关"
+              @click="togglePayment('alipay')"
+            />
+            <span class="form-tip">需先在上方"支付宝配置"中填写 AppID / 私钥 / 公钥</span>
           </el-form-item>
         </el-form>
       </el-tab-pane>

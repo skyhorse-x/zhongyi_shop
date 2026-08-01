@@ -91,6 +91,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
         // 支付
         Route::prefix('payment')->group(function () {
             Route::post('create', [V1\PaymentController::class, 'create']);
+            Route::get('methods', [V1\PaymentController::class, 'methods']);
             Route::get('order/{orderNo}', [V1\PaymentController::class, 'status']);
         });
 
@@ -117,12 +118,22 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
         Route::middleware('admin')->prefix('admin')->group(function () {
             Route::get('dashboard', [V1\AdminController::class, 'dashboard']);
 
+            // 系统配置
+            Route::prefix('config')->group(function () {
+                Route::get('payment', [V1\ConfigController::class, 'paymentConfig']);
+                Route::post('payment-toggle', [V1\ConfigController::class, 'togglePayment']);
+            });
+
             // 用户管理
             Route::get('users', [V1\AdminController::class, 'users']);
             Route::get('users/{id}', [V1\AdminController::class, 'userDetail']);
             Route::put('users/{id}', [V1\AdminController::class, 'userUpdate']);
             Route::put('users/{id}/status', [V1\AdminController::class, 'userToggleStatus']);
             Route::post('users/{id}/reset-password', [V1\AdminController::class, 'userResetPassword']);
+
+            // 用户余额：充值 / 扣减 + 流水
+            Route::post('users/{id}/balance', [V1\AdminController::class, 'userAdjustBalance']);
+            Route::get('users/{id}/balance-logs', [V1\AdminController::class, 'userBalanceLogs']);
 
             // 管理员管理（需超级管理员权限）
             Route::middleware('super_admin')->group(function () {

@@ -15,10 +15,16 @@ class UserController extends Controller
         $user = $request->user();
         $user->load(['profile', 'promoter']);
 
+        // 是否享受过注册赠送（用于前端展示"新人礼"标签）
+        $grantedTimes = (int) \App\Models\SystemConfig::getValue('user_free_analysis_times', 3);
+
         return response()->json([
             'code' => 0,
             'message' => 'success',
-            'data' => $user,
+            'data' => array_merge($user->toArray(), [
+                'is_new_user_gift' => (bool) $user->user_registered_granted && (int) $user->analysis_times > 0,
+                'gift_times'      => $user->user_registered_granted ? $grantedTimes : 0,
+            ]),
         ]);
     }
 
