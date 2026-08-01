@@ -10,32 +10,23 @@ use Illuminate\Support\Facades\Log;
 class AiService
 {
     /**
-     * DeepSeek API 配置
-     */
-    protected array $deepseekConfig;
-
-    /**
-     * 豆包 API 配置
-     */
-    protected array $doubaoConfig;
-
-    /**
      * 默认超时时间（秒）
      */
     protected int $timeout = 60;
 
+    /**
+     * 默认 API 地址
+     */
+    protected array $defaultApiUrls = [
+        'deepseek' => 'https://api.deepseek.com/v1/chat/completions',
+        'doubao' => 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+        'openai' => 'https://api.openai.com/v1/chat/completions',
+        'anthropic' => 'https://api.anthropic.com/v1/messages',
+    ];
+
     public function __construct()
     {
-        // AI 配置从后台「系统设置」中读取，键：ai_deepseek_api_key, ai_doubao_api_key
-        $this->deepseekConfig = [
-            'api_key' => \App\Models\SystemConfig::where('key', 'ai_deepseek_api_key')->value('value') ?: '',
-            'api_url' => 'https://api.deepseek.com/v1/chat/completions',
-        ];
-
-        $this->doubaoConfig = [
-            'api_key' => \App\Models\SystemConfig::where('key', 'ai_doubao_api_key')->value('value') ?: '',
-            'api_url' => 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-        ];
+        // 所有配置均从 ai_models 表读取，不再使用环境变量或 system_configs
     }
 
     /**
@@ -246,9 +237,9 @@ class AiService
                 'temperature' => 0.5,
             ];
 
-            // 优先使用专属模型配置，否则按类型选用 DeepSeek
-            $apiUrl = $model?->api_url ?? $this->deepseekConfig['api_url'];
-            $apiKey = $model?->api_key ?? $this->deepseekConfig['api_key'];
+            // 仅从 ai_models 表读取配置，不再使用环境变量
+            $apiUrl = $model?->api_url ?? $this->defaultApiUrls[$model?->provider ?? 'deepseek'];
+            $apiKey = $model?->api_key;
 
             if (empty($apiKey)) {
                 throw new \Exception('AI 模型未配置 API Key，请在管理后台 [AI 管理] 中配置有效的 API Key');
@@ -327,8 +318,9 @@ class AiService
                 'temperature' => 0.3,
             ];
 
-            $apiUrl = $model?->api_url ?? $this->doubaoConfig['api_url'];
-            $apiKey = $model?->api_key ?? $this->doubaoConfig['api_key'];
+            // 仅从 ai_models 表读取配置，不再使用环境变量
+            $apiUrl = $model?->api_url ?? $this->defaultApiUrls[$model?->provider ?? 'doubao'];
+            $apiKey = $model?->api_key;
 
             if (empty($apiKey)) {
                 throw new \Exception('视觉分析模型未配置 API Key，请在管理后台 [AI 管理] 中配置有效的 API Key');
@@ -388,8 +380,9 @@ class AiService
                 'temperature' => 0.7,
             ];
 
-            $apiUrl = $model?->api_url ?? $this->deepseekConfig['api_url'];
-            $apiKey = $model?->api_key ?? $this->deepseekConfig['api_key'];
+            // 仅从 ai_models 表读取配置，不再使用环境变量
+            $apiUrl = $model?->api_url ?? $this->defaultApiUrls[$model?->provider ?? 'deepseek'];
+            $apiKey = $model?->api_key;
 
             if (empty($apiKey)) {
                 throw new \Exception('AI 对话模型未配置 API Key，请在管理后台 [AI 管理] 中配置有效的 API Key');

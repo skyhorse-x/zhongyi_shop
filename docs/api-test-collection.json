@@ -1,0 +1,889 @@
+{
+  "info": {
+    "name": "中医商城 - 全量 API 测试",
+    "description": "覆盖所有模块的端到端 API 测试集合",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://zhongyi.qilewl.net" },
+    { "key": "token", "value": "" },
+    { "key": "admin_token", "value": "" },
+    { "key": "user_id", "value": "" },
+    { "key": "order_no", "value": "" },
+    { "key": "task_no", "value": "" },
+    { "key": "session_no", "value": "" },
+    { "key": "package_id", "value": "" },
+    { "key": "invite_code", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. 用户认证",
+      "item": [
+        {
+          "name": "1.1 用户注册（账号）",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"account\",\n  \"account\": \"testuser_{{timestamp}}\",\n  \"password\": \"123456\",\n  \"password_confirmation\": \"123456\",\n  \"invite_code\": \"{{invite_code}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('注册成功', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  var data = pm.response.json();",
+                  "  pm.expect(data.code).to.eql(0);",
+                  "  pm.expect(data.data.token).to.not.be.empty;",
+                  "  pm.environment.set('token', data.data.token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2 用户注册（手机号）",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"mobile\",\n  \"mobile\": \"1380000{{randomInt}}\",\n  \"sms_code\": \"123456\",\n  \"password\": \"123456\",\n  \"password_confirmation\": \"123456\"\n}"
+            }
+          }
+        },
+        {
+          "name": "1.3 发送短信验证码",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/sms-code",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"13800000000\",\n  \"type\": \"register\"\n}"
+            }
+          }
+        },
+        {
+          "name": "1.4 用户登录",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account\": \"testuser\",\n  \"password\": \"123456\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('登录成功', function() {",
+                  "  var data = pm.response.json();",
+                  "  if (data.code === 0) {",
+                  "    pm.environment.set('token', data.data.token);",
+                  "    pm.environment.set('user_id', data.data.user.id);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.5 获取用户信息",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/user/info"
+          }
+        },
+        {
+          "name": "1.6 退出登录",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/user/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. AI 智能分析",
+      "item": [
+        {
+          "name": "2.1 获取分析配置",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/analysis/config"
+          }
+        },
+        {
+          "name": "2.2 上传图片",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/analysis/upload-image",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "image", "type": "file", "src": "/path/to/test.jpg" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.3 提交舌诊（文字）",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/analysis/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"tongue\",\n  \"text\": \"舌质红，苔黄腻，有齿痕\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.code === 0) {",
+                  "  pm.environment.set('task_no', data.data.task_no);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.4 查询分析状态",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/analysis/status/{{task_no}}"
+          }
+        },
+        {
+          "name": "2.5 获取分析报告",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/analysis/report/{{task_no}}"
+          }
+        },
+        {
+          "name": "2.6 分析历史",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/analysis/history?page=1&limit=10"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. 体质测试",
+      "item": [
+        {
+          "name": "3.1 获取体质题目",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/constitution/questions"
+          }
+        },
+        {
+          "name": "3.2 提交体质测试",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/constitution/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": {\n    \"1\": 3,\n    \"2\": 2,\n    \"3\": 4\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "3.3 获取体质报告",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/constitution/report/{{task_no}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. 健康问答",
+      "item": [
+        {
+          "name": "4.1 创建问答会话",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/qa/sessions",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.code === 0) {",
+                  "  pm.environment.set('session_no', data.data.session_no);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.2 获取会话列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/qa/sessions?page=1&limit=10"
+          }
+        },
+        {
+          "name": "4.3 发送消息",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/qa/sessions/{{session_no}}/messages",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"我最近总是失眠，是什么原因？\"\n}"
+            }
+          }
+        },
+        {
+          "name": "4.4 获取消息列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/qa/sessions/{{session_no}}/messages?page=1&limit=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. 次数包与购买",
+      "item": [
+        {
+          "name": "5.1 获取次数包列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/packages"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.code === 0 && data.data.length > 0) {",
+                  "  pm.environment.set('package_id', data.data[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.2 获取支付方式",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/payment/methods"
+          }
+        },
+        {
+          "name": "5.3 购买次数包（余额支付）",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/packages/buy",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"package_id\": {{package_id}},\n  \"pay_type\": \"balance\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.code === 0) {",
+                  "  pm.environment.set('order_no', data.data.order_no);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.4 购买次数包（微信支付）",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/packages/buy",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"package_id\": {{package_id}},\n  \"pay_type\": \"wechat\"\n}"
+            }
+          }
+        },
+        {
+          "name": "5.5 查询订单状态",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/payment/order/{{order_no}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. 用户中心",
+      "item": [
+        {
+          "name": "6.1 我的订单",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/user/orders?page=1&limit=10"
+          }
+        },
+        {
+          "name": "6.2 取消订单",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/user/orders/{{order_no}}/cancel"
+          }
+        },
+        {
+          "name": "6.3 余额明细",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/user/balance-logs?page=1&limit=10"
+          }
+        },
+        {
+          "name": "6.4 健康档案（分析历史）",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/health/history?page=1&limit=10"
+          }
+        },
+        {
+          "name": "6.5 健康趋势",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/health/trend?days=30"
+          }
+        },
+        {
+          "name": "6.6 体质档案",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/health/constitution"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. 推广分销",
+      "item": [
+        {
+          "name": "7.1 开通推广员",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/promoter/activate"
+          }
+        },
+        {
+          "name": "7.2 推广员信息",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/promoter/info"
+          }
+        },
+        {
+          "name": "7.3 推广海报",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/promoter/poster"
+          }
+        },
+        {
+          "name": "7.4 佣金明细",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/promoter/commissions?page=1&limit=10"
+          }
+        },
+        {
+          "name": "7.5 申请提现",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/promoter/withdraw",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 10\n}"
+            }
+          }
+        },
+        {
+          "name": "7.6 提现记录",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/promoter/withdraw-history?page=1&limit=10"
+          }
+        },
+        {
+          "name": "7.7 邀请记录",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/promoter/invite-records?page=1&limit=10"
+          }
+        },
+        {
+          "name": "7.8 点击上报",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/promoter/track-click",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{invite_code}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. 管理后台 - 认证",
+      "item": [
+        {
+          "name": "8.1 管理员登录",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/admin/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.code === 0) {",
+                  "  pm.environment.set('admin_token', data.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8.2 管理员信息",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/auth/info"
+          }
+        },
+        {
+          "name": "8.3 仪表盘",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/dashboard"
+          }
+        },
+        {
+          "name": "8.4 邀请播报",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/invite-marquee"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. 管理后台 - 用户管理",
+      "item": [
+        {
+          "name": "9.1 用户列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/users?page=1&per_page=10"
+          }
+        },
+        {
+          "name": "9.2 用户详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/users/{{user_id}}"
+          }
+        },
+        {
+          "name": "9.3 余额充值",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/users/{{user_id}}/balance",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"recharge\",\n  \"amount\": 100,\n  \"remark\": \"测试充值\"\n}"
+            }
+          }
+        },
+        {
+          "name": "9.4 余额流水",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/users/{{user_id}}/balance-logs?page=1&limit=10"
+          }
+        },
+        {
+          "name": "9.5 重置密码",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/users/{{user_id}}/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"newpassword123\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. 管理后台 - 推广管理",
+      "item": [
+        {
+          "name": "10.1 推广员列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/promoters?page=1&limit=10"
+          }
+        },
+        {
+          "name": "10.2 推广员详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/promoters/1"
+          }
+        },
+        {
+          "name": "10.3 邀请记录",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/promoters/invite-records?page=1&limit=10"
+          }
+        },
+        {
+          "name": "10.4 封禁推广员",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/promoters/1/ban"
+          }
+        },
+        {
+          "name": "10.5 解封推广员",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/promoters/1/unban"
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. 管理后台 - 订单与提现",
+      "item": [
+        {
+          "name": "11.1 订单列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/orders?page=1&limit=10"
+          }
+        },
+        {
+          "name": "11.2 提现列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/withdraws?page=1&limit=10"
+          }
+        },
+        {
+          "name": "11.3 审核提现（通过）",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/withdraws/1/audit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 1\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. 管理后台 - 系统配置",
+      "item": [
+        {
+          "name": "12.1 支付方式配置",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/config/payment"
+          }
+        },
+        {
+          "name": "12.2 切换支付开关",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/config/payment-toggle",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"payment_wechat_enabled\",\n  \"value\": \"0\"\n}"
+            }
+          }
+        },
+        {
+          "name": "12.3 次数包列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/packages?page=1&limit=10"
+          }
+        },
+        {
+          "name": "12.4 AI模型列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/ai/models?page=1&limit=10"
+          }
+        },
+        {
+          "name": "12.5 测试LLM连接",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/api/v1/admin/test-llm",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model_id\": 1\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. 文章模块",
+      "item": [
+        {
+          "name": "13.1 文章列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/articles?page=1&limit=10"
+          }
+        },
+        {
+          "name": "13.2 文章详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/articles/1"
+          }
+        }
+      ]
+    }
+  ]
+}

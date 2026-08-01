@@ -5,13 +5,17 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 interface AiModel {
   id: number
   name: string
-  status: number
-  cost_per_call: number
-  timeout: number
-  retry_count: number
+  provider: string
+  model: string
   api_url?: string
   api_key?: string
-  model_name?: string
+  type?: string
+  analysis_type?: string
+  tokens_price?: number
+  timeout?: number
+  retry_times?: number
+  is_enabled?: number
+  sort_order?: number
 }
 
 interface CallRecord {
@@ -152,13 +156,17 @@ const editDialogVisible = ref(false)
 const editForm = ref<AiModel>({
   id: 0,
   name: '',
-  status: 1,
-  cost_per_call: 0.05,
-  timeout: 30,
-  retry_count: 3,
+  provider: 'deepseek',
+  model: '',
   api_url: '',
   api_key: '',
-  model_name: '',
+  type: 'chat',
+  analysis_type: 'qa',
+  tokens_price: 0.05,
+  timeout: 30,
+  retry_times: 3,
+  is_enabled: 1,
+  sort_order: 0,
 })
 
 const handleEdit = (model: AiModel) => {
@@ -170,13 +178,17 @@ const handleAdd = () => {
   editForm.value = {
     id: 0,
     name: '',
-    status: 1,
-    cost_per_call: 0.05,
-    timeout: 30,
-    retry_count: 3,
+    provider: 'deepseek',
+    model: '',
     api_url: '',
     api_key: '',
-    model_name: '',
+    type: 'chat',
+    analysis_type: 'qa',
+    tokens_price: 0.05,
+    timeout: 30,
+    retry_times: 3,
+    is_enabled: 1,
+    sort_order: 0,
   }
   editDialogVisible.value = true
 }
@@ -211,7 +223,7 @@ const handleSaveModel = async () => {
 }
 
 const handleToggleStatus = async (model: AiModel) => {
-  const newStatus = model.status === 1 ? 0 : 1
+  const newStatus = model.is_enabled === 1 ? 0 : 1
   try {
     const res = await fetch(`/api/v1/admin/ai/models/${model.id}`, {
       method: 'PUT',
@@ -220,11 +232,11 @@ const handleToggleStatus = async (model: AiModel) => {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify({ is_enabled: newStatus }),
     })
     const data = await res.json()
     if (data.code === 0) {
-      model.status = newStatus
+      model.is_enabled = newStatus
       ElMessage.success(newStatus === 1 ? '已启用' : '已禁用')
     } else {
       ElMessage.error(data.message || '操作失败')
@@ -298,20 +310,23 @@ onMounted(() => {
           <div v-for="(model, index) in models" :key="model.id" class="model-item">
             <div class="model-header">
               <span class="model-name">{{ model.name }}</span>
-              <el-tag :type="model.status === 1 ? 'success' : 'danger'" size="small">
-                {{ model.status === 1 ? '已启用' : '已禁用' }}
+              <el-tag :type="model.is_enabled === 1 ? 'success' : 'danger'" size="small">
+                {{ model.is_enabled === 1 ? '已启用' : '已禁用' }}
               </el-tag>
             </div>
             <el-descriptions :column="2" border size="small" class="model-desc">
-              <el-descriptions-item label="费用">{{ model.cost_per_call }} 元/次</el-descriptions-item>
+              <el-descriptions-item label="提供商">{{ model.provider }}</el-descriptions-item>
+              <el-descriptions-item label="模型">{{ model.model || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="类型">{{ model.type === 'vision' ? '视觉' : '文本' }}</el-descriptions-item>
+              <el-descriptions-item label="分析类型">{{ model.analysis_type || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="费用">{{ model.tokens_price }} 元/次</el-descriptions-item>
               <el-descriptions-item label="超时时间">{{ model.timeout }}s</el-descriptions-item>
-              <el-descriptions-item label="重试次数">{{ model.retry_count }} 次</el-descriptions-item>
-              <el-descriptions-item label="模型">{{ model.model_name || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="重试次数">{{ model.retry_times }} 次</el-descriptions-item>
             </el-descriptions>
             <div class="model-actions">
               <el-button size="small" type="primary" link @click="handleEdit(model)">编辑</el-button>
-              <el-button size="small" :type="model.status === 1 ? 'warning' : 'success'" link @click="handleToggleStatus(model)">
-                {{ model.status === 1 ? '禁用' : '启用' }}
+              <el-button size="small" :type="model.is_enabled === 1 ? 'warning' : 'success'" link @click="handleToggleStatus(model)">
+                {{ model.is_enabled === 1 ? '禁用' : '启用' }}
               </el-button>
               <el-button size="small" type="danger" link @click="handleDeleteModel(model)">删除</el-button>
             </div>
@@ -382,8 +397,16 @@ onMounted(() => {
         <el-form-item label="模型名称" required>
           <el-input v-model="editForm.name" placeholder="请输入模型名称" />
         </el-form-item>
-        <el-form-item label="模型标识">
-          <el-input v-model="editForm.model_name" placeholder="如: gpt-4o-mini" />
+        <el-form-item label="提供商" required>
+          <el-select v-model="editForm.provider" placeholder="请选择提供商" style="width: 100%">
+            <el-option label="DeepSeek" value="deepseek" />
+            <el-option label="豆包" value="doubao" />
+            <el-option label="OpenAI" value="openai" />
+            <el-option label="Anthropic" value="anthropic" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="模型标识" required>
+          <el-input v-model="editForm.model" placeholder="如: deepseek-chat, gpt-4o-mini" />
         </el-form-item>
         <el-form-item label="API地址">
           <el-input v-model="editForm.api_url" placeholder="请输入API地址" />
@@ -391,18 +414,32 @@ onMounted(() => {
         <el-form-item label="API密钥">
           <el-input v-model="editForm.api_key" type="password" placeholder="请输入API密钥" show-password />
         </el-form-item>
+        <el-form-item label="模型类型">
+          <el-radio-group v-model="editForm.type">
+            <el-radio value="chat">文本对话</el-radio>
+            <el-radio value="vision">视觉分析</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="分析类型">
+          <el-select v-model="editForm.analysis_type" placeholder="请选择分析类型" style="width: 100%">
+            <el-option label="通用问答 (qa)" value="qa" />
+            <el-option label="舌诊 (tongue)" value="tongue" />
+            <el-option label="面诊 (face)" value="face" />
+            <el-option label="体质 (constitution)" value="constitution" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="单次费用">
-          <el-input-number v-model="editForm.cost_per_call" :min="0" :precision="4" style="width: 100%" />
+          <el-input-number v-model="editForm.tokens_price" :min="0" :precision="4" style="width: 100%" />
         </el-form-item>
         <el-form-item label="超时时间">
           <el-input-number v-model="editForm.timeout" :min="1" style="width: 100%" />
           <span class="form-unit">秒</span>
         </el-form-item>
         <el-form-item label="重试次数">
-          <el-input-number v-model="editForm.retry_count" :min="0" :max="10" style="width: 100%" />
+          <el-input-number v-model="editForm.retry_times" :min="0" :max="10" style="width: 100%" />
         </el-form-item>
         <el-form-item label="状态">
-          <el-radio-group v-model="editForm.status">
+          <el-radio-group v-model="editForm.is_enabled">
             <el-radio :value="1">启用</el-radio>
             <el-radio :value="0">禁用</el-radio>
           </el-radio-group>

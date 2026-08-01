@@ -35,6 +35,73 @@ const handleLogout = () => {
   router.push('/auth/login')
 }
 
+// ===== 邀请播报滚动条（前台会员中心） =====
+interface MarqueeItem {
+  promoter_name: string
+  invite_count: number
+  commission: number
+}
+
+const marqueeList = ref<MarqueeItem[]>([])
+const marqueeLoading = ref(false)
+
+// 虚拟兜底数据
+const defaultMarqueeData: MarqueeItem[] = [
+  { promoter_name: '李健康', invite_count: 8, commission: 45.60 },
+  { promoter_name: '王养生', invite_count: 12, commission: 78.90 },
+  { promoter_name: '张中医', invite_count: 5, commission: 28.00 },
+  { promoter_name: '刘调理', invite_count: 15, commission: 102.30 },
+  { promoter_name: '陈艾灸', invite_count: 3, commission: 15.50 },
+  { promoter_name: '杨体质', invite_count: 20, commission: 156.80 },
+  { promoter_name: '赵经络', invite_count: 7, commission: 38.90 },
+  { promoter_name: '孙方剂', invite_count: 10, commission: 67.20 },
+  { promoter_name: '周推拿', invite_count: 6, commission: 33.00 },
+  { promoter_name: '吴养生', invite_count: 9, commission: 52.40 },
+]
+
+const loadInviteMarquee = async () => {
+  marqueeLoading.value = true
+  try {
+    const res = await fetch('/api/v1/admin/invite-marquee', {
+      headers: {
+        Authorization: `Bearer ${userStore.token}`,
+        Accept: 'application/json',
+      },
+    })
+    const ct = res.headers.get('content-type') || ''
+    if (!ct.includes('application/json')) {
+      marqueeList.value = defaultMarqueeData
+      return
+    }
+    const data = await res.json()
+    if (data.code === 0 && data.data) {
+      const realItems = data.data.recent || []
+      const topList = data.data.top_list || []
+      if (realItems.length > 0) {
+        marqueeList.value = realItems.map((item: any) => ({
+          promoter_name: item.promoter_name,
+          invite_count: item.invite_count,
+          commission: item.commission,
+        }))
+      } else if (topList.length > 0) {
+        marqueeList.value = topList.map((item: any) => ({
+          promoter_name: item.promoter_name,
+          invite_count: item.invite_count,
+          commission: item.commission,
+        }))
+      } else {
+        marqueeList.value = defaultMarqueeData
+      }
+    } else {
+      marqueeList.value = defaultMarqueeData
+    }
+  } catch (e) {
+    marqueeList.value = defaultMarqueeData
+  } finally {
+    marqueeLoading.value = false
+  }
+}
+
 onMounted(async () => {
   if (userStore.isLoggedIn) {
     try {
@@ -43,6 +110,7 @@ onMounted(async () => {
       console.error(e)
     }
   }
+  loadInviteMarquee()
 })
 </script>
 
@@ -71,6 +139,32 @@ onMounted(async () => {
             <span class="badge-num">{{ userInfo?.analysis_times ?? 0 }}</span>
             <span class="badge-label">次分析</span>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 邀请播报滚动条 -->
+    <div class="invite-marquee">
+      <div class="marquee-icon">📢</div>
+      <div class="marquee-wrapper">
+        <div class="marquee-content" :class="{ 'marquee-paused': marqueeLoading }">
+          <span v-for="(item, idx) in marqueeList" :key="idx" class="marquee-item">
+            <span class="promoter-name">{{ item.promoter_name }}</span>
+            邀请了
+            <span class="highlight-num">{{ item.invite_count }}</span>
+            人，返利
+            <span class="highlight-money">¥{{ item.commission.toFixed(2) }}</span>
+            <span class="marquee-divider">|</span>
+          </span>
+          <!-- 无缝滚动复制一份 -->
+          <span v-for="(item, idx) in marqueeList" :key="'copy-' + idx" class="marquee-item">
+            <span class="promoter-name">{{ item.promoter_name }}</span>
+            邀请了
+            <span class="highlight-num">{{ item.invite_count }}</span>
+            人，返利
+            <span class="highlight-money">¥{{ item.commission.toFixed(2) }}</span>
+            <span class="marquee-divider">|</span>
+          </span>
         </div>
       </div>
     </div>
@@ -267,5 +361,81 @@ onMounted(async () => {
   border-radius: 22px;
   font-size: 15px;
   font-weight: 500;
+}
+
+/* ===== 邀请播报滚动条 ===== */
+.invite-marquee {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #f6ffed 0%, #fcffe6 100%);
+  border: 1px solid #b7eb8f;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.marquee-icon {
+  flex-shrink: 0;
+  font-size: 18px;
+  animation: marquee-bounce 1s ease-in-out infinite;
+}
+
+@keyframes marquee-bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.marquee-wrapper {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.marquee-content {
+  display: inline-block;
+  animation: marquee-scroll 25s linear infinite;
+}
+
+.marquee-content.marquee-paused {
+  animation-play-state: paused;
+}
+
+@keyframes marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.marquee-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #333;
+}
+
+.promoter-name {
+  font-weight: 600;
+  color: #52c41a;
+}
+
+.highlight-num {
+  font-weight: 700;
+  color: #1890ff;
+}
+
+.highlight-money {
+  font-weight: 700;
+  color: #fa8c16;
+}
+
+.marquee-divider {
+  margin: 0 10px;
+  color: #b7eb8f;
+}
+
+.invite-marquee:hover .marquee-content {
+  animation-play-state: paused;
 }
 </style>
