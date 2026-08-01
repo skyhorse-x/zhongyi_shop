@@ -133,6 +133,26 @@ class UserController extends Controller
         ]);
     }
 
+    /**
+     * 当前用户余额明细
+     */
+    public function balanceLogs(Request $request)
+    {
+        $user = $request->user();
+        $logs = \App\Models\UserBalanceLog::where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->get('per_page', 15));
+
+        return response()->json([
+            'code' => 0,
+            'message' => 'success',
+            'data' => [
+                'balance' => (float) $user->balance,
+                'logs'    => $logs,
+            ],
+        ]);
+    }
+
     private function getOrderTypeName(string $type): string
     {
         // 优先从数据库配置读取，配置缺失时回退到默认值

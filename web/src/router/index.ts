@@ -187,6 +187,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/member/orders.vue'),
     meta: { title: '我的订单', needAuth: true },
   },
+  {
+    path: '/member/balance',
+    name: 'Balance',
+    component: () => import('@/views/member/balance.vue'),
+    meta: { title: '余额明细', needAuth: true },
+  },
   // 推广中心
   {
     path: '/promoter/activate',

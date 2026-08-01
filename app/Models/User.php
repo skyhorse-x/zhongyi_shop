@@ -62,4 +62,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(User::class, 'parent_id');
     }
+
+    /**
+     * 余额变动流水
+     */
+    public function balanceLogs()
+    {
+        return $this->hasMany(UserBalanceLog::class);
+    }
+
+    /**
+     * 分析次数变动流水
+     */
+    public function analysisLogs()
+    {
+        return $this->hasMany(UserAnalysisLog::class);
+    }
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Refresh } from '@element-plus/icons-vue'
+import { Edit, Refresh, Wallet } from '@element-plus/icons-vue'
 
 const form = ref({
   phone: '',
@@ -53,6 +53,7 @@ const loadUsers = async () => {
         is_promoter: !!user.is_promoter,
         birthday: user.birthday || '',
         registerTime: user.created_at || '-',
+        balance: Number(user.balance ?? 0),
       }))
       total.value = data.data.total || list.length
     } else {
@@ -311,6 +312,152 @@ const submitEdit = async () => {
 onMounted(() => {
   loadUsers()
 })
+
+// ===== 余额管理 =====
+
+// 充值/扣减弹窗
+const adjustDialogVisible = ref(false)
+const adjustLoading = ref(false)
+const adjustForm = reactive({
+  user: null as any,
+  type: 'recharge' as 'recharge' | 'admin_deduct',
+  amount: 0 as number | string,
+  remark: '',
+})
+const presetAmounts = [10, 50, 100, 200, 500, 1000]
+
+const openAdjust = (row: any, type: 'recharge' | 'admin_deduct') => {
+  adjustForm.user = row
+  adjustForm.type = type
+  adjustForm.amount = 0
+  adjustForm.remark = type === 'recharge' ? '管理员后台充值' : '管理员后台扣减'
+  adjustDialogVisible.value = true
+}
+
+const submitAdjust = async () => {
+  const amt = Number(adjustForm.amount)
+  if (!amt || amt <= 0) {
+    ElMessage.warning('请输入大于 0 的金额')
+    return
+  }
+  if (amt > 99999.99) {
+    ElMessage.warning('单次金额不能超过 99,999.99')
+    return
+  }
+  if (
+    adjustForm.type === 'admin_deduct' &&
+    amt > Number(adjustForm.user?.balance ?? 0)
+  ) {
+    ElMessage.warning('扣减金额不能超过用户当前余额')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确认要「${adjustForm.type === 'recharge' ? '充值' : '扣减'}」¥${amt.toFixed(
+        2
+      )} 给用户「${adjustForm.user?.nickname}」？`,
+      `${adjustForm.type === 'recharge' ? '充值' : '扣减'}确认`,
+      { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+
+  adjustLoading.value = true
+  try {
+    const res = await fetch(
+      `/api/v1/admin/users/${adjustForm.user.id}/balance`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: adjustForm.type,
+          amount: amt,
+          remark: adjustForm.remark,
+        }),
+      }
+    )
+    const data = await res.json()
+    if (data.code === 0) {
+      ElMessage.success(data.message || '操作成功')
+      adjustDialogVisible.value = false
+      // 刷新列表里的余额显示
+      const newBal = data.data?.balance ?? 0
+      const target = tableData.value.find((u) => u.id === adjustForm.user.id)
+      if (target) target.balance = Number(newBal)
+    } else {
+      ElMessage.error(data.message || '操作失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '操作失败')
+  } finally {
+    adjustLoading.value = false
+  }
+}
+
+// 流水弹窗
+const logsDialogVisible = ref(false)
+const logsLoading = ref(false)
+const logsList = ref<any[]>([])
+const logsTotal = ref(0)
+const logsPage = ref(1)
+const logsPageSize = ref(15)
+const logsFilterType = ref('')
+
+const logTypeName = (t: string) =>
+  ({
+    recharge: '后台充值',
+    consume: '消费扣减',
+    refund: '退款返还',
+    reward: '系统奖励',
+    admin_deduct: '后台扣减',
+  }[t] || t)
+const formatMoney = (n: any) => Number(n ?? 0).toFixed(2)
+const formatTime = (s: string) => (s ? s.replace('T', ' ').slice(0, 19) : '-')
+
+const openLogs = async (row: any) => {
+  logsDialogVisible.value = true
+  logsPage.value = 1
+  logsList.value = []
+  await loadLogs(row)
+}
+
+const loadLogs = async (row?: any) => {
+  const user = row || adjustForm.user
+  if (!user) return
+  logsLoading.value = true
+  try {
+    const params = new URLSearchParams({
+      page: logsPage.value.toString(),
+      per_page: logsPageSize.value.toString(),
+    })
+    if (logsFilterType.value) params.append('type', logsFilterType.value)
+    const res = await fetch(
+      `/api/v1/admin/users/${user.id}/balance-logs?${params}`,
+      {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          Accept: 'application/json',
+        },
+      }
+    )
+    const data = await res.json()
+    if (data.code === 0) {
+      logsList.value = data.data.logs?.data ?? []
+      logsTotal.value = data.data.logs?.total ?? logsList.value.length
+    } else {
+      ElMessage.error(data.message || '加载流水失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载流水失败')
+  } finally {
+    logsLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -365,6 +512,13 @@ onMounted(() => {
           </el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="余额" width="100" align="center">
+        <template #default="scope">
+          <span style="color: #fa8c16; font-weight: 600">
+            ¥{{ formatMoney(scope.row.balance) }}
+          </span>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="80" align="center">
         <template #default="scope">
           <el-tag :type="scope.row.statusValue === 1 ? 'success' : 'danger'" size="small">
@@ -373,7 +527,7 @@ onMounted(() => {
         </template>
       </el-table-column>
       <el-table-column prop="registerTime" label="注册时间" min-width="170" />
-      <el-table-column label="操作" width="360" align="center" fixed="right">
+      <el-table-column label="操作" width="460" align="center" fixed="right">
         <template #default="scope">
           <el-button type="primary" link size="small" @click="handleView(scope.row)">查看</el-button>
           <el-button type="primary" link size="small" @click="openEdit(scope.row)">
@@ -392,6 +546,26 @@ onMounted(() => {
           <el-button type="warning" link size="small" @click="handleResetPassword(scope.row)">
             重置密码
           </el-button>
+          <el-dropdown
+            trigger="click"
+            @command="(cmd: string) => {
+              if (cmd === 'recharge') openAdjust(scope.row, 'recharge')
+              else if (cmd === 'admin_deduct') openAdjust(scope.row, 'admin_deduct')
+              else if (cmd === 'logs') openLogs(scope.row)
+            }"
+          >
+            <el-button type="success" link size="small">
+              <el-icon><Wallet /></el-icon>
+              <span style="margin-left: 2px">余额</span>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="recharge">充值</el-dropdown-item>
+                <el-dropdown-item command="admin_deduct" divided>扣减</el-dropdown-item>
+                <el-dropdown-item command="logs" divided>查看流水</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </template>
       </el-table-column>
     </el-table>
@@ -551,6 +725,153 @@ onMounted(() => {
         <el-button type="primary" @click="submitResetPassword">确认重置</el-button>
       </template>
     </el-dialog>
+
+    <!-- 充值/扣减 弹窗 -->
+    <el-dialog
+      v-model="adjustDialogVisible"
+      :title="adjustForm.type === 'recharge' ? '用户充值' : '用户扣减'"
+      width="480px"
+      :close-on-click-modal="false"
+      v-loading="adjustLoading"
+    >
+      <el-alert
+        :title="`用户「${adjustForm.user?.nickname}」当前余额：¥${formatMoney(adjustForm.user?.balance)}`"
+        :type="adjustForm.type === 'recharge' ? 'success' : 'warning'"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      />
+      <el-form label-width="80px">
+        <el-form-item label="操作类型">
+          <el-radio-group v-model="adjustForm.type">
+            <el-radio value="recharge">充值（增加）</el-radio>
+            <el-radio value="admin_deduct">扣减（减少）</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="金额" required>
+          <el-input-number
+            v-model="adjustForm.amount"
+            :min="0.01"
+            :max="99999.99"
+            :precision="2"
+            :step="1"
+            style="width: 100%"
+            placeholder="请输入金额"
+          />
+        </el-form-item>
+        <el-form-item label="快捷">
+          <el-button
+            v-for="p in presetAmounts"
+            :key="p"
+            size="small"
+            @click="adjustForm.amount = p"
+            style="margin-right: 6px; margin-bottom: 4px"
+          >
+            ¥{{ p }}
+          </el-button>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input
+            v-model="adjustForm.remark"
+            type="textarea"
+            :rows="2"
+            maxlength="200"
+            show-word-limit
+            placeholder="如：618 活动赠送、订单退款补偿等"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="adjustDialogVisible = false">取消</el-button>
+        <el-button
+          :type="adjustForm.type === 'recharge' ? 'primary' : 'danger'"
+          :loading="adjustLoading"
+          @click="submitAdjust"
+        >
+          确认{{ adjustForm.type === 'recharge' ? '充值' : '扣减' }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 余额流水弹窗 -->
+    <el-dialog
+      v-model="logsDialogVisible"
+      :title="`用户「${adjustForm.user?.nickname}」余额流水`"
+      width="780px"
+      :close-on-click-modal="false"
+    >
+      <div class="logs-header">
+        <div class="logs-stat">
+          <span class="logs-stat-label">当前余额：</span>
+          <span class="logs-stat-value">¥{{ formatMoney(adjustForm.user?.balance) }}</span>
+        </div>
+        <el-select
+          v-model="logsFilterType"
+          placeholder="全部类型"
+          clearable
+          size="small"
+          style="width: 160px"
+          @change="() => { logsPage = 1; loadLogs() }"
+        >
+          <el-option label="后台充值" value="recharge" />
+          <el-option label="消费扣减" value="consume" />
+          <el-option label="退款返还" value="refund" />
+          <el-option label="系统奖励" value="reward" />
+          <el-option label="后台扣减" value="admin_deduct" />
+        </el-select>
+      </div>
+
+      <el-table :data="logsList" border stripe v-loading="logsLoading" max-height="420">
+        <el-table-column prop="id" label="ID" width="60" align="center" />
+        <el-table-column label="类型" width="100" align="center">
+          <template #default="scope">
+            <el-tag
+              :type="['recharge','refund','reward'].includes(scope.row.type) ? 'success' : 'danger'"
+              size="small"
+            >
+              {{ logTypeName(scope.row.type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动金额" width="110" align="right">
+          <template #default="scope">
+            <span
+              :style="{
+                color: Number(scope.row.change) > 0 ? '#67c23a' : '#f56c6c',
+                fontWeight: 600
+              }"
+            >
+              {{ Number(scope.row.change) > 0 ? '+' : '' }}{{ formatMoney(scope.row.change) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动前" width="100" align="right">
+          <template #default="scope">¥{{ formatMoney(scope.row.before) }}</template>
+        </el-table-column>
+        <el-table-column label="变动后" width="100" align="right">
+          <template #default="scope">¥{{ formatMoney(scope.row.after) }}</template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
+        <el-table-column label="时间" width="150" align="center">
+          <template #default="scope">{{ formatTime(scope.row.created_at) }}</template>
+        </el-table-column>
+      </el-table>
+
+      <el-pagination
+        v-if="logsTotal > logsPageSize"
+        v-model:current-page="logsPage"
+        :page-size="logsPageSize"
+        :total="logsTotal"
+        layout="prev, pager, next, total"
+        background
+        @current-change="() => loadLogs()"
+        style="margin-top: 12px; justify-content: flex-end"
+      />
+
+      <template #footer>
+        <el-button @click="logsDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -594,5 +915,23 @@ onMounted(() => {
   margin-left: 12px;
   font-size: 12px;
   color: #909399;
+}
+
+.logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px 12px;
+}
+
+.logs-stat-label {
+  font-size: 13px;
+  color: #909399;
+}
+
+.logs-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fa8c16;
 }
 </style>

@@ -44,6 +44,9 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::get('orders', [V1\UserController::class, 'orders']);
             Route::get('orders/{orderNo}', [V1\UserController::class, 'orderDetail']);
             Route::post('orders/{orderNo}/cancel', [V1\UserController::class, 'cancelOrder']);
+
+            // 余额明细
+            Route::get('balance-logs', [V1\UserController::class, 'balanceLogs']);
         });
 
         // AI分析

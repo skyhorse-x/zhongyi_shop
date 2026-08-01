@@ -173,6 +173,86 @@ class AdminController extends Controller
         ]);
     }
 
+    // ===== 用户余额管理 =====
+
+    /**
+     * 调整用户余额（充值或扣减）
+     * POST /admin/users/{id}/balance
+     * body: { type: 'recharge'|'admin_deduct', amount: 9.99, remark: '...' }
+     */
+    public function userAdjustBalance(Request $request, $id)
+    {
+        $data = $request->validate([
+            'type'   => 'required|in:recharge,admin_deduct',
+            'amount' => 'required|numeric|min:0.01|max:99999.99',
+            'remark' => 'nullable|string|max:200',
+        ]);
+
+        $user = User::findOrFail($id);
+        $adminId = optional($request->user())->id;
+
+        $amount = (float) $data['amount'];
+        $change = $data['type'] === 'recharge' ? $amount : -$amount;
+
+        // 扣减时校验余额是否够
+        if ($change < 0 && (float) $user->balance < $amount) {
+            return response()->json([
+                'code' => 422,
+                'message' => '用户余额不足，当前余额 ¥' . number_format((float) $user->balance, 2),
+            ], 422);
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($user, $change, $data, $adminId) {
+            $before = (float) $user->balance;
+            $after  = round($before + $change, 2);
+
+            $user->balance = $after;
+            $user->save();
+
+            \App\Models\UserBalanceLog::create([
+                'user_id'     => $user->id,
+                'change'      => $change,
+                'before'      => $before,
+                'after'       => $after,
+                'type'        => $data['type'],
+                'remark'      => $data['remark'] ?? ($data['type'] === 'recharge' ? '管理员后台充值' : '管理员后台扣减'),
+                'operator_id' => $adminId,
+            ]);
+        });
+
+        return response()->json([
+            'code'    => 0,
+            'message' => $data['type'] === 'recharge' ? '充值成功' : '扣减成功',
+            'data'    => [
+                'balance' => (float) $user->fresh()->balance,
+            ],
+        ]);
+    }
+
+    /**
+     * 用户余额变动流水
+     * GET /admin/users/{id}/balance-logs?type=&page=&per_page=
+     */
+    public function userBalanceLogs(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+        $query = \App\Models\UserBalanceLog::where('user_id', $user->id)
+            ->with('operator:id,username,name')
+            ->orderBy('created_at', 'desc');
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+        $paginator = $query->paginate($request->get('per_page', 15));
+
+        return response()->json([
+            'code' => 0,
+            'data' => [
+                'balance' => (float) $user->balance,
+                'logs'    => $paginator,
+            ],
+        ]);
+    }
+
     // ===== 订单管理 =====
     public function orders(Request $request)
     {

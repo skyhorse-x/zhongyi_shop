@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Document, FirstAidKit, ShoppingBag, Promotion, Headset } from '@element-plus/icons-vue'
+import { ArrowRight, Document, FirstAidKit, ShoppingBag, Promotion, Headset, Wallet } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import { useUserStore } from '@/stores/user'
 
@@ -17,12 +17,18 @@ interface MenuItem {
 }
 
 const menuItems = ref<MenuItem[]>([
+  { icon: Wallet, title: '余额明细', path: '/member/balance' },
   { icon: Document, title: '我的订单', path: '/member/orders' },
   { icon: FirstAidKit, title: '健康档案', path: '/health/history' },
   { icon: ShoppingBag, title: '购买次数包', path: '/packages' },
   { icon: Promotion, title: '推广中心', path: '/promoter' },
   { icon: Headset, title: '联系客服', path: '' },
 ])
+
+const formatBalance = (v: any): string => {
+  const n = Number(v ?? 0)
+  return n.toFixed(2)
+}
 
 const handleLogout = () => {
   userStore.logoutAction()
@@ -52,9 +58,15 @@ onMounted(async () => {
       <div class="user-info">
         <div class="nickname">{{ userInfo?.nickname || '用户' }}</div>
         <div class="mobile">{{ userInfo?.mobile || '' }}</div>
-        <div class="times-badge">
-          <span class="times-num">{{ userInfo?.analysis_times ?? 0 }}</span>
-          <span class="times-label">次分析</span>
+        <div class="badges">
+          <div class="badge-item">
+            <span class="badge-num">¥{{ formatBalance(userInfo?.balance) }}</span>
+            <span class="badge-label">余额</span>
+          </div>
+          <div class="badge-item badge-item--alt">
+            <span class="badge-num">{{ userInfo?.analysis_times ?? 0 }}</span>
+            <span class="badge-label">次分析</span>
+          </div>
         </div>
       </div>
     </div>
@@ -128,6 +140,7 @@ onMounted(async () => {
   color: #fff;
   position: relative;
   z-index: 1;
+  flex: 1;
 }
 
 .nickname {
@@ -141,24 +154,34 @@ onMounted(async () => {
   opacity: 0.85;
 }
 
-.times-badge {
+.badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.badge-item {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
-  margin-top: 10px;
   padding: 4px 12px;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 16px;
   width: fit-content;
 }
 
-.times-num {
+.badge-item--alt {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.badge-num {
   font-size: 20px;
   font-weight: 700;
   line-height: 1;
 }
 
-.times-label {
+.badge-label {
   font-size: 11px;
   opacity: 0.85;
 }
