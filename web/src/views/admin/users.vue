@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Refresh, Wallet } from '@element-plus/icons-vue'
+import { Edit, Refresh, Wallet, Promotion } from '@element-plus/icons-vue'
 
 const form = ref({
   phone: '',
@@ -551,6 +551,36 @@ const loadLogs = async (row?: any) => {
       <span class="page-tip">管理 C 端用户账号、状态与密码</span>
     </div>
 
+    <!-- 邀请播报滚动条 -->
+    <div class="invite-marquee">
+      <div class="marquee-icon">
+        <el-icon><Promotion /></el-icon>
+      </div>
+      <div class="marquee-wrapper">
+        <div class="marquee-content" :class="{ 'marquee-paused': marqueeLoading }">
+          <span v-for="(item, idx) in marqueeList" :key="idx" class="marquee-item">
+            <span class="promoter-name">{{ item.promoter_name }}</span>
+            邀请了
+            <span class="highlight-num">{{ item.invite_count }}</span>
+            人，返利
+            <span class="highlight-money">¥{{ item.commission.toFixed(2) }}</span>
+            <span v-if="item.is_fraud" class="fraud-tag">作弊</span>
+            <span class="marquee-divider">|</span>
+          </span>
+          <!-- 无缝滚动复制一份 -->
+          <span v-for="(item, idx) in marqueeList" :key="'copy-' + idx" class="marquee-item">
+            <span class="promoter-name">{{ item.promoter_name }}</span>
+            邀请了
+            <span class="highlight-num">{{ item.invite_count }}</span>
+            人，返利
+            <span class="highlight-money">¥{{ item.commission.toFixed(2) }}</span>
+            <span v-if="item.is_fraud" class="fraud-tag">作弊</span>
+            <span class="marquee-divider">|</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
     <el-form :model="form" inline class="search-form">
       <el-row :gutter="16">
         <el-col :span="6">
@@ -1017,5 +1047,99 @@ const loadLogs = async (row?: any) => {
   font-size: 20px;
   font-weight: 700;
   color: #fa8c16;
+}
+
+/* ===== 邀请播报滚动条 ===== */
+.invite-marquee {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #f6ffed 0%, #fcffe6 100%);
+  border: 1px solid #b7eb8f;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.marquee-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #52c41a;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 16px;
+}
+
+.marquee-wrapper {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.marquee-content {
+  display: inline-block;
+  animation: marquee-scroll 30s linear infinite;
+}
+
+.marquee-content.marquee-paused {
+  animation-play-state: paused;
+}
+
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #333;
+}
+
+.promoter-name {
+  font-weight: 600;
+  color: #52c41a;
+}
+
+.highlight-num {
+  font-weight: 700;
+  color: #1890ff;
+  font-size: 14px;
+}
+
+.highlight-money {
+  font-weight: 700;
+  color: #fa8c16;
+  font-size: 14px;
+}
+
+.fraud-tag {
+  display: inline-block;
+  padding: 0 4px;
+  font-size: 10px;
+  color: #f56c6c;
+  background: #fef0f0;
+  border-radius: 2px;
+  margin-left: 2px;
+}
+
+.marquee-divider {
+  margin: 0 12px;
+  color: #b7eb8f;
+}
+
+.invite-marquee:hover .marquee-content {
+  animation-play-state: paused;
 }
 </style>

@@ -9,28 +9,37 @@ use App\Models\SystemConfig;
  *
  * 优先级：
  * 1. SystemConfig 表 site_url（后台【系统设置 → 基本设置 → 网站域名】）
- * 2. .env FRONTEND_URL（部署期固定）
+ * 2. config('site.url')（即 .env SITE_URL，部署期固定）
  * 3. http://localhost:5173（开发默认）
  *
  * 自动去掉尾部斜杠，避免拼接出 // 路径
+ *
+ * 注意：本类不使用 env() 直接读取，避免 config:cache 后返回 null
  */
 final class Site
 {
     public const DEFAULT_URL = 'http://localhost:5173';
     public const CONFIG_KEY  = 'site_url';
-    public const ENV_KEY     = 'FRONTEND_URL';
 
     /**
      * 当前站点根 URL（不带尾部斜杠）
      */
     public static function url(): string
     {
-        $fromDb   = SystemConfig::getValue(self::CONFIG_KEY, '');
-        $fromEnv  = env(self::ENV_KEY, '');
+        // 1. 数据库配置（后台可改）
+        $fromDb = SystemConfig::getValue(self::CONFIG_KEY, '');
+        if ($fromDb !== '') {
+            return rtrim(trim($fromDb), '/');
+        }
 
-        $raw = $fromDb !== '' ? $fromDb : ($fromEnv !== '' ? $fromEnv : self::DEFAULT_URL);
+        // 2. config() 读取（config/site.php 中定义）
+        $fromConfig = config('site.url', '');
+        if (!empty($fromConfig)) {
+            return rtrim(trim($fromConfig), '/');
+        }
 
-        return rtrim(trim($raw), '/');
+        // 3. 默认值
+        return self::DEFAULT_URL;
     }
 
     /**

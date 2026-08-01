@@ -323,14 +323,16 @@ class AuthController extends Controller
                 'mobile' => $mobile,
                 'error' => $smsResult['error'],
             ]);
-            // 短信发送失败时，开发环境返回验证码以便测试
-            if (config('app.debug')) {
+
+            // 仅在本地环境 + 显式开启 SMS_DEBUG 时才返回验证码
+            // 生产环境误开 APP_DEBUG=true 也不会泄露验证码
+            if (app()->isLocal() && env('SMS_DEBUG', false)) {
                 return response()->json([
                     'code' => 0,
-                    'message' => '验证码已发送（开发模式）',
+                    'message' => '验证码已发送（本地调试模式）',
                     'data' => [
                         'expire_in' => 300,
-                        'debug_code' => $code, // 仅开发模式返回
+                        'debug_code' => $code,
                     ],
                 ]);
             }

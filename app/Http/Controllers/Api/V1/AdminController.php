@@ -90,14 +90,35 @@ class AdminController extends Controller
     /**
      * 滚动播报：最近邀请注册 + 佣金返利数据
      * 用于后台用户管理页面顶部滚动展示
+     *
+     * 优化：避免 N+1 查询，用 withCount + 预加载佣金汇总
      */
     public function inviteMarquee()
     {
-        // 最近 50 条邀请注册记录（按时间倒序）
-        $registrations = \App\Models\InviteRegistration::with(['user', 'promoter'])
+        // 最近 50 条邀请注册记录（预加载关联）
+        $registrations = \App\Models\InviteRegistration::with(['user', 'promoter.user'])
             ->orderByDesc('created_at')
             ->limit(50)
             ->get();
+
+        // 预加载每个推广员的邀请人数（1 次查询替代 N 次 count）
+        $promoterIds = $registrations->pluck('promoter_id')->unique()->filter();
+        $inviteCounts = $promoterIds->isEmpty()
+            ? []
+            : \App\Models\InviteRegistration::whereIn('promoter_id', $promoterIds)
+                ->selectRaw('promoter_id, COUNT(*) as cnt')
+                ->groupBy('promoter_id')
+                ->pluck('cnt', 'promoter_id')
+                ->toArray();
+
+        // 预加载每个推广员的佣金汇总（1 次查询替代 N 次 sum）
+        $commissionSums = $promoterIds->isEmpty()
+            ? []
+            : \App\Models\Commission::whereIn('promoter_id', $promoterIds)
+                ->selectRaw('promoter_id, COALESCE(SUM(amount), 0) as total')
+                ->groupBy('promoter_id')
+                ->pluck('total', 'promoter_id')
+                ->toArray();
 
         $items = [];
         foreach ($registrations as $reg) {
@@ -108,17 +129,13 @@ class AdminController extends Controller
                 ?? $reg->user?->name
                 ?? '用户';
 
-            // 查找该推广员给这个用户带来的佣金
-            $commission = \App\Models\Commission::where('promoter_id', $reg->promoter_id)
-                ->whereHas('order', fn($q) => $q->where('user_id', $reg->user_id))
-                ->sum('amount');
-
+            $pid = $reg->promoter_id;
             $items[] = [
                 'id' => $reg->id,
                 'promoter_name' => $promoterName,
                 'invitee_name' => $inviteeName,
-                'invite_count' => \App\Models\InviteRegistration::where('promoter_id', $reg->promoter_id)->count(),
-                'commission' => round($commission, 2),
+                'invite_count' => (int) ($inviteCounts[$pid] ?? 0),
+                'commission' => round((float) ($commissionSums[$pid] ?? 0), 2),
                 'is_fraud' => $reg->is_fraud,
                 'created_at' => $reg->created_at->format('Y-m-d H:i'),
             ];
