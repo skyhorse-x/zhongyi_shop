@@ -61,6 +61,15 @@ class AuthController extends Controller
                     'parent_id' => $parentId,
                 ]);
                 $this->autoActivatePromoter($user);
+                $user->grantInitialAnalysisTimes();
+
+                // 记录邀请注册
+                if ($parentId) {
+                    $inviter = Promoter::where('user_id', $parentId)->first();
+                    if ($inviter) {
+                        \App\Support\InviteTracker::recordRegistration($inviter, $user, $request);
+                    }
+                }
 
                 DB::commit();
             } catch (\Exception $e) {
@@ -110,6 +119,14 @@ class AuthController extends Controller
                 $this->autoActivatePromoter($user);
                 $user->grantInitialAnalysisTimes();
 
+                // 记录邀请注册（如果有推荐人 / 邀请码）
+                if ($parentId) {
+                    $inviter = Promoter::where('user_id', $parentId)->first();
+                    if ($inviter) {
+                        \App\Support\InviteTracker::recordRegistration($inviter, $user, $request);
+                    }
+                }
+
                 DB::commit();
             } catch (\Exception $e) {
                 DB::rollBack();
@@ -134,7 +151,7 @@ class AuthController extends Controller
                 'user' => $user,
                 'is_promoter' => true,
                 'invite_code' => $promoter->invite_code ?? null,
-                'invite_url' => $promoter ? (env('FRONTEND_URL', 'http://localhost:5173') . '?code=' . $promoter->invite_code) : null,
+                'invite_url' => $promoter ? \App\Support\Site::inviteLink($promoter->invite_code) : null,
             ],
         ]);
     }

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Commission;
+use App\Models\InviteClick;
+use App\Models\InviteRegistration;
 use App\Models\Promoter;
 use App\Models\SystemConfig;
 use App\Models\Withdraw;
@@ -29,7 +31,7 @@ class PromoterController extends Controller
                 'message' => '您已是推广员',
                 'data' => [
                     'invite_code' => $promoter->invite_code,
-                    'invite_url' => env('FRONTEND_URL', 'http://localhost:5173') . '?code=' . $promoter->invite_code,
+                    'invite_url' => Site::inviteLink($promoter->invite_code),
                     'level' => $promoter->level,
                     'commission_rate' => $promoter->commission_rate,
                     'activated_at' => $promoter->activated_at,
@@ -56,7 +58,7 @@ class PromoterController extends Controller
             'message' => '开通成功',
             'data' => [
                 'invite_code' => $promoter->invite_code,
-                'invite_url' => env('FRONTEND_URL', 'http://localhost:5173') . '?code=' . $promoter->invite_code,
+                'invite_url' => Site::inviteLink($promoter->invite_code),
                 'level' => $promoter->level,
                 'commission_rate' => $promoter->commission_rate,
                 'activated_at' => $promoter->activated_at,
@@ -83,7 +85,7 @@ class PromoterController extends Controller
             'message' => 'success',
             'data' => [
                 'invite_code' => $promoter->invite_code,
-                'invite_url' => env('FRONTEND_URL', 'http://localhost:5173') . '?code=' . $promoter->invite_code,
+                'invite_url' => Site::inviteLink($promoter->invite_code),
                 'level' => $promoter->level,
                 'commission_rate' => $promoter->commission_rate,
                 'total_invite' => $promoter->total_invite,
@@ -111,8 +113,7 @@ class PromoterController extends Controller
         }
 
         // 海报URL指向后端API动态生成（而非静态文件）
-        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
-        $shareLink = $frontendUrl . '?code=' . $promoter->invite_code;
+        $shareLink = Site::inviteLink($promoter->invite_code);
         $posterUrl = url('api/v1/promoter/poster-image?code=' . $promoter->invite_code);
 
         return response()->json([
@@ -141,8 +142,7 @@ class PromoterController extends Controller
             return response()->json(['code' => 404, 'message' => '推广员不存在'], 404);
         }
 
-        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
-        $shareLink = $frontendUrl . '?code=' . $promoter->invite_code;
+        $shareLink = Site::inviteLink($promoter->invite_code);
         $nickname = $promoter->user->nickname ?? '推广员';
 
         // 已生成则直接返回（缓存到 public/posters/）
@@ -481,6 +481,152 @@ class PromoterController extends Controller
                 'amount' => $withdraw->amount,
                 'status' => $withdraw->status,
             ],
+        ]);
+    }
+
+    /**
+     * 推广链接被访问时记录点击（前端 JS 上报）
+     * 也可由后端中间件自动调用
+     */
+    public function trackClick(Request $request)
+    {
+        $code = $request->input('code');
+        if (empty($code)) {
+            return response()->json(['code' => 400, 'message' => '邀请码不能为空'], 400);
+        }
+
+        $promoter = Promoter::where('invite_code', $code)->first();
+        if (!$promoter) {
+            return response()->json(['code' => 404, 'message' => '邀请码不存在'], 404);
+        }
+
+        if ($promoter->is_banned) {
+            return response()->json(['code' => 403, 'message' => '推广员已被封禁'], 403);
+        }
+
+        [$click, $isDup] = \App\Support\InviteTracker::recordClick($promoter, $request);
+
+        return response()->json([
+            'code' => 0,
+            'message' => 'success',
+            'data' => [
+                'click_id'        => $click->id,
+                'is_duplicate_ip' => $isDup,
+            ],
+        ]);
+    }
+
+    /**
+     * 当前推广员的邀请记录（注册列表，含客户端信息）
+     */
+    public function inviteRecords(Request $request)
+    {
+        $promoter = Promoter::where('user_id', $request->user()->id)->first();
+        if (!$promoter) {
+            return response()->json(['code' => 404, 'message' => '您还不是推广员'], 404);
+        }
+
+        $records = InviteRegistration::with('user')
+            ->where('promoter_id', $promoter->id)
+            ->orderByDesc('created_at')
+            ->paginate($request->get('limit', 20));
+
+        return response()->json([
+            'code' => 0,
+            'message' => 'success',
+            'data' => $records,
+        ]);
+    }
+
+    /**
+     * 当前推广员的邀请点击列表
+     */
+    public function inviteClicks(Request $request)
+    {
+        $promoter = Promoter::where('user_id', $request->user()->id)->first();
+        if (!$promoter) {
+            return response()->json(['code' => 404, 'message' => '您还不是推广员'], 404);
+        }
+
+        $clicks = InviteClick::where('promoter_id', $promoter->id)
+            ->orderByDesc('clicked_at')
+            ->paginate($request->get('limit', 20));
+
+        return response()->json([
+            'code' => 0,
+            'message' => 'success',
+            'data' => $clicks,
+        ]);
+    }
+
+    /**
+     * 后台：获取推广员邀请记录（含客户端信息、反作弊状态）
+     */
+    public function adminInviteRecords(Request $request)
+    {
+        $promoterId = $request->get('promoter_id');
+        $query = InviteRegistration::with(['user', 'promoter']);
+
+        if ($promoterId) {
+            $query->where('promoter_id', $promoterId);
+        }
+
+        // 筛选
+        if ($request->filled('is_fraud')) {
+            $query->where('is_fraud', (bool) $request->input('is_fraud'));
+        }
+        if ($request->filled('device_type')) {
+            $query->where('device_type', $request->input('device_type'));
+        }
+        if ($request->filled('ip')) {
+            $query->where('ip', 'like', '%' . $request->input('ip') . '%');
+        }
+        if ($request->filled('date_start')) {
+            $query->whereDate('created_at', '>=', $request->input('date_start'));
+        }
+        if ($request->filled('date_end')) {
+            $query->whereDate('created_at', '<=', $request->input('date_end'));
+        }
+
+        $records = $query->orderByDesc('created_at')
+            ->paginate($request->get('limit', 20));
+
+        return response()->json([
+            'code' => 0,
+            'message' => 'success',
+            'data' => $records,
+        ]);
+    }
+
+    /**
+     * 后台：封禁推广员
+     */
+    public function ban(Request $request, Promoter $promoter)
+    {
+        $promoter->update([
+            'is_banned' => true,
+            'banned_at' => now(),
+        ]);
+
+        return response()->json([
+            'code' => 0,
+            'message' => '已封禁',
+        ]);
+    }
+
+    /**
+     * 后台：解封推广员
+     */
+    public function unban(Request $request, Promoter $promoter)
+    {
+        $promoter->update([
+            'is_banned' => false,
+            'banned_at' => null,
+        ]);
+
+        return response()->json([
+            'code' => 0,
+            'message' => '已解封',
         ]);
     }
 

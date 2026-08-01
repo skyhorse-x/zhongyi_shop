@@ -311,7 +311,87 @@ const submitEdit = async () => {
 
 onMounted(() => {
   loadUsers()
+  loadInviteMarquee()
 })
+
+// ===== 邀请播报滚动条 =====
+
+interface MarqueeItem {
+  promoter_name: string
+  invitee_name?: string
+  invite_count: number
+  commission: number
+  is_fraud?: boolean
+  created_at?: string
+}
+
+const marqueeList = ref<MarqueeItem[]>([])
+const marqueeLoading = ref(false)
+
+// 虚拟兜底数据（当后端无数据时使用）
+const defaultMarqueeData: MarqueeItem[] = [
+  { promoter_name: '李健康', invite_count: 8, commission: 45.60 },
+  { promoter_name: '王养生', invite_count: 12, commission: 78.90 },
+  { promoter_name: '张中医', invite_count: 5, commission: 28.00 },
+  { promoter_name: '刘调理', invite_count: 15, commission: 102.30 },
+  { promoter_name: '陈艾灸', invite_count: 3, commission: 15.50 },
+  { promoter_name: '杨体质', invite_count: 20, commission: 156.80 },
+  { promoter_name: '赵经络', invite_count: 7, commission: 38.90 },
+  { promoter_name: '孙方剂', invite_count: 10, commission: 67.20 },
+  { promoter_name: '周推拿', invite_count: 6, commission: 33.00 },
+  { promoter_name: '吴养生', invite_count: 9, commission: 52.40 },
+]
+
+const loadInviteMarquee = async () => {
+  marqueeLoading.value = true
+  try {
+    const res = await fetch('/api/v1/admin/invite-marquee', {
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        Accept: 'application/json',
+      },
+    })
+    const ct = res.headers.get('content-type') || ''
+    if (!ct.includes('application/json')) {
+      throw new Error('非 JSON 响应')
+    }
+    const data = await res.json()
+    if (data.code === 0 && data.data) {
+      // 优先使用真实数据，否则使用虚拟兜底
+      const realItems = data.data.recent || []
+      const topList = data.data.top_list || []
+
+      if (realItems.length > 0) {
+        // 真实数据：展示推广员邀请+佣金
+        marqueeList.value = realItems.map((item: any) => ({
+          promoter_name: item.promoter_name,
+          invitee_name: item.invitee_name,
+          invite_count: item.invite_count,
+          commission: item.commission,
+          is_fraud: item.is_fraud,
+          created_at: item.created_at,
+        }))
+      } else if (topList.length > 0) {
+        // 使用排行榜兜底
+        marqueeList.value = topList.map((item: any) => ({
+          promoter_name: item.promoter_name,
+          invite_count: item.invite_count,
+          commission: item.commission,
+        }))
+      } else {
+        // 使用虚拟兜底数据
+        marqueeList.value = defaultMarqueeData
+      }
+    } else {
+      marqueeList.value = defaultMarqueeData
+    }
+  } catch (e) {
+    // 接口失败时使用虚拟兜底数据
+    marqueeList.value = defaultMarqueeData
+  } finally {
+    marqueeLoading.value = false
+  }
+}
 
 // ===== 余额管理 =====
 

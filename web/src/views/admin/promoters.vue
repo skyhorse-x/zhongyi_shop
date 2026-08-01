@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 interface Promoter {
   id: number
@@ -21,6 +21,25 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const loading = ref(false)
+
+// 邀请记录相关
+const activeTab = ref('list')
+const inviteLoading = ref(false)
+const inviteCurrentPage = ref(1)
+const invitePageSize = ref(10)
+const inviteTotal = ref(0)
+const inviteTableData = ref<any[]>([])
+const inviteFilters = ref({
+  promoter_id: '',
+  is_fraud: '',
+  device_type: '',
+  ip: '',
+  date_start: '',
+  date_end: '',
+})
+
+// 作弊相关
+const banningId = ref<number | null>(null)
 
 const detailVisible = ref(false)
 const detailLoading = ref(false)
@@ -156,6 +175,128 @@ async function toggleStatus(row: Promoter) {
   }
 }
 
+// 加载邀请记录
+const loadInviteRecords = async () => {
+  inviteLoading.value = true
+  try {
+    const params = new URLSearchParams({
+      page: inviteCurrentPage.value.toString(),
+      limit: invitePageSize.value.toString(),
+    })
+    if (inviteFilters.value.promoter_id) params.append('promoter_id', inviteFilters.value.promoter_id)
+    if (inviteFilters.value.is_fraud !== '') params.append('is_fraud', inviteFilters.value.is_fraud)
+    if (inviteFilters.value.device_type) params.append('device_type', inviteFilters.value.device_type)
+    if (inviteFilters.value.ip) params.append('ip', inviteFilters.value.ip)
+    if (inviteFilters.value.date_start) params.append('date_start', inviteFilters.value.date_start)
+    if (inviteFilters.value.date_end) params.append('date_end', inviteFilters.value.date_end)
+
+    const res = await fetch(`/api/v1/admin/promoters/invite-records?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const ct = res.headers.get('content-type') || ''
+    if (!ct.includes('application/json')) {
+      throw new Error(`接口返回非 JSON（status=${res.status}）`)
+    }
+    const data = await res.json()
+    if (data.code === 0) {
+      inviteTableData.value = data.data.data || []
+      inviteTotal.value = data.data.total || 0
+    } else {
+      ElMessage.error(data.message || '加载邀请记录失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载邀请记录失败')
+  } finally {
+    inviteLoading.value = false
+  }
+}
+
+// 封禁推广员
+const handleBan = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要封禁推广员 "${row.user?.nickname || row.user?.name || '该用户'}" 吗？封禁后其推广链接将失效。`,
+      '封禁确认',
+      { confirmButtonText: '确定封禁', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch { return }
+
+  banningId.value = row.id
+  try {
+    const res = await fetch(`/api/v1/admin/promoters/${row.id}/ban`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      ElMessage.success('已封禁')
+      loadInviteRecords()
+      loadPromoters()
+    } else {
+      ElMessage.error(data.message || '操作失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '网络错误')
+  } finally {
+    banningId.value = null
+  }
+}
+
+// 解封推广员
+const handleUnban = async (row: any) => {
+  banningId.value = row.id
+  try {
+    const res = await fetch(`/api/v1/admin/promoters/${row.id}/unban`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      ElMessage.success('已解封')
+      loadInviteRecords()
+      loadPromoters()
+    } else {
+      ElMessage.error(data.message || '操作失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '网络错误')
+  } finally {
+    banningId.value = null
+  }
+}
+
+function handleInviteSearch() {
+  inviteCurrentPage.value = 1
+  loadInviteRecords()
+}
+
+function handleInvitePageChange(page: number) {
+  inviteCurrentPage.value = page
+  loadInviteRecords()
+}
+
+function handleTabChange(tab: string) {
+  if (tab === 'invite-records' && inviteTableData.value.length === 0) {
+    loadInviteRecords()
+  }
+}
+
+// 风险分颜色
+const riskColor = (score: number) => {
+  if (score >= 80) return '#f56c6c'
+  if (score >= 50) return '#e6a23c'
+  return '#67c23a'
+}
+
 onMounted(() => {
   loadPromoters()
 })
@@ -187,78 +328,212 @@ onMounted(() => {
     </el-card>
 
     <el-card class="list-card">
-      <template #header><span>推广员列表</span></template>
+      <template #header>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <el-radio-group v-model="activeTab" @change="handleTabChange">
+            <el-radio-button value="list">推广员列表</el-radio-button>
+            <el-radio-button value="invite-records">邀请记录 & 反作弊</el-radio-button>
+          </el-radio-group>
+        </div>
+      </template>
 
-      <el-form :model="{ name: searchName, status: searchStatus }" inline>
-        <el-form-item label="昵称">
-          <el-input v-model="searchName" placeholder="请输入昵称" clearable style="width: 200px" />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="searchStatus" placeholder="全部" clearable style="width: 120px">
-            <el-option
-              v-for="opt in statusOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
+      <!-- 推广员列表 -->
+      <div v-if="activeTab === 'list'">
+        <el-form :model="{ name: searchName, status: searchStatus }" inline>
+          <el-form-item label="昵称">
+            <el-input v-model="searchName" placeholder="请输入昵称" clearable style="width: 200px" />
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="searchStatus" placeholder="全部" clearable style="width: 120px">
+              <el-option
+                v-for="opt in statusOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleSearch">搜索</el-button>
+            <el-button @click="handleReset">重置</el-button>
+          </el-form-item>
+        </el-form>
+
+        <el-table :data="tableData" border stripe style="width: 100%" v-loading="loading">
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column label="昵称" min-width="120">
+            <template #default="{ row }">
+              {{ row.user?.nickname || row.user?.name || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="手机号" width="120">
+            <template #default="{ row }">
+              {{ row.user?.mobile || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="invite_count" label="邀请人数" width="90" align="center" />
+          <el-table-column prop="consume_count" label="消费人数" width="90" align="center" />
+          <el-table-column label="累计佣金" width="110" align="right">
+            <template #default="{ row }">¥{{ (row.total_commission || 0).toFixed(2) }}</template>
+          </el-table-column>
+          <el-table-column label="可提现金额" width="110" align="right">
+            <template #default="{ row }">¥{{ (row.withdrawable_commission || 0).toFixed(2) }}</template>
+          </el-table-column>
+          <el-table-column label="状态" width="80" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">
+                {{ row.status === 1 ? '正常' : '禁用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="封禁" width="80" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.is_banned" type="danger" size="small">已封禁</el-tag>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="开通时间" width="170">
+            <template #default="{ row }">{{ row.created_at || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="220" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" type="primary" link @click="viewDetail(row)">查看</el-button>
+              <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" link @click="toggleStatus(row)">
+                {{ row.status === 1 ? '禁用' : '启用' }}
+              </el-button>
+              <el-button v-if="!row.is_banned" size="small" type="danger" link @click="handleBan(row)" :loading="banningId === row.id">
+                封禁
+              </el-button>
+              <el-button v-else size="small" type="success" link @click="handleUnban(row)" :loading="banningId === row.id">
+                解封
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="pagination-wrapper">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :total="total"
+            layout="total, prev, pager, next, jumper"
+            background
+            @current-change="handlePageChange"
+            @size-change="handleSizeChange"
+          />
+        </div>
+      </div>
+
+      <!-- 邀请记录 & 反作弊 -->
+      <div v-if="activeTab === 'invite-records'">
+        <el-form :model="inviteFilters" inline>
+          <el-form-item label="推广员ID">
+            <el-input v-model="inviteFilters.promoter_id" placeholder="推广员ID" clearable style="width: 120px" />
+          </el-form-item>
+          <el-form-item label="作弊状态">
+            <el-select v-model="inviteFilters.is_fraud" placeholder="全部" clearable style="width: 100px">
+              <el-option label="正常" value="0" />
+              <el-option label="作弊" value="1" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="设备类型">
+            <el-select v-model="inviteFilters.device_type" placeholder="全部" clearable style="width: 110px">
+              <el-option label="手机" value="mobile" />
+              <el-option label="电脑" value="desktop" />
+              <el-option label="平板" value="tablet" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="IP">
+            <el-input v-model="inviteFilters.ip" placeholder="搜索IP" clearable style="width: 140px" />
+          </el-form-item>
+          <el-form-item label="日期">
+            <el-date-picker
+              v-model="inviteFilters.date_start"
+              type="date"
+              placeholder="开始日期"
+              value-format="YYYY-MM-DD"
+              style="width: 140px"
             />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
+            <span style="margin: 0 4px">至</span>
+            <el-date-picker
+              v-model="inviteFilters.date_end"
+              type="date"
+              placeholder="结束日期"
+              value-format="YYYY-MM-DD"
+              style="width: 140px"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleInviteSearch">搜索</el-button>
+          </el-form-item>
+        </el-form>
 
-      <el-table :data="tableData" border stripe style="width: 100%" v-loading="loading">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column label="昵称" min-width="120">
-          <template #default="{ row }">
-            {{ row.user?.nickname || row.user?.name || '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="手机号" width="120">
-          <template #default="{ row }">
-            {{ row.user?.mobile || '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="invite_count" label="邀请人数" width="90" align="center" />
-        <el-table-column prop="consume_count" label="消费人数" width="90" align="center" />
-        <el-table-column label="累计佣金" width="110" align="right">
-          <template #default="{ row }">¥{{ (row.total_commission || 0).toFixed(2) }}</template>
-        </el-table-column>
-        <el-table-column label="可提现金额" width="110" align="right">
-          <template #default="{ row }">¥{{ (row.withdrawable_commission || 0).toFixed(2) }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="80" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">
-              {{ row.status === 1 ? '正常' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="开通时间" width="170">
-          <template #default="{ row }">{{ row.created_at || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="140" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" type="primary" link @click="viewDetail(row)">查看</el-button>
-            <el-button size="small" :type="row.status === 1 ? 'warning' : 'success'" link @click="toggleStatus(row)">
-              {{ row.status === 1 ? '禁用' : '启用' }}
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        <el-table :data="inviteTableData" border stripe style="width: 100%" v-loading="inviteLoading">
+          <el-table-column prop="id" label="ID" width="70" />
+          <el-table-column label="推广员" min-width="120">
+            <template #default="{ row }">
+              {{ row.promoter?.user?.nickname || row.promoter?.user?.name || row.promoter_id || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="被邀请用户" min-width="120">
+            <template #default="{ row }">
+              {{ row.user?.nickname || row.user?.name || row.user_id || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="设备类型" width="80" align="center">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.device_type === 'mobile' ? 'primary' : (row.device_type === 'tablet' ? 'warning' : 'info')">
+                {{ row.device_type === 'mobile' ? '手机' : (row.device_type === 'tablet' ? '平板' : (row.device_type === 'desktop' ? '电脑' : row.device_type)) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="设备型号" min-width="140" show-overflow-tooltip>
+            <template #default="{ row }">
+              <code style="font-size: 11px;">{{ row.device_model || '-' }}</code>
+            </template>
+          </el-table-column>
+          <el-table-column label="浏览器" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag size="small" type="">{{ row.browser || '-' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作系统" width="90" align="center">
+            <template #default="{ row }">
+              {{ row.os || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="ip" label="IP地址" width="130" />
+          <el-table-column label="注册时间" width="160">
+            <template #default="{ row }">{{ row.created_at || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="风险分" width="80" align="center">
+            <template #default="{ row }">
+              <span :style="{ color: riskColor(row.risk_score), fontWeight: '700' }">
+                {{ row.risk_score ?? 0 }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="作弊判定" width="120" align="center">
+            <template #default="{ row }">
+              <div v-if="row.is_fraud" style="text-align: center;">
+                <el-tag type="danger" size="small">作弊</el-tag>
+                <div v-if="row.fraud_reason" style="font-size: 11px; color: #f56c6c; margin-top: 2px;">{{ row.fraud_reason }}</div>
+              </div>
+              <el-tag v-else type="success" size="small">正常</el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
 
-      <div class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :total="total"
-          layout="total, prev, pager, next, jumper"
-          background
-          @current-change="handlePageChange"
-          @size-change="handleSizeChange"
-        />
+        <div class="pagination-wrapper">
+          <el-pagination
+            v-model:current-page="inviteCurrentPage"
+            v-model:page-size="invitePageSize"
+            :total="inviteTotal"
+            layout="total, prev, pager, next, jumper"
+            background
+            @current-change="handleInvitePageChange"
+          />
+        </div>
       </div>
     </el-card>
 

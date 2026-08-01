@@ -87,6 +87,63 @@ class AdminController extends Controller
         ]]);
     }
 
+    /**
+     * 滚动播报：最近邀请注册 + 佣金返利数据
+     * 用于后台用户管理页面顶部滚动展示
+     */
+    public function inviteMarquee()
+    {
+        // 最近 50 条邀请注册记录（按时间倒序）
+        $registrations = \App\Models\InviteRegistration::with(['user', 'promoter'])
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        $items = [];
+        foreach ($registrations as $reg) {
+            $promoterName = $reg->promoter?->user?->nickname
+                ?? $reg->promoter?->user?->name
+                ?? '推广员';
+            $inviteeName = $reg->user?->nickname
+                ?? $reg->user?->name
+                ?? '用户';
+
+            // 查找该推广员给这个用户带来的佣金
+            $commission = \App\Models\Commission::where('promoter_id', $reg->promoter_id)
+                ->whereHas('order', fn($q) => $q->where('user_id', $reg->user_id))
+                ->sum('amount');
+
+            $items[] = [
+                'id' => $reg->id,
+                'promoter_name' => $promoterName,
+                'invitee_name' => $inviteeName,
+                'invite_count' => \App\Models\InviteRegistration::where('promoter_id', $reg->promoter_id)->count(),
+                'commission' => round($commission, 2),
+                'is_fraud' => $reg->is_fraud,
+                'created_at' => $reg->created_at->format('Y-m-d H:i'),
+            ];
+        }
+
+        // 补充推广员汇总（邀请人数 + 总佣金）
+        $topPromoters = \App\Models\Promoter::with('user')
+            ->orderByDesc('total_invite')
+            ->limit(20)
+            ->get()
+            ->map(fn($p) => [
+                'promoter_name' => $p->user?->nickname ?? $p->user?->name ?? '推广员',
+                'invite_count' => $p->total_invite,
+                'commission' => round($p->total_commission, 2),
+            ]);
+
+        return response()->json([
+            'code' => 0,
+            'data' => [
+                'recent' => $items,
+                'top_list' => $topPromoters,
+            ],
+        ]);
+    }
+
     // ===== 用户管理 =====
     public function users(Request $request)
     {

@@ -103,6 +103,11 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::get('commissions', [V1\PromoterController::class, 'commissions']);
             Route::get('withdraw-history', [V1\PromoterController::class, 'withdrawHistory']);
             Route::post('withdraw', [V1\PromoterController::class, 'withdraw']);
+
+            // 邀请追踪
+            Route::post('track-click', [V1\PromoterController::class, 'trackClick']);
+            Route::get('invite-records', [V1\PromoterController::class, 'inviteRecords']);
+            Route::get('invite-clicks', [V1\PromoterController::class, 'inviteClicks']);
         });
 
         // 推广海报生成（公开访问，无需登录）
@@ -117,6 +122,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
         // ===== 管理后台（需管理员登录） =====
         Route::middleware('admin')->prefix('admin')->group(function () {
             Route::get('dashboard', [V1\AdminController::class, 'dashboard']);
+            Route::get('invite-marquee', [V1\AdminController::class, 'inviteMarquee']);
 
             // 系统配置
             Route::prefix('config')->group(function () {
@@ -156,6 +162,11 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
 
             // 推广管理
             Route::get('promoters', [V1\AdminController::class, 'promoters']);
+
+            // 邀请记录 + 反作弊
+            Route::get('promoters/invite-records', [V1\PromoterController::class, 'adminInviteRecords']);
+            Route::post('promoters/{id}/ban', [V1\PromoterController::class, 'ban']);
+            Route::post('promoters/{id}/unban', [V1\PromoterController::class, 'unban']);
 
             // 提现审核
             Route::get('withdraws', [V1\AdminController::class, 'withdraws']);

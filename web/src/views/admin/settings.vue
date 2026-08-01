@@ -7,6 +7,7 @@ const form = ref({
   // 基本设置
   siteName: '',
   siteDescription: '',
+  siteUrl: '',
   adminEmail: '',
   // 费用设置
   analysisMode: 'paid',
@@ -150,6 +151,7 @@ const loadConfigs = async () => {
           const keyMap: Record<string, string> = {
             site_name: 'siteName',
             site_description: 'siteDescription',
+            site_url: 'siteUrl',
             admin_email: 'adminEmail',
             analysis_mode: 'analysisMode',
             analysis_price: 'analysisPrice',
@@ -190,7 +192,45 @@ const loadConfigs = async () => {
 }
 
 // 保存设置
+// 预览当前域名生成的推广链接示例
+const previewInviteLink = () => {
+  const url = (form.value.siteUrl || '').trim()
+  if (!url) {
+    ElMessage.warning('请先填写网站域名')
+    return
+  }
+  if (!/^https?:\/\//.test(url)) {
+    ElMessage.error('域名必须以 http:// 或 https:// 开头')
+    return
+  }
+  const base = url.replace(/\/+$/, '')
+  const sample = base + '?code=ABC123'
+  ElMessageBox.alert(
+    `<div style="word-break: break-all; line-height: 1.6;">
+      <b>推广员访问示例：</b><br>
+      <code>${sample}</code><br><br>
+      <b>分享海报（带参数 code=ABC123）会指向该 URL</b>
+    </div>`,
+    '推广链接预览',
+    { dangerouslyUseHTMLString: true, confirmButtonText: '复制' }
+  ).then(() => {
+    navigator.clipboard.writeText(sample).then(() => {
+      ElMessage.success('已复制到剪贴板')
+    }).catch(() => {
+      ElMessage.warning('复制失败，请手动复制')
+    })
+  }).catch(() => {})
+}
+
 const handleSave = async () => {
+  // 保存前自动去掉尾斜杠（与后端 Site.php 行为一致）
+  if (form.value.siteUrl) {
+    form.value.siteUrl = form.value.siteUrl.trim().replace(/\/+$/, '')
+    if (form.value.siteUrl && !/^https?:\/\//.test(form.value.siteUrl)) {
+      ElMessage.error('网站域名必须以 http:// 或 https:// 开头')
+      return
+    }
+  }
   loading.value = true
   try {
     const configData = {
@@ -570,6 +610,15 @@ onMounted(() => {
   margin-left: 12px;
   color: #999;
   font-size: 12px;
+  line-height: 1.6;
+}
+.form-tip code {
+  background: #f0f0f0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 11px;
+  color: #d6336c;
 }
 
 .submit-area {
