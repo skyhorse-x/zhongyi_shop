@@ -12,18 +12,18 @@ use App\Http\Controllers\Api\V1;
 // V1 版本API
 Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::class])->group(function () {
     
-    // ===== 公开接口（带速率限制） =====
+    // ===== 公开接口 =====
     Route::prefix('auth')->group(function () {
-        Route::post('register', [V1\AuthController::class, 'register'])->middleware('throttle:5,1');
-        Route::post('login', [V1\AuthController::class, 'login'])->middleware('throttle:10,1');
-        Route::post('sms-code', [V1\AuthController::class, 'sendSmsCode'])->middleware('throttle:3,1');
+        Route::post('register', [V1\AuthController::class, 'register']);
+        Route::post('login', [V1\AuthController::class, 'login']);
+        Route::post('sms-code', [V1\AuthController::class, 'sendSmsCode']);
         Route::post('wechat', [V1\AuthController::class, 'wechatLogin']);        // 微信登录
         Route::post('refresh', [V1\AuthController::class, 'refreshToken']);      // 刷新Token
     });
 
-    // ===== 管理后台公开接口（带速率限制） =====
+    // ===== 管理后台公开接口 =====
     Route::prefix('admin')->group(function () {
-        Route::post('auth/login', [V1\AdminController::class, 'login'])->middleware('throttle:5,1');
+        Route::post('auth/login', [V1\AdminController::class, 'login']);
     });
 
     // ===== 需要登录的接口 =====

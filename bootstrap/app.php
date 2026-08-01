@@ -31,8 +31,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // 全局API请求日志中间件
         $middleware->append(\App\Http\Middleware\RequestLogMiddleware::class);
 
-        // API 速率限制
-        $middleware->throttleApi('api');
+        // API 速率限制（已禁用：取消全局 throttle）
+        // $middleware->throttleApi('api');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // API请求返回JSON格式错误

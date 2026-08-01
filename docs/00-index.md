@@ -25,6 +25,7 @@
 - [14 编码规范](14-standards.md)
 - [15 DevOps](15-devops.md)
 - [16 蓝图自检与完整性报告](16-self-check.md)
+- [17 Nginx 伪静态规则](17-nginx-rewrite.md)
 
 ---
 
