@@ -75,6 +75,16 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::get('sessions/{sessionNo}/messages', [V1\QaController::class, 'messages']);
         });
 
+        // 客服（用户端）
+        Route::prefix('customer-service')->group(function () {
+            Route::get('session', [V1\CustomerServiceController::class, 'getOrCreateSession']);
+            Route::get('sessions', [V1\CustomerServiceController::class, 'sessions']);
+            Route::get('sessions/{sessionNo}/messages', [V1\CustomerServiceController::class, 'messages']);
+            Route::post('sessions/{sessionNo}/messages', [V1\CustomerServiceController::class, 'sendMessage']);
+            Route::post('sessions/{sessionNo}/upload-image', [V1\CustomerServiceController::class, 'uploadImage']);
+            Route::post('sessions/{sessionNo}/close', [V1\CustomerServiceController::class, 'closeSession']);
+        });
+
         // 次数包
         Route::prefix('packages')->group(function () {
             Route::get('/', [V1\PackageController::class, 'index']);
@@ -199,6 +209,16 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             // 推广员详情/禁用
             Route::get('promoters/{id}', [V1\AdminController::class, 'promoterDetail']);
             Route::post('promoters/{id}/toggle', [V1\AdminController::class, 'promoterToggle']);
+
+            // 客服管理（后台）
+            Route::prefix('customer-service')->group(function () {
+                Route::get('statistics', [V1\Admin\CustomerServiceController::class, 'statistics']);
+                Route::get('sessions', [V1\Admin\CustomerServiceController::class, 'sessions']);
+                Route::get('sessions/{sessionNo}/messages', [V1\Admin\CustomerServiceController::class, 'messages']);
+                Route::post('sessions/{sessionNo}/messages', [V1\Admin\CustomerServiceController::class, 'sendMessage']);
+                Route::post('sessions/{sessionNo}/upload-image', [V1\Admin\CustomerServiceController::class, 'uploadImage']);
+                Route::post('sessions/{sessionNo}/close', [V1\Admin\CustomerServiceController::class, 'closeSession']);
+            });
         });
     });
 

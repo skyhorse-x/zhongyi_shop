@@ -54,9 +54,9 @@ request.interceptors.response.use(
     if (error.response) {
       const { status, data } = error.response
       if (status === 401) {
-        localStorage.removeItem('token')
-        router.push({ name: 'Login' })
-        ElMessage.error('请先登录')
+        // 登录失败（账号或密码错误）- 显示后端返回的错误信息
+        const errorMsg = data?.message || '账号或密码错误'
+        ElMessage.error(errorMsg)
       } else if (status === 422) {
         // 验证错误
         const messages = Object.values(data.errors || {}).flat()

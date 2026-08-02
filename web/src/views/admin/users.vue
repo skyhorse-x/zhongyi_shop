@@ -939,4 +939,73 @@ const loadLogs = async (row?: any) => {
   color: #fa8c16;
 }
 
+/* 手机端适配 */
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .page-header h2 {
+    font-size: 18px;
+  }
+
+  .search-form {
+    padding: 12px;
+  }
+
+  .el-form--inline .el-form-item {
+    margin-right: 0;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+
+  .el-form--inline .el-form-item .el-input,
+  .el-form--inline .el-form-item .el-select {
+    width: 100% !important;
+  }
+
+  .el-table {
+    font-size: 12px;
+  }
+
+  .el-table .el-button {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  .el-pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .el-dialog {
+    width: 90% !important;
+    max-width: 400px;
+  }
+
+  .el-row {
+    flex-direction: column;
+  }
+
+  .el-row .el-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  .el-form-item {
+    margin-bottom: 12px;
+  }
+
+  .logs-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .logs-stat-value {
+    font-size: 16px;
+  }
+}
 </style>

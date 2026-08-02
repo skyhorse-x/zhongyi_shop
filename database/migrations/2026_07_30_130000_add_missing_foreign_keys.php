@@ -66,18 +66,35 @@ return new class extends Migration
      */
     private function foreignKeyExists(string $table, string $column): bool
     {
-        $database = DB::getDatabaseName();
-        $tableName = $table;
-        // 生成 Laravel 默认的外键名称: table_column_foreign
-        $fkName = "{$table}_{$column}_foreign";
+        try {
+            // SQLite 使用 PRAGMA，MySQL/PostgreSQL 使用 information_schema
+            $driver = DB::getDriverName();
+            if ($driver === 'sqlite') {
+                $foreignKeys = DB::select("PRAGMA foreign_key_list({$table})");
+                foreach ($foreignKeys as $fk) {
+                    if (isset($fk->from) && $fk->from === $column) {
+                        return true;
+                    }
+                }
+                return false;
+            }
 
-        $result = DB::select(
-            "SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
-             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?",
-            [$database, $tableName, $fkName]
-        );
+            $database = DB::getDatabaseName();
+            $tableName = $table;
+            // 生成 Laravel 默认的外键名称: table_column_foreign
+            $fkName = "{$table}_{$column}_foreign";
 
-        return !empty($result);
+            $result = DB::select(
+                "SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+                 WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?",
+                [$database, $tableName, $fkName]
+            );
+
+            return !empty($result);
+        } catch (\Exception $e) {
+            // 如果检查失败，尝试添加（Schema::table 会处理重复的情况）
+            return false;
+        }
     }
 
     /**
@@ -110,14 +127,29 @@ return new class extends Migration
      */
     private function indexExists(string $table, string $indexName): bool
     {
-        $database = DB::getDatabaseName();
-        $result = DB::select(
-            "SELECT INDEX_NAME FROM information_schema.STATISTICS
-             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?",
-            [$database, $table, $indexName]
-        );
+        try {
+            $driver = DB::getDriverName();
+            if ($driver === 'sqlite') {
+                $indexes = DB::select("PRAGMA index_list({$table})");
+                foreach ($indexes as $index) {
+                    if (isset($index->name) && $index->name === $indexName) {
+                        return true;
+                    }
+                }
+                return false;
+            }
 
-        return !empty($result);
+            $database = DB::getDatabaseName();
+            $result = DB::select(
+                "SELECT INDEX_NAME FROM information_schema.STATISTICS
+                 WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?",
+                [$database, $table, $indexName]
+            );
+
+            return !empty($result);
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**

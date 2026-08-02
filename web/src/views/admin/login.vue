@@ -402,6 +402,12 @@ const goUserLogin = () => {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
+}
+
+.login-form {
+  width: 100%;
+  max-width: 400px;
 }
 
 .login-header {
@@ -586,13 +592,42 @@ const goUserLogin = () => {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+  .admin-login-page {
+    padding: 16px;
+    align-items: flex-start;
+  }
+
   .admin-login-container {
     flex-direction: column;
     min-height: auto;
+    border-radius: 16px;
   }
 
   .brand-section {
-    padding: 40px 24px;
+    padding: 24px 20px;
+  }
+
+  .logo-wrapper {
+    margin-bottom: 16px;
+  }
+
+  .logo-icon {
+    width: 60px;
+    height: 60px;
+  }
+
+  .logo-emoji {
+    font-size: 32px;
+  }
+
+  .brand-title {
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+
+  .brand-subtitle {
+    font-size: 13px;
+    margin-bottom: 0;
   }
 
   .brand-features {
@@ -600,7 +635,63 @@ const goUserLogin = () => {
   }
 
   .login-section {
-    padding: 40px 24px;
+    padding: 24px 20px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .login-header {
+    margin-bottom: 20px;
+    text-align: center;
+    width: 100%;
+  }
+
+  .login-form {
+    max-width: 100%;
+  }
+
+  .login-title {
+    font-size: 22px;
+  }
+
+  .login-desc {
+    font-size: 13px;
+  }
+
+  .login-form :deep(.el-form-item) {
+    margin-bottom: 16px;
+  }
+
+  .login-form :deep(.el-input__wrapper) {
+    padding: 2px 12px;
+  }
+
+  .form-options {
+    margin-bottom: 16px;
+    width: 100%;
+  }
+
+  .login-button {
+    height: 44px;
+    font-size: 15px;
+    width: 100%;
+  }
+
+  .login-footer {
+    margin-top: 16px;
+  }
+
+  .admin-tips {
+    margin-top: 16px;
+    padding: 10px 12px;
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: flex-start;
+  }
+
+  .admin-tips span {
+    font-size: 11px;
+    text-align: left;
   }
 
   .copyright {
@@ -608,8 +699,31 @@ const goUserLogin = () => {
     bottom: auto;
     left: auto;
     transform: none;
-    margin-top: 24px;
+    margin-top: 16px;
     text-align: center;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 380px) {
+  .admin-login-page {
+    padding: 12px;
+  }
+
+  .brand-section {
+    padding: 20px 16px;
+  }
+
+  .login-section {
+    padding: 20px 16px;
+  }
+
+  .brand-title {
+    font-size: 18px;
+  }
+
+  .login-title {
+    font-size: 20px;
   }
 }
 </style>

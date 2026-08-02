@@ -33,7 +33,7 @@ const handleLogin = async () => {
     const redirect = (route.query.redirect as string) || '/'
     router.push(redirect)
   } catch (e: any) {
-    ElMessage.error(e.message || '登录失败')
+    // 错误信息已在请求拦截器中显示，此处不再重复提示
   } finally {
     loading.value = false
   }

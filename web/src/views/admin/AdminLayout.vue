@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { ref, shallowRef, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen } from '@element-plus/icons-vue'
+import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
 
 const sidebarCollapsed = ref(false)
 const mobileSidebarOpen = ref(false)
+const waitingCount = ref(0)
 
 // 使用 shallowRef 避免图标组件被 reactive 包裹，消除 Vue 警告
 const menuItems = shallowRef([
   { title: '仪表盘', icon: TrendCharts, path: '/admin/dashboard' },
+  { title: '客服管理', icon: Service, path: '/admin/customer-service', badge: () => waitingCount.value },
   { title: '用户管理', icon: UserFilled, path: '/admin/users' },
   { title: '订单管理', icon: Tickets, path: '/admin/orders' },
   { title: '次数包管理', icon: Goods, path: '/admin/packages' },
@@ -22,6 +24,27 @@ const menuItems = shallowRef([
   { title: '体质题目', icon: EditPen, path: '/admin/constitution' },
   { title: '系统设置', icon: Setting, path: '/admin/settings' },
 ])
+
+// 获取认证token
+const getAdminToken = (): string => localStorage.getItem('admin_token') || ''
+
+// 加载待接入客服数量
+const loadWaitingCount = async () => {
+  try {
+    const res = await fetch('/api/v1/admin/customer-service/statistics', {
+      headers: {
+        'Authorization': `Bearer ${getAdminToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      waitingCount.value = data.data.waiting || 0
+    }
+  } catch (e) {
+    // 忽略错误
+  }
+}
 
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
@@ -46,6 +69,11 @@ onMounted(() => {
   document.body.classList.add('admin-page')
   const appEl = document.getElementById('app')
   if (appEl) appEl.classList.add('admin-app')
+  
+  // 加载客服待接入数量
+  loadWaitingCount()
+  // 每30秒刷新一次
+  setInterval(loadWaitingCount, 30000)
 })
 </script>
 
@@ -69,8 +97,12 @@ onMounted(() => {
           :class="{ active: route.path === item.path || (item.path !== '/admin/dashboard' && route.path.startsWith(item.path)) }"
           @click="navigateTo(item.path)"
         >
-          <el-icon class="nav-icon"><component :is="item.icon" /></el-icon>
+          <div class="nav-icon-wrap">
+            <el-icon class="nav-icon"><component :is="item.icon" /></el-icon>
+            <span v-if="item.badge && item.badge() > 0" class="nav-badge">{{ item.badge() > 99 ? '99+' : item.badge() }}</span>
+          </div>
           <span v-if="!sidebarCollapsed" class="nav-label">{{ item.title }}</span>
+          <span v-if="sidebarCollapsed && item.badge && item.badge() > 0" class="collapsed-badge">{{ item.badge() > 99 ? '99+' : item.badge() }}</span>
         </div>
       </nav>
 
@@ -188,6 +220,46 @@ onMounted(() => {
 
 .nav-label {
   font-size: 14px;
+  flex: 1;
+}
+
+.nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.nav-badge {
+  position: absolute;
+  top: -8px;
+  right: -12px;
+  min-width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  background: #ee0a24;
+  color: #fff;
+  font-size: 10px;
+  border-radius: 9px;
+  padding: 0 5px;
+  font-weight: bold;
+  z-index: 1;
+}
+
+.collapsed-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  background: #ee0a24;
+  color: #fff;
+  font-size: 10px;
+  border-radius: 9px;
+  padding: 0 5px;
+  font-weight: bold;
 }
 
 .sidebar-footer {

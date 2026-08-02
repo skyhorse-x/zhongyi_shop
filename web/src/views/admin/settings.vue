@@ -626,4 +626,29 @@ onMounted(() => {
   padding-top: 20px;
   border-top: 1px solid #ebeef5;
 }
+
+/* 手机端适配 */
+@media (max-width: 768px) {
+  .el-row { flex-direction: column; }
+
+  .el-row .el-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  .el-form-item {
+    margin-bottom: 16px;
+  }
+
+  .submit-area {
+    margin-top: 16px;
+    padding-top: 16px;
+  }
+
+  .submit-area .el-button {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+}
 </style>

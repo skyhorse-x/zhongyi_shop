@@ -314,4 +314,34 @@ onMounted(() => {
 .el-table {
   margin-bottom: 16px;
 }
+
+/* 手机端适配 */
+@media (max-width: 768px) {
+  .search-form { padding: 12px; }
+
+  .el-form--inline .el-form-item {
+    margin-right: 0;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+
+  .el-form--inline .el-form-item .el-input,
+  .el-form--inline .el-form-item .el-select {
+    width: 100% !important;
+  }
+
+  .el-table { font-size: 12px; }
+
+  .el-pagination { flex-wrap: wrap; justify-content: center; }
+
+  .el-dialog { width: 90% !important; max-width: 400px; }
+
+  .el-row { flex-direction: column; }
+
+  .el-row .el-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+}
 </style>

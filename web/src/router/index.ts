@@ -101,6 +101,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/settings.vue'),
         meta: { title: '系统设置' },
       },
+      {
+        path: 'customer-service',
+        name: 'AdminCustomerService',
+        component: () => import('@/views/admin/customer-service.vue'),
+        meta: { title: '客服管理' },
+      },
     ],
   },
   // 舌诊分析
@@ -147,6 +153,19 @@ const routes: RouteRecordRaw[] = [
     name: 'QaSessions',
     component: () => import('@/views/qa/sessions.vue'),
     meta: { title: '问答记录', needAuth: true },
+  },
+  // 消息中心
+  {
+    path: '/messages',
+    name: 'Messages',
+    component: () => import('@/views/messages/index.vue'),
+    meta: { title: '消息中心', needAuth: true },
+  },
+  {
+    path: '/messages/customer-service',
+    name: 'CustomerService',
+    component: () => import('@/views/messages/customer-service.vue'),
+    meta: { title: '客服聊天', needAuth: true },
   },
   // 次数包
   {

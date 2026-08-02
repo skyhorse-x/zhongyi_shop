@@ -484,4 +484,25 @@ onMounted(() => {
 .pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
 
 .form-unit { margin-left: 8px; color: #999; }
+
+/* 手机端适配 */
+@media (max-width: 768px) {
+  .stats-num { font-size: 16px; }
+
+  .el-table { font-size: 12px; }
+
+  .el-pagination { flex-wrap: wrap; justify-content: center; }
+
+  .el-dialog { width: 90% !important; max-width: 400px; }
+
+  .el-row { flex-direction: column; }
+
+  .el-row .el-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  .pagination-wrapper { justify-content: center; }
+}
 </style>

@@ -295,4 +295,28 @@ onMounted(() => {
 .page-desc { font-size: 14px; color: #999; }
 
 .pagination-wrapper { margin-top: 20px; display: flex; justify-content: flex-end; }
+
+/* 手机端适配 */
+@media (max-width: 768px) {
+  .page-title { font-size: 18px; }
+
+  .el-form--inline .el-form-item {
+    margin-right: 0;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+
+  .el-form--inline .el-form-item .el-input,
+  .el-form--inline .el-form-item .el-select {
+    width: 100% !important;
+  }
+
+  .el-table { font-size: 12px; }
+
+  .el-pagination { flex-wrap: wrap; justify-content: center; }
+
+  .el-dialog { width: 90% !important; max-width: 400px; }
+
+  .pagination-wrapper { justify-content: center; }
+}
 </style>

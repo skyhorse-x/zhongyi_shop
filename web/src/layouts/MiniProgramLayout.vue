@@ -7,6 +7,7 @@ import {
   User,
   Document,
   ChatLineRound,
+  Bell,
   Share,
   MoreFilled,
   Back,
@@ -67,6 +68,7 @@ const tabItems = [
   { icon: HomeFilled, label: '首页', path: '/' },
   { icon: Document, label: '订单', path: '/member/orders' },
   { icon: ChatLineRound, label: '问答', path: '/qa/chat' },
+  { icon: Bell, label: '消息', path: '/messages' },
   { icon: User, label: '我的', path: '/member' },
 ]
 
@@ -76,6 +78,7 @@ const activeTab = computed(() => {
   if (path === '/') return '/'
   if (path.startsWith('/member/orders')) return '/member/orders'
   if (path.startsWith('/qa')) return '/qa/chat'
+  if (path.startsWith('/messages')) return '/messages'
   if (path.startsWith('/member')) return '/member'
   return '/'
 })
@@ -84,6 +87,9 @@ const activeTab = computed(() => {
 const switchTab = (path: string) => {
   router.push(path)
 }
+
+// 未读消息数
+const unreadCount = ref(3)
 </script>
 
 <template>
@@ -147,13 +153,22 @@ const switchTab = (path: string) => {
         :class="{ active: activeTab === tab.path }"
         @click="switchTab(tab.path)"
       >
-        <el-icon class="tab-icon"><component :is="tab.icon" /></el-icon>
+        <div class="tab-icon-wrap">
+          <el-icon class="tab-icon"><component :is="tab.icon" /></el-icon>
+          <span class="tab-badge" v-if="tab.path === '/messages' && unreadCount > 0">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+        </div>
         <span class="tab-label">{{ tab.label }}</span>
       </div>
     </div>
 
     <!-- 底部安全区域 -->
     <div class="safe-area-bottom"></div>
+
+    <!-- 悬浮聊天入口 -->
+    <div class="chat-float-btn" @click="navigateTo('/qa/chat')" v-if="route.path !== '/qa/chat'">
+      <el-icon class="chat-icon"><ChatLineRound /></el-icon>
+      <span class="chat-text">咨询</span>
+    </div>
   </div>
 </template>
 
@@ -362,10 +377,63 @@ const switchTab = (path: string) => {
   background: rgba(0, 0, 0, 0.02);
 }
 
+.tab-icon-wrap {
+  position: relative;
+}
+
+.tab-badge {
+  position: absolute;
+  top: -6px;
+  right: -12px;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  background: #ee0a24;
+  color: #fff;
+  font-size: 10px;
+  border-radius: 8px;
+  padding: 0 4px;
+  font-weight: 500;
+}
+
 /* 底部安全区域 */
 .safe-area-bottom {
   height: env(safe-area-inset-bottom);
   background: #fff;
+}
+
+/* 悬浮聊天入口 */
+.chat-float-btn {
+  position: fixed;
+  right: 16px;
+  bottom: 80px;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #07c160 0%, #06ad56 100%);
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(7, 193, 96, 0.35);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chat-float-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 8px rgba(7, 193, 96, 0.3);
+}
+
+.chat-icon {
+  font-size: 18px;
+  color: #fff;
+}
+
+.chat-text {
+  font-size: 14px;
+  color: #fff;
+  font-weight: 500;
 }
 
 /* 过渡动画 */
