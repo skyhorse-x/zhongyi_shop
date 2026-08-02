@@ -5,6 +5,53 @@ import router from '@/router'
 let isRedirectingToUserLogin = false
 let isRedirectingToAdminLogin = false
 
+// 标记是否正在刷新 token，避免重复刷新
+let isRefreshingToken = false
+// 等待刷新完成的请求队列
+let refreshSubscribers: Array<(token: string) => void> = []
+
+// 刷新 token 并通知等待的请求
+const doRefreshToken = async (oldToken: string): Promise<string | null> => {
+  if (isRefreshingToken) {
+    // 如果正在刷新，返回一个 Promise，等待刷新完成
+    return new Promise((resolve) => {
+      refreshSubscribers.push((token: string) => {
+        resolve(token)
+      })
+    })
+  }
+
+  isRefreshingToken = true
+
+  try {
+    const res = await fetch('/api/v1/refresh', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ refresh_token: oldToken }),
+    })
+
+    const data = await res.json()
+
+    if (data.code === 0 && data.data?.token) {
+      const newToken = data.data.token
+      localStorage.setItem('token', newToken)
+      // 通知所有等待的请求
+      refreshSubscribers.forEach((cb) => cb(newToken))
+      refreshSubscribers = []
+      return newToken
+    }
+
+    return null
+  } catch {
+    return null
+  } finally {
+    isRefreshingToken = false
+  }
+}
+
 // 处理用户端未登录跳转
 const handleUserUnauthorized = () => {
   // 如果没有 token，说明确实未登录
@@ -43,6 +90,11 @@ const isAdminRequest = (url: string): boolean => {
 
 // 包装原生 fetch，统一处理 401 错误
 export const safeFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
+  // 跳过刷新接口本身
+  if (url.includes('/api/v1/refresh')) {
+    return fetch(url, options)
+  }
+
   const response = await fetch(url, options)
 
   // 检查是否为 401 错误
@@ -57,6 +109,20 @@ export const safeFetch = async (url: string, options: RequestInit = {}): Promise
         if (isAdminRequest(url)) {
           handleAdminUnauthorized()
         } else {
+          // 尝试静默刷新 token
+          const oldToken = localStorage.getItem('token')
+          if (oldToken) {
+            const newToken = await doRefreshToken(oldToken)
+            if (newToken) {
+              // 刷新成功，用新 token 重试原请求
+              const newOptions = { ...options }
+              const newHeaders = new Headers(options.headers)
+              newHeaders.set('Authorization', `Bearer ${newToken}`)
+              newOptions.headers = newHeaders
+              return fetch(url, newOptions)
+            }
+          }
+          // 刷新失败，跳转登录
           handleUserUnauthorized()
         }
       }
@@ -65,6 +131,19 @@ export const safeFetch = async (url: string, options: RequestInit = {}): Promise
       if (isAdminRequest(url)) {
         handleAdminUnauthorized()
       } else {
+        // 尝试静默刷新 token
+        const oldToken = localStorage.getItem('token')
+        if (oldToken) {
+          const newToken = await doRefreshToken(oldToken)
+          if (newToken) {
+            // 刷新成功，用新 token 重试原请求
+            const newOptions = { ...options }
+            const newHeaders = new Headers(options.headers)
+            newHeaders.set('Authorization', `Bearer ${newToken}`)
+            newOptions.headers = newHeaders
+            return fetch(url, newOptions)
+          }
+        }
         handleUserUnauthorized()
       }
     }

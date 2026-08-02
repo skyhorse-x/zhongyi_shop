@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -447,10 +448,52 @@ class AuthController extends Controller
     {
         $request->validate(['refresh_token' => 'required']);
 
+        $refreshToken = $request->input('refresh_token');
+
+        // 查找 token 记录
+        $accessToken = PersonalAccessToken::findToken($refreshToken);
+
+        if (!$accessToken) {
+            return response()->json([
+                'code' => 401,
+                'message' => 'Token 无效，请重新登录',
+            ], 401);
+        }
+
+        // 获取关联用户
+        $tokenable = $accessToken->tokenable;
+
+        if (!$tokenable) {
+            return response()->json([
+                'code' => 401,
+                'message' => '用户不存在，请重新登录',
+            ], 401);
+        }
+
+        // 检查是否超过最大刷新期限（7天）
+        $maxRefreshDays = 7;
+        $tokenCreatedAt = $accessToken->created_at ?? now();
+        if ($tokenCreatedAt->diffInDays(now()) > $maxRefreshDays) {
+            // 超过刷新期限，删除 token
+            $accessToken->delete();
+            return response()->json([
+                'code' => 401,
+                'message' => '登录已过期，请重新登录',
+            ], 401);
+        }
+
+        // 删除旧 token
+        $accessToken->delete();
+
+        // 创建新 token
+        $newToken = $tokenable->createToken('auth_token')->plainTextToken;
+
         return response()->json([
-            'code' => 501,
-            'message' => 'Token 刷新功能尚未实现，请重新登录',
-            'data' => null,
-        ], 501);
+            'code' => 0,
+            'message' => '刷新成功',
+            'data' => [
+                'token' => $newToken,
+            ],
+        ]);
     }
 }
