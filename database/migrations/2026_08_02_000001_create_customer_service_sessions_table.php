@@ -12,6 +12,9 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('customer_service_sessions')) {
+            return;
+        }
         Schema::create('customer_service_sessions', function (Blueprint $table) {
             $table->id();
             $table->string('session_no', 32)->unique()->comment('会话编号');

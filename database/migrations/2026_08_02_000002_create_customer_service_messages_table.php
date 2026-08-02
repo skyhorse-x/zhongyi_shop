@@ -12,6 +12,9 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('customer_service_messages')) {
+            return;
+        }
         Schema::create('customer_service_messages', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('session_id')->comment('会话ID');
