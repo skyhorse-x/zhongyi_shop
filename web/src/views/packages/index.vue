@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElDialog, ElRadioGroup, ElRadio, ElButton } from 'element-plus'
 import { List, Check, InfoFilled, ShoppingBag, Sunny, Star, Trophy, Wallet, Money, ChatLineSquare } from '@element-plus/icons-vue'
 import { toMoney } from '@/utils'
+import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
 const loading = ref(false)

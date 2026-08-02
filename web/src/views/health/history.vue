@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 import { User, Sunny } from '@element-plus/icons-vue'
 
 const router = useRouter()

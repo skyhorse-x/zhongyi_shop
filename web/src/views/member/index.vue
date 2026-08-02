@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ArrowRight, Document, FirstAidKit, ShoppingBag, Promotion, Headset, Wallet } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
 const userStore = useUserStore()

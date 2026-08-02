@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Money, Wallet, Refresh } from '@element-plus/icons-vue'
 import { toMoney } from '@/utils'
+import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
 

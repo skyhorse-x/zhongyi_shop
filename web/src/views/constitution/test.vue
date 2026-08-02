@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
 const loading = ref(false)

@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CameraFilled, ChatLineRound, Delete } from '@element-plus/icons-vue'
+import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
 

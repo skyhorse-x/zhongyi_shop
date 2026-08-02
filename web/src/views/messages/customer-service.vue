@@ -2,6 +2,7 @@
 import { ref, nextTick, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Picture } from '@element-plus/icons-vue'
+import { safeFetch } from '@/utils/fetch'
 
 interface ChatMessage {
   id: number
