@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Picture, ArrowLeft } from '@element-plus/icons-vue'
 
@@ -320,8 +320,6 @@ const getStatusColor = (status: number): string => {
 const previewImage = (url: string) => {
   window.open(url, '_blank')
 }
-
-import { nextTick, onUnmounted } from 'vue'
 
 // 定时器引用
 let sessionsInterval: number | null = null
