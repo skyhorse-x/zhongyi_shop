@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Commission;
+use App\Support\Site;
 use App\Models\InviteClick;
 use App\Models\InviteRegistration;
 use App\Models\Promoter;
@@ -67,17 +68,27 @@ class PromoterController extends Controller
     }
 
     /**
-     * 获取推广信息
+     * 获取推广信息（不存在则自动创建）
      */
     public function info(Request $request)
     {
-        $promoter = Promoter::where('user_id', $request->user()->id)->first();
+        $user = $request->user();
+        $promoter = Promoter::where('user_id', $user->id)->first();
 
+        // 自动创建推广员记录
         if (!$promoter) {
-            return response()->json([
-                'code' => 404,
-                'message' => '您还不是推广员',
-            ], 404);
+            $commissionRate = (float) (SystemConfig::where('key', 'commission_rate')->value('value') ?? 15);
+
+            $promoter = Promoter::create([
+                'user_id' => $user->id,
+                'invite_code' => $this->generateInviteCode(),
+                'level' => 1,
+                'commission_rate' => $commissionRate,
+                'status' => 1,
+                'activated_at' => now(),
+            ]);
+
+            $user->update(['is_promoter' => 1]);
         }
 
         return response()->json([

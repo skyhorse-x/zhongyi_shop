@@ -26,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'super_admin' => \App\Http\Middleware\SuperAdminMiddleware::class,
+            'auth.or.admin' => \App\Http\Middleware\AuthenticateOrAdmin::class,
         ]);
 
         // 全局API请求日志中间件

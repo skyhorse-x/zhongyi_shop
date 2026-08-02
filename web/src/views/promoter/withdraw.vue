@@ -21,7 +21,7 @@ const withdrawTypes = [
   { value: 'alipay', label: '支付宝' },
 ]
 
-const getToken = (): string => localStorage.getItem('token') || ''
+const getToken = (): string => localStorage.getItem('token') || localStorage.getItem('admin_token') || ''
 
 const canWithdraw = computed(() => {
   const amount = parseFloat(form.value.amount)
@@ -42,8 +42,7 @@ const loadPromoterInfo = async () => {
     if (data.code === 0) {
       balance.value = data.data.available_commission || 0
     } else {
-      ElMessage.error('请先开通推广员')
-      router.push('/promoter/activate')
+      ElMessage.error(data.message || '加载推广信息失败')
     }
   } catch (e: any) {
     ElMessage.error(e.message || '加载推广信息失败')

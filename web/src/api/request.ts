@@ -34,10 +34,15 @@ let isRedirectingToLogin = false
 const handleUnauthorized = () => {
   if (isRedirectingToLogin) return
   isRedirectingToLogin = true
-  
+
+  // 只有确实没有 token 时才显示"请先登录"
+  const hasToken = !!localStorage.getItem('token')
+  if (!hasToken) {
+    ElMessage.error('请先登录')
+  }
+
   localStorage.removeItem('token')
-  ElMessage.error('请先登录')
-  
+
   // 使用 replace 避免导航冲突，并在完成后重置标记
   router.replace({ name: 'Login' }).finally(() => {
     isRedirectingToLogin = false

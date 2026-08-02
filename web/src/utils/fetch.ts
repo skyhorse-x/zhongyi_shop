@@ -7,11 +7,16 @@ let isRedirectingToAdminLogin = false
 
 // 处理用户端未登录跳转
 const handleUserUnauthorized = () => {
+  // 如果没有 token，说明确实未登录
+  const hasToken = !!localStorage.getItem('token')
+  if (!hasToken) {
+    ElMessage.error('请先登录')
+  }
+  
   if (isRedirectingToUserLogin) return
   isRedirectingToUserLogin = true
 
   localStorage.removeItem('token')
-  ElMessage.error('请先登录')
 
   router.replace({ name: 'Login' }).finally(() => {
     isRedirectingToUserLogin = false

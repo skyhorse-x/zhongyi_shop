@@ -36,7 +36,7 @@ const payTypeMap: Record<string, string> = {
 
 const withdrawList = ref<WithdrawItem[]>([])
 
-const getToken = (): string => localStorage.getItem('token') || ''
+const getToken = (): string => localStorage.getItem('token') || localStorage.getItem('admin_token') || ''
 
 const loadWithdraws = async () => {
   loading.value = true
@@ -47,9 +47,6 @@ const loadWithdraws = async () => {
     const data = await res.json()
     if (data.code === 0) {
       withdrawList.value = (data.data?.data ?? data.data ?? []) as WithdrawItem[]
-    } else if (data.code === 404) {
-      ElMessage.warning('请先开通推广员')
-      router.push('/promoter/activate')
     } else {
       ElMessage.error(data.message || '加载提现记录失败')
     }

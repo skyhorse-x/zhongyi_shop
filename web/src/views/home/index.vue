@@ -62,7 +62,7 @@ const goToFeature = (path: string) => {
     </div>
 
     <!-- 推广入口 -->
-    <div class="promote-entry" @click="router.push('/promoter/activate')">
+    <div class="promote-entry" @click="router.push('/promoter')">
       <div class="entry-icon">
         <el-icon><Money /></el-icon>
       </div>

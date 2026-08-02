@@ -133,7 +133,9 @@ const handleRegister = async () => {
 
     await userStore.registerAction(data)
     ElMessage.success('注册成功')
-    router.push('/')
+    // 清除邀请码，防止返回注册页时重复使用
+    form.value.invite_code = ''
+    router.replace('/')
   } catch (e: any) {
     ElMessage.error(e.message || '注册失败')
   } finally {

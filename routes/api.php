@@ -32,7 +32,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
     });
 
     // ===== 需要登录的接口 =====
-    Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware('auth.or.admin')->group(function () {
 
         // 管理员自身管理（普通管理员可用）
         Route::prefix('admin')->group(function () {
@@ -135,6 +135,9 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
         // 推广海报生成（公开访问，无需登录）
         Route::get('promoter/poster-image', [V1\PromoterController::class, 'posterImage']);
 
+        // 邀请播报（公开访问，用于会员中心展示）
+        Route::get('invite-marquee', [V1\AdminController::class, 'inviteMarquee']);
+
         // 文章
         Route::prefix('articles')->group(function () {
             Route::get('/', [V1\ArticleController::class, 'index']);
@@ -144,7 +147,6 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
         // ===== 管理后台（需管理员登录） =====
         Route::middleware('admin')->prefix('admin')->group(function () {
             Route::get('dashboard', [V1\AdminController::class, 'dashboard']);
-            Route::get('invite-marquee', [V1\AdminController::class, 'inviteMarquee']);
 
             // 系统配置
             Route::prefix('config')->group(function () {
@@ -154,6 +156,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
 
             // 用户管理
             Route::get('users', [V1\AdminController::class, 'users']);
+            Route::post('users', [V1\AdminController::class, 'userStore']);
             Route::get('users/{id}', [V1\AdminController::class, 'userDetail']);
             Route::put('users/{id}', [V1\AdminController::class, 'userUpdate']);
             Route::put('users/{id}/status', [V1\AdminController::class, 'userToggleStatus']);

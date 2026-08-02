@@ -14,7 +14,7 @@ const paying = ref(false)
 const userInfo = ref<any>(null)
 const userBalance = ref(0)
 
-const getToken = (): string => localStorage.getItem('token') || ''
+const getToken = (): string => localStorage.getItem('token') || localStorage.getItem('admin_token') || ''
 
 // icon 名称 → 组件映射（后端只传 icon 名称，前端解析）
 const iconMap: Record<string, any> = {

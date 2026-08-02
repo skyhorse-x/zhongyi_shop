@@ -171,6 +171,37 @@ class AdminController extends Controller
         return response()->json(['code' => 0, 'data' => $query->paginate($request->per_page ?? 10)]);
     }
 
+    /**
+     * 新增用户
+     */
+    public function userStore(Request $request)
+    {
+        $data = $request->validate([
+            'mobile' => 'required|string|regex:/^1[3-9]\d{9}$/|unique:users,mobile',
+            'password' => 'required|string|min:6|max:32',
+            'nickname' => 'required|string|max:50',
+            'name' => 'nullable|string|max:50',
+            'email' => 'nullable|email|max:100|unique:users,email',
+            'gender' => 'nullable|in:0,1,2',
+            'birthday' => 'nullable|date',
+            'is_promoter' => 'nullable|boolean',
+            'status' => 'nullable|in:0,1',
+        ]);
+
+        $data['password'] = Hash::make($data['password']);
+        $data['gender'] = $data['gender'] ?? 0;
+        $data['status'] = $data['status'] ?? 1;
+        $data['is_promoter'] = $data['is_promoter'] ?? false;
+
+        $user = User::create($data);
+
+        return response()->json([
+            'code' => 0,
+            'message' => '用户创建成功',
+            'data' => $user,
+        ]);
+    }
+
     public function userDetail($id)
     {
         $user = User::with('profile', 'orders')->findOrFail($id);

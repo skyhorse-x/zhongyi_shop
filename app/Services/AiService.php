@@ -230,19 +230,21 @@ class AiService
                 ['role' => 'user', 'content' => $userMessage],
             ];
 
+            // 确定配置来源：ai_models 表优先，否则使用 system_configs
+            $provider = $model?->provider ?? SystemConfigService::get('llm_provider', 'deepseek');
+            $apiUrl = $model?->api_url ?? SystemConfigService::get('llm_api_url', $this->defaultApiUrls[$provider] ?? $this->defaultApiUrls['deepseek']);
+            $apiKey = $model?->api_key ?? SystemConfigService::get('llm_api_key', '');
+            $modelName = $model?->model ?? SystemConfigService::get('llm_model', 'deepseek-chat');
+
             $data = [
-                'model' => $model?->model ?? 'deepseek-chat',
+                'model' => $modelName,
                 'messages' => $messages,
                 'max_tokens' => 2000,
                 'temperature' => 0.5,
             ];
 
-            // 仅从 ai_models 表读取配置，不再使用环境变量
-            $apiUrl = $model?->api_url ?? $this->defaultApiUrls[$model?->provider ?? 'deepseek'];
-            $apiKey = $model?->api_key;
-
             if (empty($apiKey)) {
-                throw new \Exception('AI 模型未配置 API Key，请在管理后台 [AI 管理] 中配置有效的 API Key');
+                throw new \Exception('AI 模型未配置 API Key，请在管理后台 [系统设置] 或 [AI 管理] 中配置有效的 API Key');
             }
 
             $response = Http::withHeaders([
@@ -285,7 +287,7 @@ class AiService
      */
     protected function callVisionApi(string $imageUrl, string $prompt, string $type): array
     {
-        // 获取AI模型配置
+        // 获取AI模型配置：优先从 ai_models 表读取，如果没有则从 system_configs 读取
         $model = AiModel::where('analysis_type', $type)
             ->where('is_enabled', true)
             ->orderBy('sort_order')
@@ -294,9 +296,15 @@ class AiService
         $startTime = microtime(true);
 
         try {
+            // 确定配置来源：ai_models 表优先，否则使用 system_configs
+            $provider = $model?->provider ?? SystemConfigService::get('llm_provider', 'doubao');
+            $apiUrl = $model?->api_url ?? SystemConfigService::get('llm_api_url', $this->defaultApiUrls[$provider] ?? $this->defaultApiUrls['doubao']);
+            $apiKey = $model?->api_key ?? SystemConfigService::get('llm_api_key', '');
+            $modelName = $model?->model ?? SystemConfigService::get('llm_model', 'doubao-vision');
+
             // 构建请求数据
             $data = [
-                'model' => $model?->model ?? 'doubao-vision',
+                'model' => $modelName,
                 'messages' => [
                     [
                         'role' => 'user',
@@ -318,12 +326,8 @@ class AiService
                 'temperature' => 0.3,
             ];
 
-            // 仅从 ai_models 表读取配置，不再使用环境变量
-            $apiUrl = $model?->api_url ?? $this->defaultApiUrls[$model?->provider ?? 'doubao'];
-            $apiKey = $model?->api_key;
-
             if (empty($apiKey)) {
-                throw new \Exception('视觉分析模型未配置 API Key，请在管理后台 [AI 管理] 中配置有效的 API Key');
+                throw new \Exception('视觉分析模型未配置 API Key，请在管理后台 [系统设置] 或 [AI 管理] 中配置有效的 API Key');
             }
 
             $response = Http::withHeaders([
@@ -364,7 +368,7 @@ class AiService
      */
     protected function callChatApi(array $messages): string
     {
-        // 获取AI模型配置
+        // 获取AI模型配置：优先从 ai_models 表读取，如果没有则从 system_configs 读取
         $model = AiModel::where('analysis_type', 'qa')
             ->where('is_enabled', true)
             ->orderBy('sort_order')
@@ -373,19 +377,23 @@ class AiService
         $startTime = microtime(true);
 
         try {
+            // 确定配置来源：ai_models 表优先，否则使用 system_configs
+            $provider = $model?->provider ?? SystemConfigService::get('llm_provider', 'deepseek');
+            $apiUrl = $model?->api_url ?? SystemConfigService::get('llm_api_url', $this->defaultApiUrls[$provider] ?? $this->defaultApiUrls['deepseek']);
+            $apiKey = $model?->api_key ?? SystemConfigService::get('llm_api_key', '');
+            $modelName = $model?->model ?? SystemConfigService::get('llm_model', 'deepseek-chat');
+            $maxTokens = $model?->max_tokens ?? (int) SystemConfigService::get('llm_max_tokens', 2000);
+            $temperature = $model?->temperature ?? (float) SystemConfigService::get('llm_temperature', 0.7);
+
             $data = [
-                'model' => $model?->model ?? 'deepseek-chat',
+                'model' => $modelName,
                 'messages' => $messages,
-                'max_tokens' => 2000,
-                'temperature' => 0.7,
+                'max_tokens' => $maxTokens,
+                'temperature' => $temperature,
             ];
 
-            // 仅从 ai_models 表读取配置，不再使用环境变量
-            $apiUrl = $model?->api_url ?? $this->defaultApiUrls[$model?->provider ?? 'deepseek'];
-            $apiKey = $model?->api_key;
-
             if (empty($apiKey)) {
-                throw new \Exception('AI 对话模型未配置 API Key，请在管理后台 [AI 管理] 中配置有效的 API Key');
+                throw new \Exception('AI 对话模型未配置 API Key，请在管理后台 [系统设置] 或 [AI 管理] 中配置有效的 API Key');
             }
 
             $response = Http::withHeaders([

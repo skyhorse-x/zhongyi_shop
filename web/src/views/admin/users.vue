@@ -18,6 +18,107 @@ const loading = ref(false)
 
 const getToken = (): string => localStorage.getItem('admin_token') || ''
 
+// ===== 新增用户 =====
+const createDialogVisible = ref(false)
+const createLoading = ref(false)
+const createForm = reactive({
+  mobile: '',
+  password: '',
+  nickname: '',
+  name: '',
+  email: '',
+  gender: 0 as 0 | 1 | 2,
+  birthday: '',
+  is_promoter: false,
+  status: 1 as 0 | 1,
+})
+
+const openCreate = () => {
+  Object.assign(createForm, {
+    mobile: '',
+    password: '',
+    nickname: '',
+    name: '',
+    email: '',
+    gender: 0,
+    birthday: '',
+    is_promoter: false,
+    status: 1,
+  })
+  createDialogVisible.value = true
+}
+
+const generateCreatePassword = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  let pwd = ''
+  for (let i = 0; i < 10; i++) {
+    pwd += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  createForm.password = pwd
+}
+
+const submitCreate = async () => {
+  if (!createForm.mobile) {
+    ElMessage.warning('请输入手机号')
+    return
+  }
+  if (!/^1[3-9]\d{9}$/.test(createForm.mobile)) {
+    ElMessage.warning('手机号格式不正确')
+    return
+  }
+  if (!createForm.password) {
+    ElMessage.warning('请输入密码')
+    return
+  }
+  if (createForm.password.length < 6) {
+    ElMessage.warning('密码长度不能少于 6 位')
+    return
+  }
+  if (!createForm.nickname?.trim()) {
+    ElMessage.warning('请输入昵称')
+    return
+  }
+  if (createForm.email && !/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(createForm.email)) {
+    ElMessage.warning('邮箱格式不正确')
+    return
+  }
+
+  createLoading.value = true
+  try {
+    const res = await safeFetch('/api/v1/admin/users', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        mobile: createForm.mobile,
+        password: createForm.password,
+        nickname: createForm.nickname,
+        name: createForm.name || null,
+        email: createForm.email || null,
+        gender: createForm.gender,
+        birthday: createForm.birthday || null,
+        is_promoter: createForm.is_promoter,
+        status: createForm.status,
+      }),
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      ElMessage.success('用户创建成功')
+      createDialogVisible.value = false
+      loadUsers()
+    } else {
+      ElMessage.error(data.message || '创建失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '创建失败')
+  } finally {
+    createLoading.value = false
+  }
+}
+
 // 加载用户列表
 const loadUsers = async () => {
   loading.value = true
@@ -470,6 +571,9 @@ const loadLogs = async (row?: any) => {
     <div class="page-header">
       <h2>用户管理</h2>
       <span class="page-tip">管理 C 端用户账号、状态与密码</span>
+      <div style="margin-left: auto">
+        <el-button type="primary" @click="openCreate">+ 新增用户</el-button>
+      </div>
     </div>
 
     <el-form :model="form" inline class="search-form">
@@ -795,6 +899,112 @@ const loadLogs = async (row?: any) => {
         >
           确认{{ adjustForm.type === 'recharge' ? '充值' : '扣减' }}
         </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 新增用户弹窗 -->
+    <el-dialog
+      v-model="createDialogVisible"
+      title="新增用户"
+      width="600px"
+      :close-on-click-modal="false"
+      v-loading="createLoading"
+    >
+      <el-alert
+        title="创建新用户账号，手机号将作为登录账号"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      />
+      <el-form :model="createForm" label-width="100px">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="手机号" required>
+              <el-input v-model="createForm.mobile" placeholder="11位手机号" maxlength="11" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="昵称" required>
+              <el-input v-model="createForm.nickname" placeholder="请输入昵称" maxlength="50" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="密码" required>
+              <el-input
+                v-model="createForm.password"
+                placeholder="至少 6 位"
+                show-password
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="姓名">
+              <el-input v-model="createForm.name" placeholder="可选" maxlength="50" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="邮箱">
+              <el-input v-model="createForm.email" placeholder="可选" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="性别">
+              <el-radio-group v-model="createForm.gender">
+                <el-radio :value="0">未知</el-radio>
+                <el-radio :value="1">男</el-radio>
+                <el-radio :value="2">女</el-radio>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="生日">
+              <el-date-picker
+                v-model="createForm.birthday"
+                type="date"
+                value-format="YYYY-MM-DD"
+                placeholder="可选"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="账号状态">
+              <el-radio-group v-model="createForm.status">
+                <el-radio :value="1">正常</el-radio>
+                <el-radio :value="0">禁用</el-radio>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="推广员身份">
+              <el-switch
+                v-model="createForm.is_promoter"
+                active-color="#07c160"
+                inline-prompt
+                active-text="是"
+                inactive-text="否"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="随机密码">
+              <el-button size="small" @click="generateCreatePassword">生成随机密码</el-button>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button @click="createDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="createLoading" @click="submitCreate">创建用户</el-button>
       </template>
     </el-dialog>
 

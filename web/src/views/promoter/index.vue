@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Money, Wallet, Refresh } from '@element-plus/icons-vue'
+import { Money, Wallet, Refresh, Share } from '@element-plus/icons-vue'
 import { toMoney } from '@/utils'
 import { safeFetch } from '@/utils/fetch'
 
@@ -10,7 +10,7 @@ const router = useRouter()
 
 const loading = ref(false)
 const promoterInfo = ref<any>(null)
-const isPromoter = ref(false)
+const loadError = ref('')
 
 const stats = ref({
   totalCommission: '0.00',
@@ -18,6 +18,8 @@ const stats = ref({
   totalOrders: 0,
   pendingCommission: '0.00',
 })
+
+const getToken = (): string => localStorage.getItem('token') || localStorage.getItem('admin_token') || ''
 
 const tools = ref([
   { icon: 'qr', title: '推广二维码', action: 'poster' },
@@ -30,11 +32,10 @@ const tools = ref([
 const posterVisible = ref(false)
 const posterUrl = ref('')
 
-const getToken = (): string => localStorage.getItem('token') || ''
-
 // 工具：安全转字符串数字（@/utils 已有同名函数）
 const loadPromoterInfo = async () => {
   loading.value = true
+  loadError.value = ''
   try {
     const res = await safeFetch('/api/v1/promoter/info', {
       headers: {
@@ -45,7 +46,6 @@ const loadPromoterInfo = async () => {
     const data = await res.json()
 
     if (data.code === 0) {
-      isPromoter.value = true
       promoterInfo.value = data.data
       stats.value = {
         totalCommission: toMoney(data.data.available_commission),
@@ -53,36 +53,11 @@ const loadPromoterInfo = async () => {
         totalOrders: Number(data.data.total_consume) || 0,
         pendingCommission: toMoney(data.data.frozen_commission),
       }
-    } else if (data.code === 404) {
-      // 兼容历史数据：老用户未自动开通，调用 activate 补建
-      isPromoter.value = false
-      try {
-        const r2 = await safeFetch('/api/v1/promoter/activate', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({}),
-        })
-        const d2 = await r2.json()
-        if (d2.code === 0) {
-          isPromoter.value = true
-          promoterInfo.value = d2.data
-          stats.value = {
-            totalCommission: '0.00',
-            todayCommission: '0.00',
-            totalOrders: 0,
-            pendingCommission: '0.00',
-          }
-        }
-      } catch (e) {
-        // 静默失败，保持未开通状态
-      }
+    } else {
+      loadError.value = data.message || '加载推广信息失败'
     }
   } catch (e: any) {
-    ElMessage.error(e.message || '加载推广信息失败')
+    loadError.value = e.message || '加载推广信息失败'
   } finally {
     loading.value = false
   }
@@ -109,28 +84,29 @@ const handleToolClick = (action: string) => {
   }
 }
 
-const showPoster = async () => {
+const showPoster = () => {
   if (!promoterInfo.value?.invite_code) {
-    ElMessage.warning('请先开通推广员')
+    ElMessage.warning('推广信息加载中，请稍后再试')
     return
   }
-  // 拼接后端动态生成的海报 URL（无需 token，可直接分享）
+  // 使用后端生成的推广海报
   posterUrl.value = `/api/v1/promoter/poster-image?code=${promoterInfo.value.invite_code}&t=${Date.now()}`
   posterVisible.value = true
 }
 
 const handleCopyLink = async () => {
-  if (!promoterInfo.value?.invite_url) {
-    ElMessage.warning('请先开通推广员')
+  const url = promoterInfo.value?.invite_url || ''
+  if (!url) {
+    ElMessage.warning('推广链接不可用')
     return
   }
   try {
-    await navigator.clipboard.writeText(promoterInfo.value.invite_url)
+    await navigator.clipboard.writeText(url)
     ElMessage.success('推广链接已复制')
   } catch {
     // 降级方案
     const input = document.createElement('input')
-    input.value = promoterInfo.value.invite_url
+    input.value = url
     document.body.appendChild(input)
     input.select()
     document.execCommand('copy')
@@ -159,10 +135,6 @@ const handleDownloadPoster = async () => {
   }
 }
 
-const goToActivate = () => {
-  router.push('/promoter/activate')
-}
-
 onMounted(() => {
   loadPromoterInfo()
 })
@@ -170,16 +142,13 @@ onMounted(() => {
 
 <template>
   <div class="promoter-page">
-
-    <!-- 未开通推广员 -->
-    <div v-if="!isPromoter && !loading" class="not-promoter">
-      <div class="not-promoter-icon">🌿</div>
-      <div class="not-promoter-title">您还不是推广员</div>
-      <div class="not-promoter-desc">开通推广员，分享健康赚取佣金</div>
-      <el-button type="primary" round @click="goToActivate">立即开通</el-button>
+    <!-- 加载失败提示 -->
+    <div v-if="loadError" class="error-block">
+      <div class="error-text">{{ loadError }}</div>
+      <el-button type="primary" size="small" @click="loadPromoterInfo">重新加载</el-button>
     </div>
 
-    <!-- 推广员信息 -->
+    <!-- 推广员信息 - 直接显示 -->
     <template v-else>
       <div class="stats-card">
         <div class="stats-header">
@@ -233,7 +202,7 @@ onMounted(() => {
       </div>
     </template>
 
-    <!-- 推广二维码弹层 -->
+    <!-- 推广海报弹层 -->
     <el-dialog v-model="posterVisible" title="推广海报" width="360px" center>
       <div class="poster-dialog">
         <div class="poster-qr">
@@ -274,29 +243,6 @@ onMounted(() => {
   min-height: 100vh;
   background: #f7f8fa;
   padding-bottom: 24px;
-}
-
-.not-promoter {
-  text-align: center;
-  padding: 60px 20px;
-}
-
-.not-promoter-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-}
-
-.not-promoter-title {
-  font-size: 18px;
-  font-weight: bold;
-  color: #323233;
-  margin-bottom: 8px;
-}
-
-.not-promoter-desc {
-  font-size: 14px;
-  color: #969799;
-  margin-bottom: 24px;
 }
 
 .stats-card {
@@ -455,6 +401,22 @@ onMounted(() => {
   flex: 1;
   background: linear-gradient(135deg, #07c160 0%, #04a152 100%);
   border: none;
+}
+
+.loading-block,
+.error-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+}
+
+.loading-text,
+.error-text {
+  font-size: 14px;
+  color: #999;
 }
 </style>
 

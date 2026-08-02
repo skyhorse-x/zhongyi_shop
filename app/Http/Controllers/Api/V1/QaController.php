@@ -132,7 +132,7 @@ class QaController extends Controller
             ]);
             return response()->json([
                 'code' => 500,
-                'message' => '消息发送失败，请稍后重试',
+                'message' => $e->getMessage(),
             ], 500);
         }
     }

@@ -7,18 +7,19 @@ export function setupPermissionGuard() {
   router.beforeEach((to, _from, next) => {
     document.title = (to.meta.title as string) || 'AI中医健康管理'
 
-    // 用户端认证
+    const token = localStorage.getItem('token')
+    const adminToken = localStorage.getItem('admin_token')
+
+    // 用户端认证 - 推广中心、会员中心、购买页面：用户或管理员都可以访问
     if (to.meta.needAuth) {
-      const token = localStorage.getItem('token')
-      if (!token) {
+      if (!token && !adminToken) {
         next({ name: 'Login', query: { redirect: to.fullPath } })
         return
       }
     }
 
-    // 管理后台认证
+    // 管理后台认证 - 只需要 adminToken
     if (to.meta.needAdminAuth) {
-      const adminToken = localStorage.getItem('admin_token')
       if (!adminToken) {
         next({ name: 'AdminLogin' })
         return

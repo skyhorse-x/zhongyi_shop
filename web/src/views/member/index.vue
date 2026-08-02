@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Document, FirstAidKit, ShoppingBag, Promotion, Headset, Wallet } from '@element-plus/icons-vue'
+import { ArrowRight, Document, FirstAidKit, ShoppingBag, Promotion, Headset, Wallet, Money } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { safeFetch } from '@/utils/fetch'
@@ -19,6 +19,7 @@ interface MenuItem {
 
 const menuItems = ref<MenuItem[]>([
   { icon: Wallet, title: '余额明细', path: '/member/balance' },
+  { icon: Money, title: '提现', path: '/promoter/withdraw' },
   { icon: Document, title: '我的订单', path: '/member/orders' },
   { icon: FirstAidKit, title: '健康档案', path: '/health/history' },
   { icon: ShoppingBag, title: '购买次数包', path: '/packages' },
@@ -63,17 +64,8 @@ const defaultMarqueeData: MarqueeItem[] = [
 const loadInviteMarquee = async () => {
   marqueeLoading.value = true
   try {
-    const res = await safeFetch('/api/v1/admin/invite-marquee', {
-      headers: {
-        Authorization: `Bearer ${userStore.token}`,
-        Accept: 'application/json',
-      },
-    })
-    const ct = res.headers.get('content-type') || ''
-    if (!ct.includes('application/json')) {
-      marqueeList.value = defaultMarqueeData
-      return
-    }
+    // 公开接口，无需 Authorization
+    const res = await safeFetch('/api/v1/invite-marquee')
     const data = await res.json()
     if (data.code === 0 && data.data) {
       const realItems = data.data.recent || []
