@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
+import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
 
@@ -35,7 +36,7 @@ const getToken = (): string => localStorage.getItem('token') || ''
 const loadCommissions = async () => {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/promoter/commissions?limit=50', {
+    const res = await safeFetch('/api/v1/promoter/commissions?limit=50', {
       headers: { Authorization: `Bearer ${getToken()}`, Accept: 'application/json' },
     })
     const data = await res.json()

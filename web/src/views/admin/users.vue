@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 import { Edit, Refresh, Wallet, Promotion } from '@element-plus/icons-vue'
 
 const form = ref({
@@ -29,7 +30,7 @@ const loadUsers = async () => {
     if (form.value.nickname) params.append('nickname', form.value.nickname)
     if (form.value.status) params.append('status', form.value.status)
 
-    const res = await fetch(`/api/v1/admin/users?${params}`, {
+    const res = await safeFetch(`/api/v1/admin/users?${params}`, {
       headers: {
         Authorization: `Bearer ${getToken()}`,
         Accept: 'application/json',
@@ -118,7 +119,7 @@ const handleToggleStatus = async (row: any) => {
   }
 
   try {
-    const res = await fetch(`/api/v1/admin/users/${row.id}/status`, {
+    const res = await safeFetch(`/api/v1/admin/users/${row.id}/status`, {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${getToken()}`,
@@ -159,7 +160,7 @@ const submitResetPassword = async () => {
     return
   }
   try {
-    const res = await fetch(`/api/v1/admin/users/${resetPwdData.value.user.id}/reset-password`, {
+    const res = await safeFetch(`/api/v1/admin/users/${resetPwdData.value.user.id}/reset-password`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${getToken()}`,
@@ -209,7 +210,7 @@ const openEdit = async (row: any) => {
   editLoading.value = true
   editDialogVisible.value = true
   try {
-    const res = await fetch(`/api/v1/admin/users/${row.id}`, {
+    const res = await safeFetch(`/api/v1/admin/users/${row.id}`, {
       headers: {
         Authorization: `Bearer ${getToken()}`,
         Accept: 'application/json',
@@ -276,7 +277,7 @@ const submitEdit = async () => {
 
   editLoading.value = true
   try {
-    const res = await fetch(`/api/v1/admin/users/${editForm.id}`, {
+    const res = await safeFetch(`/api/v1/admin/users/${editForm.id}`, {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${getToken()}`,
@@ -365,7 +366,7 @@ const submitAdjust = async () => {
 
   adjustLoading.value = true
   try {
-    const res = await fetch(
+    const res = await safeFetch(
       `/api/v1/admin/users/${adjustForm.user.id}/balance`,
       {
         method: 'POST',
@@ -436,7 +437,7 @@ const loadLogs = async (row?: any) => {
       per_page: logsPageSize.value.toString(),
     })
     if (logsFilterType.value) params.append('type', logsFilterType.value)
-    const res = await fetch(
+    const res = await safeFetch(
       `/api/v1/admin/users/${user.id}/balance-logs?${params}`,
       {
         headers: {

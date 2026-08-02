@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, ChatDotSquare, ArrowRight } from '@element-plus/icons-vue'
+import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
 
@@ -23,7 +24,7 @@ const getToken = (): string => localStorage.getItem('token') || ''
 const fetchSessions = async () => {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/qa/sessions', {
+    const res = await safeFetch('/api/v1/qa/sessions', {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -63,7 +64,7 @@ const enterSession = (sessionNo: string) => {
 const deleteSession = async (session: SessionItem) => {
   try {
     await ElMessageBox.confirm('确定要删除这条问答记录吗？', '删除记录', { type: 'warning' })
-    const res = await fetch(`/api/v1/qa/sessions/${session.session_no}`, {
+    const res = await safeFetch(`/api/v1/qa/sessions/${session.session_no}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${getToken()}`,

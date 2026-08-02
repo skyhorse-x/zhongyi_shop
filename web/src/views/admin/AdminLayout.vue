@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, shallowRef, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { safeFetch } from '@/utils/fetch'
 import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -31,7 +32,7 @@ const getAdminToken = (): string => localStorage.getItem('admin_token') || ''
 // 加载待接入客服数量
 const loadWaitingCount = async () => {
   try {
-    const res = await fetch('/api/v1/admin/customer-service/statistics', {
+    const res = await safeFetch('/api/v1/admin/customer-service/statistics', {
       headers: {
         'Authorization': `Bearer ${getAdminToken()}`,
         'Accept': 'application/json',

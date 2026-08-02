@@ -25,7 +25,7 @@ const getToken = (): string => localStorage.getItem('token') || ''
 const fetchHistory = async () => {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/health/history?limit=20', {
+    const res = await safeFetch('/api/v1/health/history?limit=20', {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',

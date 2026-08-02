@@ -38,7 +38,7 @@ const fetchTrendData = async () => {
   try {
     const tab = tabs.find(t => t.key === activeTab.value)
     const days = tab?.days || 7
-    const res = await fetch(`/api/v1/health/trend?days=${days}`, {
+    const res = await safeFetch(`/api/v1/health/trend?days=${days}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',

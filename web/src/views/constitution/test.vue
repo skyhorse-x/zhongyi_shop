@@ -13,7 +13,7 @@ const answers = reactive<Record<number, string>>({})
 // 获取题目列表
 const fetchQuestions = async () => {
   try {
-    const res = await fetch('/api/v1/constitution/questions', {
+    const res = await safeFetch('/api/v1/constitution/questions', {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`,
         'Accept': 'application/json',
@@ -55,7 +55,7 @@ const handleSubmit = async () => {
 
   loading.value = true
   try {
-    const res = await fetch('/api/v1/constitution/submit', {
+    const res = await safeFetch('/api/v1/constitution/submit', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

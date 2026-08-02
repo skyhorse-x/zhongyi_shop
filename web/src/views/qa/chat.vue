@@ -27,7 +27,7 @@ const getToken = (): string => localStorage.getItem('token') || ''
 
 // 创建新会话
 const createSession = async (): Promise<string> => {
-  const res = await fetch('/api/v1/qa/sessions', {
+  const res = await safeFetch('/api/v1/qa/sessions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getToken()}`,
@@ -45,7 +45,7 @@ const createSession = async (): Promise<string> => {
 // 加载历史消息
 const loadMessages = async (sNo: string) => {
   try {
-    const res = await fetch(`/api/v1/qa/sessions/${sNo}/messages`, {
+    const res = await safeFetch(`/api/v1/qa/sessions/${sNo}/messages`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -102,7 +102,7 @@ const sendMessage = async () => {
   // 调用AI获取回复
   loading.value = true
   try {
-    const res = await fetch(`/api/v1/qa/sessions/${sessionNo.value}/messages`, {
+    const res = await safeFetch(`/api/v1/qa/sessions/${sessionNo.value}/messages`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getToken()}`,

@@ -63,7 +63,7 @@ const fetchOrders = async () => {
     if (activeTab.value !== '') {
       params.append('status', activeTab.value)
     }
-    const res = await fetch(`/api/v1/user/orders?${params}`, {
+    const res = await safeFetch(`/api/v1/user/orders?${params}`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     })
     const json = await res.json()

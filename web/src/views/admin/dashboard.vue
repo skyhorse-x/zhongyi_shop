@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { shallowRef, ref, onMounted } from 'vue'
 import { UserFilled, Plus, List, Coin, TrendCharts, Cpu, Money } from '@element-plus/icons-vue'
+import { safeFetch } from '@/utils/fetch'
 
 const stats = shallowRef([
   { title: '今日访问', value: '--', color: '#1989fa', icon: TrendCharts },
@@ -31,7 +32,7 @@ const loading = ref(false)
 const loadDashboardData = async () => {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/admin/dashboard', {
+    const res = await safeFetch('/api/v1/admin/dashboard', {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
         'Accept': 'application/json',

@@ -43,7 +43,7 @@ const CONSTITUTION_META: Record<string, { description: string; features: string[
 const fetchConstitutionData = async () => {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/health/constitution', {
+    const res = await safeFetch('/api/v1/health/constitution', {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',

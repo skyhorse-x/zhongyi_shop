@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 import { Refresh } from '@element-plus/icons-vue'
 
 const form = ref({
@@ -27,7 +28,7 @@ const loadAdmins = async () => {
     if (form.value.username) params.append('username', form.value.username)
     if (form.value.name) params.append('name', form.value.name)
 
-    const res = await fetch(`/api/v1/admin/admins?${params}`, {
+    const res = await safeFetch(`/api/v1/admin/admins?${params}`, {
       headers: {
         Authorization: `Bearer ${getToken()}`,
         Accept: 'application/json',
@@ -119,7 +120,7 @@ const submitAdd = async () => {
     return
   }
   try {
-    const res = await fetch('/api/v1/admin/admins', {
+    const res = await safeFetch('/api/v1/admin/admins', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${getToken()}`,
@@ -156,7 +157,7 @@ const handleEdit = (row: any) => {
 
 const submitEdit = async () => {
   try {
-    const res = await fetch(`/api/v1/admin/admins/${editForm.value.id}`, {
+    const res = await safeFetch(`/api/v1/admin/admins/${editForm.value.id}`, {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${getToken()}`,
@@ -201,7 +202,7 @@ const submitResetPassword = async () => {
     return
   }
   try {
-    const res = await fetch(`/api/v1/admin/admins/${resetPwdData.value.admin.id}/reset-password`, {
+    const res = await safeFetch(`/api/v1/admin/admins/${resetPwdData.value.admin.id}/reset-password`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${getToken()}`,
@@ -238,7 +239,7 @@ const handleDelete = (row: any) => {
     }
   ).then(async () => {
     try {
-      const res = await fetch(`/api/v1/admin/admins/${row.id}`, {
+      const res = await safeFetch(`/api/v1/admin/admins/${row.id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${getToken()}`,
@@ -276,7 +277,7 @@ const handleToggleStatus = async (row: any) => {
     return
   }
   try {
-    const res = await fetch(`/api/v1/admin/admins/${row.id}`, {
+    const res = await safeFetch(`/api/v1/admin/admins/${row.id}`, {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${getToken()}`,

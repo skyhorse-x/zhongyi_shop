@@ -23,7 +23,7 @@ const getToken = (): string => localStorage.getItem('token') || ''
 // 获取分析模式配置
 const fetchAnalysisMode = async () => {
   try {
-    const res = await fetch('/api/v1/analysis/config', {
+    const res = await safeFetch('/api/v1/analysis/config', {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -60,7 +60,7 @@ const uploadSingleImage = async (file: File): Promise<string> => {
   const formData = new FormData()
   formData.append('image', file)
 
-  const res = await fetch('/api/v1/analysis/upload-image', {
+  const res = await safeFetch('/api/v1/analysis/upload-image', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getToken()}`,
@@ -76,7 +76,7 @@ const uploadSingleImage = async (file: File): Promise<string> => {
 
 // 提交分析任务
 const submitAnalysis = async (imageUrls: string[], type: 'tongue' | 'face', text: string) => {
-  const res = await fetch('/api/v1/analysis/submit', {
+  const res = await safeFetch('/api/v1/analysis/submit', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getToken()}`,

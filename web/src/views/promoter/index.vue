@@ -35,7 +35,7 @@ const getToken = (): string => localStorage.getItem('token') || ''
 const loadPromoterInfo = async () => {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/promoter/info', {
+    const res = await safeFetch('/api/v1/promoter/info', {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -56,7 +56,7 @@ const loadPromoterInfo = async () => {
       // 兼容历史数据：老用户未自动开通，调用 activate 补建
       isPromoter.value = false
       try {
-        const r2 = await fetch('/api/v1/promoter/activate', {
+        const r2 = await safeFetch('/api/v1/promoter/activate', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${getToken()}`,

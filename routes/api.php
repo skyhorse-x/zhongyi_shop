@@ -12,6 +12,11 @@ use App\Http\Controllers\Api\V1;
 // V1 版本API
 Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::class])->group(function () {
     
+    // 登录路由命名（用于未认证时重定向）
+    Route::get('login', function () {
+        return redirect('/auth/login');
+    })->name('login');
+    
     // ===== 公开接口 =====
     Route::prefix('auth')->group(function () {
         Route::post('register', [V1\AuthController::class, 'register']);
@@ -83,6 +88,13 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::post('sessions/{sessionNo}/messages', [V1\CustomerServiceController::class, 'sendMessage']);
             Route::post('sessions/{sessionNo}/upload-image', [V1\CustomerServiceController::class, 'uploadImage']);
             Route::post('sessions/{sessionNo}/close', [V1\CustomerServiceController::class, 'closeSession']);
+        });
+        
+        // 系统消息（用户端）
+        Route::prefix('system-messages')->group(function () {
+            Route::get('/', [V1\SystemMessageController::class, 'index']);
+            Route::get('unread-count', [V1\SystemMessageController::class, 'unreadCount']);
+            Route::post('{id}/read', [V1\SystemMessageController::class, 'markAsRead']);
         });
 
         // 次数包
@@ -218,6 +230,28 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
                 Route::post('sessions/{sessionNo}/messages', [V1\Admin\CustomerServiceController::class, 'sendMessage']);
                 Route::post('sessions/{sessionNo}/upload-image', [V1\Admin\CustomerServiceController::class, 'uploadImage']);
                 Route::post('sessions/{sessionNo}/close', [V1\Admin\CustomerServiceController::class, 'closeSession']);
+                
+                // 常用话术管理
+                Route::get('phrases', [V1\Admin\CustomerServiceManageController::class, 'phrases']);
+                Route::post('phrases', [V1\Admin\CustomerServiceManageController::class, 'phraseStore']);
+                Route::put('phrases/{id}', [V1\Admin\CustomerServiceManageController::class, 'phraseUpdate']);
+                Route::delete('phrases/{id}', [V1\Admin\CustomerServiceManageController::class, 'phraseDestroy']);
+                
+                // 系统消息管理
+                Route::get('system-messages', [V1\Admin\CustomerServiceManageController::class, 'systemMessages']);
+                Route::post('system-messages', [V1\Admin\CustomerServiceManageController::class, 'sendSystemMessage']);
+                Route::delete('system-messages/{id}', [V1\Admin\CustomerServiceManageController::class, 'systemMessageDestroy']);
+                
+                // 余额不足记录
+                Route::get('balance-insufficient-logs', [V1\Admin\CustomerServiceManageController::class, 'balanceInsufficientLogs']);
+                Route::get('balance-insufficient-stats', [V1\Admin\CustomerServiceManageController::class, 'balanceInsufficientStats']);
+                
+                // 客服配置
+                Route::get('configs', [V1\Admin\CustomerServiceManageController::class, 'configs']);
+                Route::post('configs', [V1\Admin\CustomerServiceManageController::class, 'configUpdate']);
+                
+                // 发送系统消息到客服会话
+                Route::post('sessions/{sessionNo}/system-message', [V1\Admin\CustomerServiceManageController::class, 'sendSessionSystemMessage']);
             });
         });
     });

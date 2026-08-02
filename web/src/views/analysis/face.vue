@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CameraFilled, ChatLineRound } from '@element-plus/icons-vue'
+import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
 const imageUrl = ref('')
@@ -24,7 +25,7 @@ const uploadImage = async (blob: Blob, name: string): Promise<string> => {
   const formData = new FormData()
   formData.append('image', blob, name)
 
-  const res = await fetch('/api/v1/analysis/upload-image', {
+  const res = await safeFetch('/api/v1/analysis/upload-image', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getToken()}`,
@@ -40,7 +41,7 @@ const uploadImage = async (blob: Blob, name: string): Promise<string> => {
 
 // 提交分析任务
 const submitAnalysis = async (imageUrl: string, type: 'tongue' | 'face', text: string) => {
-  const res = await fetch('/api/v1/analysis/submit', {
+  const res = await safeFetch('/api/v1/analysis/submit', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getToken()}`,

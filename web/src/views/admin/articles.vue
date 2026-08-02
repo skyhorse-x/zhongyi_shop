@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 
 const form = ref({
   title: '',
@@ -25,7 +26,7 @@ const loadArticles = async () => {
     })
     if (form.value.title) params.append('title', form.value.title)
 
-    const res = await fetch(`/api/v1/admin/articles?${params}`, {
+    const res = await safeFetch(`/api/v1/admin/articles?${params}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -109,7 +110,7 @@ const handleSave = async () => {
       : '/api/v1/admin/articles'
     const method = isEdit.value ? 'PUT' : 'POST'
 
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       method,
       headers: {
         'Authorization': `Bearer ${getToken()}`,
@@ -144,7 +145,7 @@ const handleDelete = (row: any) => {
     type: 'warning'
   }).then(async () => {
     try {
-      const res = await fetch(`/api/v1/admin/articles/${row.id}`, {
+      const res = await safeFetch(`/api/v1/admin/articles/${row.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${getToken()}`,

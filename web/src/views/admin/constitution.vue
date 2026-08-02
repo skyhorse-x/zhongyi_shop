@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 import { Plus, Edit, Delete, Search, Refresh, ArrowDown, ArrowUp } from '@element-plus/icons-vue'
 
 interface QuestionOption {
@@ -54,7 +55,7 @@ const getToken = (): string => localStorage.getItem('admin_token') || ''
 const fetchQuestions = async () => {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/admin/constitution/questions', {
+    const res = await safeFetch('/api/v1/admin/constitution/questions', {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -157,7 +158,7 @@ const handleSubmit = async () => {
       ? '/api/v1/admin/constitution/questions'
       : `/api/v1/admin/constitution/questions/${form.id}`
     const method = dialogMode.value === 'create' ? 'POST' : 'PUT'
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -188,7 +189,7 @@ const handleDelete = async (row: ConstitutionQuestion) => {
       '删除确认',
       { type: 'warning' }
     )
-    const res = await fetch(`/api/v1/admin/constitution/questions/${row.id}`, {
+    const res = await safeFetch(`/api/v1/admin/constitution/questions/${row.id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${getToken()}`,
@@ -208,7 +209,7 @@ const handleDelete = async (row: ConstitutionQuestion) => {
 }
 
 const handleToggle = async (row: ConstitutionQuestion) => {
-  const res = await fetch(`/api/v1/admin/constitution/questions/${row.id}`, {
+  const res = await safeFetch(`/api/v1/admin/constitution/questions/${row.id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',

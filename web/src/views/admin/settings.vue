@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 import { Connection, Setting, Money, Promotion, Cpu, ChatDotRound, Message, Wallet, Switch } from '@element-plus/icons-vue'
 
 const form = ref({
@@ -59,7 +60,7 @@ const paymentConfig = ref({
 const loadPaymentConfig = async () => {
   paymentLoading.value = true
   try {
-    const res = await fetch('/api/v1/admin/config/payment', {
+    const res = await safeFetch('/api/v1/admin/config/payment', {
       headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}`, Accept: 'application/json' },
     })
     const data = await res.json()
@@ -88,7 +89,7 @@ const togglePayment = async (type: 'balance' | 'wechat' | 'alipay') => {
   }
   savingPayment.value = true
   try {
-    const res = await fetch('/api/v1/admin/config/payment-toggle', {
+    const res = await safeFetch('/api/v1/admin/config/payment-toggle', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -115,7 +116,7 @@ const togglePayment = async (type: 'balance' | 'wechat' | 'alipay') => {
 const testLlmConnection = async () => {
   testingLlm.value = true
   try {
-    const res = await fetch('/api/v1/admin/test-llm', {
+    const res = await safeFetch('/api/v1/admin/test-llm', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -138,7 +139,7 @@ const testLlmConnection = async () => {
 // 加载配置
 const loadConfigs = async () => {
   try {
-    const res = await fetch('/api/v1/admin/configs', {
+    const res = await safeFetch('/api/v1/admin/configs', {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
@@ -264,7 +265,7 @@ const handleSave = async () => {
       sms_bao_pass: form.value.smsBaoPass,
     }
 
-    const res = await fetch('/api/v1/admin/configs', {
+    const res = await safeFetch('/api/v1/admin/configs', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

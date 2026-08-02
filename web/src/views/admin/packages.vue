@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 import { Plus, Edit, Delete, Search, Refresh, View } from '@element-plus/icons-vue'
 
 interface Package {
@@ -60,7 +61,7 @@ const fetchPackages = async () => {
       per_page: String(pageSize.value),
     })
     if (searchKeyword.value) params.append('name', searchKeyword.value)
-    const res = await fetch(`/api/v1/admin/packages?${params}`, {
+    const res = await safeFetch(`/api/v1/admin/packages?${params}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -127,7 +128,7 @@ const handleSubmit = async () => {
       ? '/api/v1/admin/packages'
       : `/api/v1/admin/packages/${form.id}`
     const method = dialogMode.value === 'create' ? 'POST' : 'PUT'
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -158,7 +159,7 @@ const handleDelete = async (row: Package) => {
       '删除确认',
       { type: 'warning' }
     )
-    const res = await fetch(`/api/v1/admin/packages/${row.id}`, {
+    const res = await safeFetch(`/api/v1/admin/packages/${row.id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${getToken()}`,
@@ -178,7 +179,7 @@ const handleDelete = async (row: Package) => {
 }
 
 const handleToggle = async (row: Package) => {
-  const res = await fetch(`/api/v1/admin/packages/${row.id}/toggle`, {
+  const res = await safeFetch(`/api/v1/admin/packages/${row.id}/toggle`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getToken()}`,

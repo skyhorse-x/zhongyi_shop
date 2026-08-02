@@ -26,7 +26,7 @@ const getToken = (): string => localStorage.getItem('token') || ''
 // 获取或创建会话
 const getOrCreateSession = async () => {
   try {
-    const res = await fetch('/api/v1/customer-service/session', {
+    const res = await safeFetch('/api/v1/customer-service/session', {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -49,7 +49,7 @@ const getOrCreateSession = async () => {
 const loadMessages = async () => {
   if (!sessionNo.value) return
   try {
-    const res = await fetch(`/api/v1/customer-service/sessions/${sessionNo.value}/messages`, {
+    const res = await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/messages`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -75,7 +75,7 @@ const sendMessage = async () => {
   }
 
   try {
-    const res = await fetch(`/api/v1/customer-service/sessions/${sessionNo.value}/messages`, {
+    const res = await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/messages`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getToken()}`,
@@ -130,7 +130,7 @@ const handleFileChange = async (event: Event) => {
 
   try {
     loading.value = true
-    const res = await fetch(`/api/v1/customer-service/sessions/${sessionNo.value}/upload-image`, {
+    const res = await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/upload-image`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getToken()}`,

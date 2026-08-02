@@ -17,7 +17,7 @@ const total = ref(0)
 const load = async () => {
   loading.value = true
   try {
-    const res = await fetch(
+    const res = await safeFetch(
       `/api/v1/user/balance-logs?page=${currentPage.value}&per_page=${pageSize.value}`,
       {
         headers: {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 import { Search, Refresh, View, Delete, Tickets, Money, Document, Check, Close } from '@element-plus/icons-vue'
 
 const form = ref({
@@ -46,7 +47,7 @@ const loadOrders = async () => {
     if (form.value.orderStatus) params.append('status', form.value.orderStatus)
     if (form.value.payMethod) params.append('pay_method', form.value.payMethod)
 
-    const res = await fetch(`/api/v1/admin/orders?${params}`, {
+    const res = await safeFetch(`/api/v1/admin/orders?${params}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -124,7 +125,7 @@ const deleteOrder = (row: any) => {
     type: 'warning'
   }).then(async () => {
     try {
-      const res = await fetch(`/api/v1/admin/orders/${row.orderNo}`, {
+      const res = await safeFetch(`/api/v1/admin/orders/${row.orderNo}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${getToken()}`,

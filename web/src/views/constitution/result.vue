@@ -50,7 +50,7 @@ const loadResult = async () => {
   }
   loading.value = true
   try {
-    const res = await fetch(`/api/v1/constitution/report/${taskNo.value}`, {
+    const res = await safeFetch(`/api/v1/constitution/report/${taskNo.value}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',

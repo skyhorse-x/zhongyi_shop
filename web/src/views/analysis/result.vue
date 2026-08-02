@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import html2canvas from 'html2canvas'
+import { safeFetch } from '@/utils/fetch'
 import {
   Loading, Refresh, Check, Calendar, Document, Histogram,
   Promotion, Sunny, ChatLineRound, Star, Trophy, Share, Download, Picture
@@ -51,7 +52,7 @@ const getToken = (): string => localStorage.getItem('token') || ''
 
 const fetchStatus = async () => {
   try {
-    const res = await fetch(`/api/v1/analysis/status/${taskNo.value}`, {
+    const res = await safeFetch(`/api/v1/analysis/status/${taskNo.value}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -78,7 +79,7 @@ const fetchStatus = async () => {
 
 const fetchReport = async () => {
   try {
-    const res = await fetch(`/api/v1/analysis/report/${taskNo.value}`, {
+    const res = await safeFetch(`/api/v1/analysis/report/${taskNo.value}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',

@@ -14,7 +14,7 @@ const getToken = (): string => localStorage.getItem('token') || ''
 const checkPromoter = async () => {
   checking.value = true
   try {
-    const res = await fetch('/api/v1/promoter/info', {
+    const res = await safeFetch('/api/v1/promoter/info', {
       headers: {
         Authorization: `Bearer ${getToken()}`,
         Accept: 'application/json',
@@ -35,7 +35,7 @@ const checkPromoter = async () => {
 const handleActivate = async () => {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/promoter/activate', {
+    const res = await safeFetch('/api/v1/promoter/activate', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${getToken()}`,

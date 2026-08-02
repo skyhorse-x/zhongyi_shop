@@ -24,6 +24,8 @@ class CustomerServiceController extends Controller
             ->orderBy('created_at', 'desc')
             ->first();
         
+        $isNew = false;
+        
         if (!$session) {
             $session = CustomerServiceSession::create([
                 'session_no' => CustomerServiceSession::generateSessionNo(),
@@ -31,12 +33,17 @@ class CustomerServiceController extends Controller
                 'title' => '客服咨询',
                 'status' => 0,
             ]);
+            $isNew = true;
+            
+            // 自动发送欢迎消息
+            $session->sendWelcomeMessage();
         }
         
         return response()->json([
             'code' => 0,
             'message' => 'success',
             'data' => $session,
+            'is_new' => $isNew,
         ]);
     }
 

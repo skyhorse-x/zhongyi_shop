@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 
 interface Promoter {
   id: number
@@ -84,7 +85,7 @@ const loadPromoters = async () => {
     if (searchName.value) params.append('nickname', searchName.value)
     if (searchStatus.value) params.append('status', searchStatus.value)
 
-    const res = await fetch(`/api/v1/admin/promoters?${params}`, {
+    const res = await safeFetch(`/api/v1/admin/promoters?${params}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -132,7 +133,7 @@ async function viewDetail(row: Promoter) {
   detailVisible.value = true
   detailLoading.value = true
   try {
-    const res = await fetch(`/api/v1/admin/promoters/${row.id}`, {
+    const res = await safeFetch(`/api/v1/admin/promoters/${row.id}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -156,7 +157,7 @@ async function viewDetail(row: Promoter) {
 
 async function toggleStatus(row: Promoter) {
   try {
-    const res = await fetch(`/api/v1/admin/promoters/${row.id}/toggle`, {
+    const res = await safeFetch(`/api/v1/admin/promoters/${row.id}/toggle`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getToken()}`,
@@ -190,7 +191,7 @@ const loadInviteRecords = async () => {
     if (inviteFilters.value.date_start) params.append('date_start', inviteFilters.value.date_start)
     if (inviteFilters.value.date_end) params.append('date_end', inviteFilters.value.date_end)
 
-    const res = await fetch(`/api/v1/admin/promoters/invite-records?${params}`, {
+    const res = await safeFetch(`/api/v1/admin/promoters/invite-records?${params}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -226,7 +227,7 @@ const handleBan = async (row: any) => {
 
   banningId.value = row.id
   try {
-    const res = await fetch(`/api/v1/admin/promoters/${row.id}/ban`, {
+    const res = await safeFetch(`/api/v1/admin/promoters/${row.id}/ban`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getToken()}`,
@@ -252,7 +253,7 @@ const handleBan = async (row: any) => {
 const handleUnban = async (row: any) => {
   banningId.value = row.id
   try {
-    const res = await fetch(`/api/v1/admin/promoters/${row.id}/unban`, {
+    const res = await safeFetch(`/api/v1/admin/promoters/${row.id}/unban`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getToken()}`,

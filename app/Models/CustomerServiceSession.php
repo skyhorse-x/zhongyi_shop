@@ -15,6 +15,7 @@ class CustomerServiceSession extends Model
         'admin_id',
         'title',
         'status',
+        'welcome_sent',
         'message_count',
         'user_unread',
         'admin_unread',
@@ -24,12 +25,39 @@ class CustomerServiceSession extends Model
 
     protected $casts = [
         'status' => 'integer',
+        'welcome_sent' => 'boolean',
         'message_count' => 'integer',
         'user_unread' => 'integer',
         'admin_unread' => 'integer',
         'last_message_at' => 'datetime',
         'closed_at' => 'datetime',
     ];
+
+    /**
+     * 欢迎消息内容
+     */
+    public const WELCOME_MESSAGE = '您好！欢迎使用AI中医健康平台，我是您的专属客服。请问有什么可以帮助您的吗？您可以咨询健康问题、了解套餐服务或反馈使用体验。';
+
+    /**
+     * 发送欢迎消息
+     */
+    public function sendWelcomeMessage(): bool
+    {
+        if ($this->welcome_sent) {
+            return false;
+        }
+
+        $message = $this->messages()->create([
+            'sender_id' => 0, // 系统发送
+            'sender_type' => 'system',
+            'content' => self::WELCOME_MESSAGE,
+            'msg_type' => 'text',
+        ]);
+
+        $this->update(['welcome_sent' => true]);
+
+        return true;
+    }
 
     /**
      * 生成唯一会话编号

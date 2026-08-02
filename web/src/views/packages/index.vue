@@ -30,7 +30,7 @@ const remainingTimes = computed(() => Number(userInfo.value?.analysis_times ?? 0
 const fetchPackages = async () => {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/packages', {
+    const res = await safeFetch('/api/v1/packages', {
       headers: { Authorization: `Bearer ${getToken()}`, Accept: 'application/json' },
     })
     const data = await res.json()
@@ -84,7 +84,7 @@ const selectedPayType = ref('')
 // 拉取支付方式
 const fetchPaymentMethods = async () => {
   try {
-    const res = await fetch('/api/v1/payment/methods', {
+    const res = await safeFetch('/api/v1/payment/methods', {
       headers: { Authorization: `Bearer ${getToken()}`, Accept: 'application/json' },
     })
     const data = await res.json()
@@ -156,7 +156,7 @@ const handlePurchase = async (pkg: any) => {
     }
     try {
       paying.value = true
-      const res = await fetch('/api/v1/packages/buy', {
+      const res = await safeFetch('/api/v1/packages/buy', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -198,7 +198,7 @@ const handlePurchase = async (pkg: any) => {
 
   paying.value = true
   try {
-    const res = await fetch('/api/v1/packages/buy', {
+    const res = await safeFetch('/api/v1/packages/buy', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -227,7 +227,7 @@ const handlePurchase = async (pkg: any) => {
 // 拉取用户信息
 const fetchUserInfo = async () => {
   try {
-    const res = await fetch('/api/v1/user/info', {
+    const res = await safeFetch('/api/v1/user/info', {
       headers: { Authorization: `Bearer ${getToken()}`, Accept: 'application/json' },
     })
     const data = await res.json()

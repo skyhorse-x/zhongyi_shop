@@ -62,7 +62,7 @@ const defaultMarqueeData: MarqueeItem[] = [
 const loadInviteMarquee = async () => {
   marqueeLoading.value = true
   try {
-    const res = await fetch('/api/v1/admin/invite-marquee', {
+    const res = await safeFetch('/api/v1/admin/invite-marquee', {
       headers: {
         Authorization: `Bearer ${userStore.token}`,
         Accept: 'application/json',

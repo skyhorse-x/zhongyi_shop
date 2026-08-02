@@ -31,7 +31,7 @@ const canWithdraw = computed(() => {
 const loadPromoterInfo = async () => {
   fetchingBalance.value = true
   try {
-    const res = await fetch('/api/v1/promoter/info', {
+    const res = await safeFetch('/api/v1/promoter/info', {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -76,7 +76,7 @@ const handleWithdraw = async () => {
 
   loading.value = true
   try {
-    const res = await fetch('/api/v1/promoter/withdraw', {
+    const res = await safeFetch('/api/v1/promoter/withdraw', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getToken()}`,

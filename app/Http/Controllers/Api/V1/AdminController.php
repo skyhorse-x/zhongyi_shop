@@ -16,6 +16,7 @@ use App\Models\AiLog;
 use App\Models\SystemConfig;
 use App\Models\Admin;
 use App\Services\LlmService;
+use App\Services\SystemConfigService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -598,11 +599,15 @@ class AdminController extends Controller
             'cos_region', 'cos_bucket', 'cos_secret_id', 'cos_secret_key',
             'commission_level1', 'commission_level2',
             'withdraw_min_amount',
+            // LLM配置
+            'llm_provider', 'llm_api_url', 'llm_api_key', 'llm_model',
+            'llm_temperature', 'llm_max_tokens', 'llm_timeout',
         ];
 
         $data = $request->only($allowedKeys);
         foreach ($data as $key => $value) {
-            SystemConfig::updateOrCreate(['key' => $key], ['value' => $value]);
+            // 使用 SystemConfigService 以支持加密存储
+            SystemConfigService::set($key, $value);
         }
         return response()->json(['code' => 0, 'message' => '保存成功']);
     }

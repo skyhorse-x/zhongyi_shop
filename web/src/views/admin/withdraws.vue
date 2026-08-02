@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 
 interface WithdrawRecord {
   id: string
@@ -53,7 +54,7 @@ const loadWithdraws = async () => {
     if (searchPromoter.value) params.append('promoter', searchPromoter.value)
     if (searchStatus.value) params.append('status', searchStatus.value)
 
-    const res = await fetch(`/api/v1/admin/withdraws?${params}`, {
+    const res = await safeFetch(`/api/v1/admin/withdraws?${params}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -119,7 +120,7 @@ async function approve(row: WithdrawRecord) {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
     })
-    const res = await fetch(`/api/v1/admin/withdraws/${row.id}/audit`, {
+    const res = await safeFetch(`/api/v1/admin/withdraws/${row.id}/audit`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getToken()}`,
@@ -147,7 +148,7 @@ async function reject(row: WithdrawRecord) {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
     })
-    const res = await fetch(`/api/v1/admin/withdraws/${row.id}/audit`, {
+    const res = await safeFetch(`/api/v1/admin/withdraws/${row.id}/audit`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getToken()}`,

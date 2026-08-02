@@ -40,7 +40,7 @@ const getToken = (): string => localStorage.getItem('token') || ''
 const loadWithdraws = async () => {
   loading.value = true
   try {
-    const res = await fetch('/api/v1/promoter/withdraw-history?limit=50', {
+    const res = await safeFetch('/api/v1/promoter/withdraw-history?limit=50', {
       headers: { Authorization: `Bearer ${getToken()}`, Accept: 'application/json' },
     })
     const data = await res.json()

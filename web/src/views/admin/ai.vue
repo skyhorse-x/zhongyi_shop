@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { safeFetch } from '@/utils/fetch'
 
 interface AiModel {
   id: number
@@ -49,7 +50,7 @@ const getToken = (): string => localStorage.getItem('admin_token') || ''
 // 加载AI模型列表
 const loadModels = async () => {
   try {
-    const res = await fetch('/api/v1/admin/ai/models', {
+    const res = await safeFetch('/api/v1/admin/ai/models', {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -74,7 +75,7 @@ const loadCallRecords = async () => {
       page: currentPage.value.toString(),
       limit: pageSize.value.toString(),
     })
-    const res = await fetch(`/api/v1/admin/ai/logs?${params}`, {
+    const res = await safeFetch(`/api/v1/admin/ai/logs?${params}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -108,7 +109,7 @@ const loadCallRecords = async () => {
 const loadStats = async () => {
   try {
     const params = new URLSearchParams({ page: '1', limit: '1000' })
-    const res = await fetch(`/api/v1/admin/ai/logs?${params}`, {
+    const res = await safeFetch(`/api/v1/admin/ai/logs?${params}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -200,7 +201,7 @@ const handleSaveModel = async () => {
       : '/api/v1/admin/ai/models'
     const method = editForm.value.id ? 'PUT' : 'POST'
 
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       method,
       headers: {
         'Authorization': `Bearer ${getToken()}`,
@@ -225,7 +226,7 @@ const handleSaveModel = async () => {
 const handleToggleStatus = async (model: AiModel) => {
   const newStatus = model.is_enabled === 1 ? 0 : 1
   try {
-    const res = await fetch(`/api/v1/admin/ai/models/${model.id}`, {
+    const res = await safeFetch(`/api/v1/admin/ai/models/${model.id}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${getToken()}`,
@@ -253,7 +254,7 @@ const handleDeleteModel = (model: AiModel) => {
     type: 'warning'
   }).then(async () => {
     try {
-      const res = await fetch(`/api/v1/admin/ai/models/${model.id}`, {
+      const res = await safeFetch(`/api/v1/admin/ai/models/${model.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${getToken()}`,
