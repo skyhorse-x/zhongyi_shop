@@ -2,6 +2,7 @@
 import { shallowRef, ref, onMounted } from 'vue'
 import { UserFilled, Plus, List, Coin, TrendCharts, Cpu, Money } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
+import { buildAdminHeaders } from '@/utils/auth'
 
 const stats = shallowRef([
   { title: '今日访问', value: '--', color: '#1989fa', icon: TrendCharts },
