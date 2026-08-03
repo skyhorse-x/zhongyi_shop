@@ -34,7 +34,7 @@ const loadDashboardData = async () => {
   try {
     const res = await safeFetch('/api/v1/admin/dashboard', {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+        ...buildAdminHeaders(),
         'Accept': 'application/json',
       },
     })

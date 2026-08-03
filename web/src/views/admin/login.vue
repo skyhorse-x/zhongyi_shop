@@ -56,7 +56,7 @@ const handleLogin = async () => {
     const data = await res.json()
 
     if (data.code === 0) {
-      localStorage.setItem('admin_token', data.data.token)
+      setAdminToken(data.data.token)
       ElMessage.success('登录成功')
       router.push('/admin/dashboard')
     } else {

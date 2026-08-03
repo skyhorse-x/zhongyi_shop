@@ -29,11 +29,11 @@ class SystemConfigSeeder extends Seeder
             ['key' => 'commission_settle_days', 'value' => '7', 'name' => '佣金结算天数', 'group_name' => 'promotion', 'type' => 'number', 'remark' => '订单完成后几天结算佣金'],
             ['key' => 'withdraw_min_amount', 'value' => '10', 'name' => '最低提现金额', 'group_name' => 'promotion', 'type' => 'number', 'remark' => '推广员最低可提现金额（元）'],
 
-            // 大模型接口配置
-            ['key' => 'llm_provider', 'value' => 'openai', 'name' => '大模型服务商', 'group_name' => 'llm', 'type' => 'select', 'remark' => '选择大模型服务商：openai/anthropic/deepseek/qwen'],
-            ['key' => 'llm_api_url', 'value' => 'https://api.openai.com/v1', 'name' => 'API地址', 'group_name' => 'llm', 'type' => 'text', 'remark' => '大模型API请求地址'],
-            ['key' => 'llm_api_key', 'value' => '', 'name' => 'API密钥', 'group_name' => 'llm', 'type' => 'password', 'remark' => '大模型API密钥'],
-            ['key' => 'llm_model', 'value' => 'gpt-4o-mini', 'name' => '模型名称', 'group_name' => 'llm', 'type' => 'text', 'remark' => '使用的模型名称'],
+            // 大模型接口配置（由后台完全接管，不再依赖 .env）
+            ['key' => 'llm_provider', 'value' => 'longcat', 'name' => '大模型服务商', 'group_name' => 'llm', 'type' => 'select', 'remark' => '选择大模型服务商：openai/anthropic/deepseek/qwen/longcat（美团 LongCat）'],
+            ['key' => 'llm_api_url', 'value' => 'https://api.longcat.chat/openai/v1', 'name' => 'API地址', 'group_name' => 'llm', 'type' => 'text', 'remark' => '大模型API请求地址（OpenAI 兼容，如 LongCat: https://api.longcat.chat/openai/v1）'],
+            ['key' => 'llm_api_key', 'value' => '', 'name' => 'API密钥', 'group_name' => 'llm', 'type' => 'password', 'remark' => '大模型API密钥（LongCat 使用 ak_ 前缀；首次部署请在后台填写）'],
+            ['key' => 'llm_model', 'value' => 'LongCat-2.0', 'name' => '模型名称', 'group_name' => 'llm', 'type' => 'text', 'remark' => '使用的模型名称（LongCat 可选：LongCat-2.0 / LongCat-Flash-Chat）'],
             ['key' => 'llm_temperature', 'value' => '0.7', 'name' => '温度参数', 'group_name' => 'llm', 'type' => 'number', 'remark' => '生成文本的随机性（0-2）'],
             ['key' => 'llm_max_tokens', 'value' => '2000', 'name' => '最大Token数', 'group_name' => 'llm', 'type' => 'number', 'remark' => '单次请求最大token数'],
             ['key' => 'llm_timeout', 'value' => '30', 'name' => '超时时间', 'group_name' => 'llm', 'type' => 'number', 'remark' => 'API请求超时时间（秒）'],

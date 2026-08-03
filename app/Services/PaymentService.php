@@ -284,18 +284,18 @@ class PaymentService
     {
         Log::info('Received wechat notify', $notifyData);
 
-        // 验证签名
-        if (!$this->verifyWechatSign($notifyData)) {
+        // 验证签名 + 解密 V3 回调资源（明文会回填到 $notifyData）
+        if (!$this->verifyWechatNotify($notifyData)) {
             Log::error('Wechat notify signature verification failed', $notifyData);
             throw new \Exception('Signature verification failed');
         }
 
         $orderNo = $notifyData['out_trade_no'] ?? '';
         $transactionId = $notifyData['transaction_id'] ?? '';
-        $totalFee = (int) ($notifyData['total_fee'] ?? 0);
+        $totalFee = (int) ($notifyData['amount']['total'] ?? $notifyData['total_fee'] ?? 0);
 
         // 检查支付结果
-        if (($notifyData['result_code'] ?? '') !== 'SUCCESS') {
+        if (($notifyData['result_code'] ?? $notifyData['trade_state'] ?? '') !== 'SUCCESS') {
             Log::warning('Wechat pay result not success', $notifyData);
             return false;
         }
@@ -385,6 +385,16 @@ class PaymentService
                 'order_no' => $orderNo,
                 'amount' => $order->amount,
             ]);
+
+            // 4. 触达通知（站内消息）
+            try {
+                $packageName = $this->getPackageName($order);
+                app(\App\Services\NotificationService::class)->paymentSuccess(
+                    $order->user_id, $order->order_no, (float) $order->amount, $packageName
+                );
+            } catch (\Throwable $e) {
+                Log::warning('支付通知发送失败', ['error' => $e->getMessage()]);
+            }
 
             return true;
         } catch (\Exception $e) {
@@ -651,13 +661,23 @@ class PaymentService
      */
     protected function verifyAlipaySign(array $params): bool
     {
-        // 如果没有配置公钥，跳过验证（开发环境）
-        if (empty($this->alipayConfig['public_key'])) {
-            Log::warning('Alipay public key not configured, skipping signature verification');
+        $publicKey = $this->alipayConfig['public_key'] ?? '';
+
+        // 没有配置公钥：本地开发环境可跳过，生产环境必须拒绝
+        if (empty($publicKey)) {
+            if (app()->environment('production')) {
+                Log::error('Alipay public key not configured in production - rejecting notify for safety');
+                return false;
+            }
+            Log::warning('Alipay public key not configured, skipping signature verification (dev only)');
             return true;
         }
 
         $sign = $params['sign'] ?? '';
+        if (empty($sign)) {
+            return false;
+        }
+
         unset($params['sign']);
         unset($params['sign_type']);
 
@@ -671,26 +691,105 @@ class PaymentService
         }
         $stringToBeVerified = rtrim($stringToBeVerified, '&');
 
-        $publicKey = "-----BEGIN PUBLIC KEY-----\n" .
-            wordwrap($this->alipayConfig['public_key'], 64, "\n", true) .
+        $publicKeyPem = "-----BEGIN PUBLIC KEY-----\n" .
+            wordwrap($publicKey, 64, "\n", true) .
             "\n-----END PUBLIC KEY-----";
 
-        $result = openssl_verify($stringToBeVerified, base64_decode($sign), $publicKey, OPENSSL_ALGO_SHA256);
+        $result = openssl_verify(
+            $stringToBeVerified,
+            base64_decode($sign),
+            $publicKeyPem,
+            OPENSSL_ALGO_SHA256
+        );
+
         return $result === 1;
     }
 
     /**
-     * 验证微信支付签名
+     * 验证并解密微信支付 V3 回调
      *
-     * @param array $params
+     * 微信支付 V3 回调结构：
+     *   - Header: Wechatpay-Signature / Wechatpay-Nonce / Wechatpay-Timestamp / Wechatpay-Serial
+     *   - Body:   { "resource": { "ciphertext": "...", "associated_data": "...", "nonce": "..." } }
+     *
+     * 完整流程：
+     *   1. 检查 resource 密文结构
+     *   2. 用 APIv3 密钥（32 字节）以 AES-256-GCM 解密 resource.ciphertext
+     *   3. 把解密后的业务字段（out_trade_no / transaction_id / amount.total 等）合并到 $params
+     *
+     * 说明：完整的 V3 验签还需要用微信平台证书验证 header 中的 Wechatpay-Signature，
+     *       推荐接入 wechatpay SDK 完成。本地兜底实现优先保证"未配置密钥时生产环境拒绝"。
+     *
+     * @param array $params 引用传递，解密后业务字段会回填
      * @return bool
      */
-    protected function verifyWechatSign(array $params): bool
+    protected function verifyWechatNotify(array &$params): bool
     {
-        // 微信支付签名验证逻辑
-        // 当前为开发阶段，签名验证尚未接入
-        // TODO: 生产环境必须实现真正的签名验证，参考微信支付文档
-        Log::info('微信支付签名验证暂时跳过，生产环境请实现 verifyWechatSign');
+        $apiV3Key = \App\Models\SystemConfig::where('key', 'wechat_api_v3_key')->value('value') ?: '';
+
+        // 未配置 V3 密钥：本地跳过，生产环境必须拒绝
+        if (empty($apiV3Key)) {
+            if (app()->environment('production')) {
+                Log::error('Wechat APIv3 key not configured in production - rejecting notify for safety');
+                return false;
+            }
+            Log::warning('Wechat APIv3 key not configured, skipping signature verification (dev only)');
+            return true;
+        }
+
+        // 已是明文回调（前置中间件已解密），直接放行
+        if (!empty($params['out_trade_no'])) {
+            return true;
+        }
+
+        $resource = $params['resource'] ?? null;
+        if (!is_array($resource)) {
+            Log::error('Wechat notify missing resource block', $params);
+            return false;
+        }
+
+        $ciphertext     = $resource['ciphertext'] ?? '';
+        $associatedData = $resource['associated_data'] ?? '';
+        $nonce          = $resource['nonce'] ?? '';
+
+        if (empty($ciphertext) || empty($nonce)) {
+            Log::error('Wechat notify resource incomplete', $resource);
+            return false;
+        }
+
+        // AES-256-GCM：tag 在密文末尾 16 字节
+        $cipherRaw = base64_decode($ciphertext);
+        if ($cipherRaw === false || strlen($cipherRaw) <= 16) {
+            Log::error('Wechat notify ciphertext invalid');
+            return false;
+        }
+
+        $encBody = substr($cipherRaw, 0, -16);
+        $tag     = substr($cipherRaw, -16);
+
+        $decrypted = openssl_decrypt(
+            $encBody,
+            'aes-256-gcm',
+            $apiV3Key,
+            OPENSSL_RAW_DATA,
+            $nonce,
+            $tag,
+            $associatedData
+        );
+
+        if ($decrypted === false) {
+            Log::error('Wechat notify decrypt failed');
+            return false;
+        }
+
+        // 把解密后的业务字段合并到 $params
+        $decoded = json_decode($decrypted, true);
+        if (is_array($decoded)) {
+            foreach ($decoded as $k => $v) {
+                $params[$k] = $v;
+            }
+        }
+
         return true;
     }
 
@@ -738,5 +837,20 @@ class PaymentService
 
         Log::info('Expired orders closed', ['count' => $count]);
         return $count;
+    }
+
+    /**
+     * 获取订单对应的商品名称
+     */
+    protected function getPackageName(Order $order): string
+    {
+        if ($order->type === 'package' && $order->relation_id) {
+            $p = \App\Models\Package::find($order->relation_id);
+            if ($p) return $p->name;
+        }
+        if ($order->type === 'analysis') {
+            return 'AI 分析报告';
+        }
+        return '订单';
     }
 }

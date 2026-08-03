@@ -18,12 +18,16 @@ class SystemConfigService
     ];
 
     /**
-     * 获取配置值（自动解密）
+     * 获取配置值（自动解密 + 走 Redis 缓存）
      */
     public static function get(string $key, $default = null)
     {
-        $config = SystemConfig::where('key', $key)->first();
+        $value = CacheService::namespace('sys:config')->get($key, null);
+        if ($value !== null) {
+            return $value;
+        }
 
+        $config = SystemConfig::where('key', $key)->first();
         if (!$config) {
             return $default;
         }
@@ -40,16 +44,22 @@ class SystemConfigService
             }
         }
 
+        // 缓存到 Redis（敏感配置不缓存明文，缓存空串占位避免重复查 DB）
+        CacheService::namespace('sys:config')->put(
+            $key,
+            in_array($key, self::$encryptedKeys) ? '__ENCRYPTED__' : $value
+        );
+
         return $value;
     }
 
     /**
-     * 设置配置值（自动加密）
+     * 设置配置值（自动加密 + 失效缓存）
      */
     public static function set(string $key, $value): void
     {
-        // 敏感配置加密存储
-        if (in_array($key, self::$encryptedKeys) && !empty($value)) {
+        $isEncrypted = in_array($key, self::$encryptedKeys) && !empty($value);
+        if ($isEncrypted) {
             $value = Crypt::encryptString($value);
         }
 
@@ -57,6 +67,9 @@ class SystemConfigService
             ['key' => $key],
             ['value' => $value]
         );
+
+        // 失效缓存
+        CacheService::namespace('sys:config')->forget($key);
     }
 
     /**
@@ -70,17 +83,22 @@ class SystemConfigService
     }
 
     /**
-     * 获取分组配置
+     * 获取分组配置（带缓存）
      */
     public static function getByGroup(string $group): array
     {
+        $cacheKey = "group:{$group}";
+        $cached = CacheService::namespace('sys:config')->get($cacheKey);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
         $configs = SystemConfig::where('group_name', $group)->get();
         $result = [];
 
         foreach ($configs as $config) {
             $value = $config->value;
 
-            // 解密敏感配置
             if (in_array($config->key, self::$encryptedKeys) && !empty($value)) {
                 try {
                     $value = Crypt::decryptString($value);
@@ -92,11 +110,12 @@ class SystemConfigService
             $result[$config->key] = $value;
         }
 
+        CacheService::namespace('sys:config')->put($cacheKey, $result);
         return $result;
     }
 
     /**
-     * 获取所有配置（按分组）
+     * 获取所有配置（按分组）- 不缓存（管理后台用）
      */
     public static function getAllGrouped(): array
     {
@@ -106,7 +125,6 @@ class SystemConfigService
         foreach ($configs as $config) {
             $value = $config->value;
 
-            // 解密敏感配置
             if (in_array($config->key, self::$encryptedKeys) && !empty($value)) {
                 try {
                     $value = Crypt::decryptString($value);
@@ -125,5 +143,13 @@ class SystemConfigService
         }
 
         return $grouped;
+    }
+
+    /**
+     * 失效整个 sys:config 命名空间
+     */
+    public static function flush(): void
+    {
+        CacheService::namespace('sys:config')->flush();
     }
 }

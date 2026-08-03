@@ -1,14 +1,15 @@
 import router from '@/router'
 import { useAdminStore } from '@/stores/admin'
 import { ElMessage } from 'element-plus'
+import { getToken, getAdminToken } from '@/utils/auth'
 
 // 路由守卫 - 权限检查
 export function setupPermissionGuard() {
   router.beforeEach((to, _from, next) => {
     document.title = (to.meta.title as string) || 'AI中医健康管理'
 
-    const token = localStorage.getItem('token')
-    const adminToken = localStorage.getItem('admin_token')
+    const token = getToken()
+    const adminToken = getAdminToken()
 
     // 用户端认证 - 推广中心、会员中心、购买页面：用户或管理员都可以访问
     if (to.meta.needAuth) {

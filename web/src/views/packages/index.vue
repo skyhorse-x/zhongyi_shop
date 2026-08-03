@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox, ElDialog, ElRadioGroup, ElRadio, ElButton } fr
 import { List, Check, InfoFilled, ShoppingBag, Sunny, Star, Trophy, Wallet, Money, ChatLineSquare } from '@element-plus/icons-vue'
 import { toMoney } from '@/utils'
 import { safeFetch } from '@/utils/fetch'
+import { getToken } from '@/utils/auth'
 
 const router = useRouter()
 const loading = ref(false)
@@ -14,7 +15,7 @@ const paying = ref(false)
 const userInfo = ref<any>(null)
 const userBalance = ref(0)
 
-const getToken = (): string => localStorage.getItem('token') || localStorage.getItem('admin_token') || ''
+const getAuthToken = (): string => getToken() || ''
 
 // icon 名称 → 组件映射（后端只传 icon 名称，前端解析）
 const iconMap: Record<string, any> = {

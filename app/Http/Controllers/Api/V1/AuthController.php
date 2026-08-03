@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Promoter;
 use App\Models\SystemConfig;
 use App\Models\User;
+use App\Services\CacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -116,6 +117,8 @@ class AuthController extends Controller
                     'password' => Hash::make($request->password),
                     'nickname' => '用户' . substr($request->mobile, -4),
                     'parent_id' => $parentId,
+                    'parent_locked' => (bool) $parentId, // 有邀请人即锁定
+                    'parent_locked_at' => $parentId ? now() : null,
                 ]);
                 $this->autoActivatePromoter($user);
                 $user->grantInitialAnalysisTimes();
@@ -129,6 +132,13 @@ class AuthController extends Controller
                 }
 
                 DB::commit();
+
+                // 发送欢迎消息
+                try {
+                    app(\App\Services\NotificationService::class)->welcome($user->id, $user->nickname ?? '');
+                } catch (\Throwable $e) {
+                    Log::warning('Welcome message failed', ['error' => $e->getMessage()]);
+                }
             } catch (\Exception $e) {
                 DB::rollBack();
                 Log::error('Register failed', ['error' => $e->getMessage()]);
@@ -295,9 +305,11 @@ class AuthController extends Controller
         $mobile = $request->mobile;
         $type = $request->type;
 
+        $smsCache = CacheService::namespace('sms');
+
         // 频率限制：同一手机号1分钟内只能发一次
-        $rateKey = 'sms_rate_' . $mobile;
-        if (\Illuminate\Support\Facades\Cache::has($rateKey)) {
+        $rateKey = "rate:{$mobile}";
+        if ($smsCache->get($rateKey)) {
             return response()->json([
                 'code' => 429,
                 'message' => '请求过于频繁，请稍后再试',
@@ -308,13 +320,13 @@ class AuthController extends Controller
         $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         // 存储验证码到缓存（5分钟过期）
-        \Illuminate\Support\Facades\Cache::put('sms_code_' . $mobile, [
+        $smsCache->put("code:{$mobile}", [
             'code' => $code,
             'type' => $type,
         ], 300);
 
         // 设置发送频率限制（60秒）
-        \Illuminate\Support\Facades\Cache::put($rateKey, 1, 60);
+        $smsCache->put($rateKey, 1, 60);
 
         // 发送短信（接入短信宝/阿里云短信服务）
         $smsResult = $this->sendSmsViaProvider($mobile, $code, $type);

@@ -20,7 +20,9 @@ interface AnalysisRecord {
 const records = ref<AnalysisRecord[]>([])
 const loading = ref(false)
 
-const getToken = (): string => localStorage.getItem('token') || ''
+import { getToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getToken() || ''
 
 // 从后端加载历史记录（无任何硬编码）
 const fetchHistory = async () => {

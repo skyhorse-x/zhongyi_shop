@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
+import { getAuthToken } from '@/utils/auth'
 
 const router = useRouter()
 
@@ -21,8 +22,6 @@ const withdrawTypes = [
   { value: 'alipay', label: '支付宝' },
 ]
 
-const getToken = (): string => localStorage.getItem('token') || localStorage.getItem('admin_token') || ''
-
 const canWithdraw = computed(() => {
   const amount = parseFloat(form.value.amount)
   return amount > 0 && amount <= balance.value && form.value.payAccount
@@ -34,7 +33,7 @@ const loadPromoterInfo = async () => {
   try {
     const res = await safeFetch('/api/v1/promoter/info', {
       headers: {
-        'Authorization': `Bearer ${getToken()}`,
+        'Authorization': `Bearer ${getAuthToken()}`,
         'Accept': 'application/json',
       },
     })
@@ -79,7 +78,7 @@ const handleWithdraw = async () => {
     const res = await safeFetch('/api/v1/promoter/withdraw', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${getToken()}`,
+        'Authorization': `Bearer ${getAuthToken()}`,
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },

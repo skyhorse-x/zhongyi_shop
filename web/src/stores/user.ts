@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { login, register, getUserInfo, logout } from '@/api/auth'
+import { getToken, setToken, clearToken, getUserInfo as readUserInfo, setUserInfo, clearUserInfo } from '@/utils/auth'
 
 export const useUserStore = defineStore('user', () => {
   // 状态
-  const token = ref(localStorage.getItem('token') || '')
-  const userInfo = ref<any>(null)
+  const token = ref(getToken() || '')
+  const userInfo = ref<any>(readUserInfo())
 
   // 计算属性
   const isLoggedIn = computed(() => !!token.value)
@@ -16,7 +17,8 @@ export const useUserStore = defineStore('user', () => {
     const res: any = await login({ account, password })
     token.value = res.token
     userInfo.value = res.user
-    localStorage.setItem('token', res.token)
+    setToken(res.token)
+    setUserInfo(res.user)
     return res
   }
 
@@ -25,7 +27,8 @@ export const useUserStore = defineStore('user', () => {
     const res: any = await register(data)
     token.value = res.token
     userInfo.value = res.user
-    localStorage.setItem('token', res.token)
+    setToken(res.token)
+    setUserInfo(res.user)
     return res
   }
 
@@ -33,6 +36,7 @@ export const useUserStore = defineStore('user', () => {
   const fetchUserInfo = async () => {
     const res = await getUserInfo()
     userInfo.value = res
+    setUserInfo(res)
     return res
   }
 
@@ -45,7 +49,8 @@ export const useUserStore = defineStore('user', () => {
     }
     token.value = ''
     userInfo.value = null
-    localStorage.removeItem('token')
+    clearToken()
+    clearUserInfo()
   }
 
   return {

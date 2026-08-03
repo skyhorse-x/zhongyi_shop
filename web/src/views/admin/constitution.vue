@@ -50,7 +50,9 @@ const CATEGORIES = [
   '血瘀质', '气郁质', '特禀质', '平和质',
 ]
 
-const getToken = (): string => localStorage.getItem('admin_token') || ''
+import { getAdminToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getAdminToken() || ''
 
 const fetchQuestions = async () => {
   loading.value = true

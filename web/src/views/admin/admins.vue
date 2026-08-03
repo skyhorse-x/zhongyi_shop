@@ -15,7 +15,9 @@ const total = ref(0)
 const currentPage = ref(1)
 const loading = ref(false)
 
-const getToken = (): string => localStorage.getItem('admin_token') || ''
+import { getAdminToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getAdminToken() || ''
 
 // 加载管理员列表
 const loadAdmins = async () => {

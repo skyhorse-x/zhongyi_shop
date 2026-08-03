@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 import { Connection, Setting, Money, Promotion, Cpu, ChatDotRound, Message, Wallet, Switch } from '@element-plus/icons-vue'
+import { buildAdminHeaders, getAdminToken } from '@/utils/auth'
 
 const form = ref({
   // 基本设置
@@ -61,7 +62,7 @@ const loadPaymentConfig = async () => {
   paymentLoading.value = true
   try {
     const res = await safeFetch('/api/v1/admin/config/payment', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}`, Accept: 'application/json' },
+      headers: { Authorization: `Bearer ${getAdminToken() || ''}`, Accept: 'application/json' },
     })
     const data = await res.json()
     if (data.code === 0) {
@@ -93,7 +94,7 @@ const togglePayment = async (type: 'balance' | 'wechat' | 'alipay') => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('admin_token')}`,
+        Authorization: `Bearer ${getAdminToken() || ''}`,
         Accept: 'application/json',
       },
       body: JSON.stringify({ type, enabled: newVal ? 1 : 0 }),
@@ -120,7 +121,7 @@ const testLlmConnection = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+        'Authorization': `Bearer ${getAdminToken() || ''}`,
       },
     })
     const data = await res.json()
@@ -141,7 +142,7 @@ const loadConfigs = async () => {
   try {
     const res = await safeFetch('/api/v1/admin/configs', {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+        'Authorization': `Bearer ${getAdminToken() || ''}`,
       },
     })
     const data = await res.json()
@@ -269,7 +270,7 @@ const handleSave = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+        'Authorization': `Bearer ${getAdminToken() || ''}`,
       },
       body: JSON.stringify(configData),
     })
@@ -449,6 +450,7 @@ onMounted(() => {
               <el-option label="Anthropic (Claude)" value="anthropic" />
               <el-option label="DeepSeek" value="deepseek" />
               <el-option label="通义千问" value="qwen" />
+              <el-option label="美团 LongCat" value="longcat" />
             </el-select>
           </el-form-item>
           <el-form-item label="API地址">

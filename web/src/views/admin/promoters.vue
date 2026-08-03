@@ -72,7 +72,9 @@ const stats = computed(() => {
   }
 })
 
-const getToken = (): string => localStorage.getItem('admin_token') || ''
+import { getAdminToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getAdminToken() || ''
 
 // 加载推广员列表
 const loadPromoters = async () => {

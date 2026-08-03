@@ -22,7 +22,9 @@ const messageListRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 // 获取认证token
-const getToken = (): string => localStorage.getItem('token') || ''
+import { getToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getToken() || ''
 
 // 获取或创建会话
 const getOrCreateSession = async () => {

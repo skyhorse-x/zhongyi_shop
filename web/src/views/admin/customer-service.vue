@@ -132,7 +132,9 @@ const tabs = [
 ]
 
 // 获取认证token
-const getToken = (): string => localStorage.getItem('admin_token') || ''
+import { getAdminToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getAdminToken() || ''
 
 // 播放提示音
 const playNotificationSound = () => {

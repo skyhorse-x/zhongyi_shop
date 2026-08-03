@@ -17,7 +17,9 @@ const total = ref(0)
 const currentPage = ref(1)
 const loading = ref(false)
 
-const getToken = (): string => localStorage.getItem('admin_token') || ''
+import { getAdminToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getAdminToken() || ''
 
 // 状态映射
 const statusMap: Record<number, { type: string; label: string; color: string }> = {

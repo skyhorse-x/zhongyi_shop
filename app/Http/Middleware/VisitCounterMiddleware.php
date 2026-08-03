@@ -2,17 +2,18 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\CacheService;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 
 class VisitCounterMiddleware
 {
     /**
      * 访问量统计中间件
-     * - 按天自增访问量（存于 cache，过期时间 7 天）
+     * - 按天自增访问量（走 stats 命名空间，存于 Redis）
      * - 排除 API 内部调用、静态资源
+     * - 失败自动降级到 file/database（CacheService 内部处理）
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -23,12 +24,15 @@ class VisitCounterMiddleware
             && $request->method() === 'GET';      // 只统计 GET
 
         if ($shouldCount) {
-            $key = 'stats:visits:' . date('Ymd');
-            // 当前值 +1（永久保存到当天 23:59:59 后）
-            Cache::increment($key);
-            // 如果 key 不存在会被置为 1，再确保有过期时间
-            if (Cache::has($key)) {
-                Cache::put($key, Cache::get($key, 1), now()->endOfDay());
+            $key = 'visits:' . date('Ymd');
+            $statsCache = CacheService::namespace('stats');
+
+            // 当前值 +1
+            $count = $statsCache->increment($key);
+
+            // 如果是首次写入（count=1），补上当天结束前的过期时间
+            if ($count === 1) {
+                $statsCache->put($key, $count, now()->endOfDay());
             }
         }
 

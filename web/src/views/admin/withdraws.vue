@@ -40,7 +40,9 @@ const statusMap: Record<number, { type: 'warning' | 'success' | 'danger'; label:
 
 const tableData = ref<WithdrawRecord[]>([])
 
-const getToken = (): string => localStorage.getItem('admin_token') || ''
+import { getAdminToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getAdminToken() || ''
 
 // 加载提现列表
 const loadWithdraws = async () => {

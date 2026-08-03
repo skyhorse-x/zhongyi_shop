@@ -19,7 +19,9 @@ const aiText = ref('')
 const analysisMode = ref('paid')
 const analysisPrice = ref(9.99)
 
-const getToken = (): string => localStorage.getItem('token') || ''
+import { getToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getToken() || ''
 
 // 获取分析模式配置
 const fetchAnalysisMode = async () => {

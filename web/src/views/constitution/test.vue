@@ -3,6 +3,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
+import { buildUserHeaders } from '@/utils/auth'
 
 const router = useRouter()
 const loading = ref(false)
@@ -16,7 +17,7 @@ const fetchQuestions = async () => {
   try {
     const res = await safeFetch('/api/v1/constitution/questions', {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        ...buildUserHeaders(),
         'Accept': 'application/json',
       },
     })
@@ -60,7 +61,7 @@ const handleSubmit = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        ...buildUserHeaders(),
         'Accept': 'application/json',
       },
       body: JSON.stringify({ answers }),

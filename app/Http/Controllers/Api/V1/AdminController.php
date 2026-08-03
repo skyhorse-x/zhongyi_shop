@@ -15,6 +15,7 @@ use App\Models\AiModel;
 use App\Models\AiLog;
 use App\Models\SystemConfig;
 use App\Models\Admin;
+use App\Services\CacheService;
 use App\Services\LlmService;
 use App\Services\SystemConfigService;
 use Illuminate\Http\Request;
@@ -67,9 +68,8 @@ class AdminController extends Controller
         $totalAiCost = AiLog::sum('cost') ?? 0;
         $totalProfit = $totalIncome - $totalWithdraw - $totalAiCost;
 
-        // ✅ today_visits: 通过 Redis 或缓存键自增的访问量
-        // 这里从 cache 读取今日访问数（中间件负责自增）
-        $todayVisits = \Illuminate\Support\Facades\Cache::get('stats:visits:' . date('Ymd'), 0);
+        // ✅ today_visits: 通过 CacheService 统一读 stats 命名空间（中间件自增）
+        $todayVisits = (int) CacheService::namespace('stats')->get('visits:' . date('Ymd'), 0);
 
         return response()->json(['code' => 0, 'data' => [
             'today_visits' => $todayVisits,
@@ -517,10 +517,30 @@ class AdminController extends Controller
 
                 $withdraw->update($updateData);
 
-                // 找到这次提现关联的佣金记录，按比例从冻结变为已提现
-                // 由于提现时没有和 commissions 关联，这里通过 user_id + 时间段反查最近的冻结佣金
                 $promoter = $withdraw->promoter;
                 if ($promoter) {
+                    // 精确查找本次提现关联的佣金（通过 withdraw_id）
+                    $commissions = \App\Models\Commission::where('withdraw_id', $withdraw->id)
+                        ->where('status', 0)
+                        ->lockForUpdate()
+                        ->get();
+
+                    if ($commissions->isNotEmpty()) {
+                        $totalLinked = (float) $commissions->sum('amount');
+
+                        // 防御：关联的 commission 总额必须等于提现金额
+                        if (abs($totalLinked - (float) $withdraw->amount) > 0.01) {
+                            throw new \Exception(
+                                "本次提现关联佣金总额 ({$totalLinked}) 与申请金额 ({$withdraw->amount}) 不一致，请联系开发排查"
+                            );
+                        }
+
+                        // 标记为已结算（status = 1）
+                        \App\Models\Commission::where('withdraw_id', $withdraw->id)
+                            ->where('status', 0)
+                            ->update(['status' => 1]);
+                    }
+
                     // 扣除冻结佣金
                     $promoter->decrement('frozen_commission', $withdraw->amount);
 
@@ -528,29 +548,9 @@ class AdminController extends Controller
                     if ($isPaid) {
                         $promoter->increment('withdrawn_commission', $withdraw->amount);
                     }
-
-                    // 找到最近的冻结中佣金记录，标记为已结算
-                    // 取累计冻结金额中等于本次提现金额的最新一条
-                    $remainingAmount = $withdraw->amount;
-                    $commissions = \App\Models\Commission::where('promoter_id', $promoter->id)
-                        ->where('status', 0) // 冻结中
-                        ->orderBy('created_at', 'asc')
-                        ->get();
-
-                    foreach ($commissions as $commission) {
-                        if ($remainingAmount <= 0) break;
-                        if ($commission->amount <= $remainingAmount) {
-                            $commission->update(['status' => 1]); // 已结算
-                            $remainingAmount -= $commission->amount;
-                        } else {
-                            // 拆单：超出部分需要新记录（这里简化处理，按比例标记为部分结算）
-                            $commission->update(['status' => 1]);
-                            $remainingAmount = 0;
-                        }
-                    }
                 }
             } else {
-                // 审核拒绝，解冻佣金
+                // 审核拒绝，解冻佣金并解除 commission 关联
                 $withdraw->update([
                     'status' => 2,
                     'audit_remark' => $request->remark,
@@ -560,6 +560,10 @@ class AdminController extends Controller
                 $promoter = $withdraw->promoter;
                 if ($promoter) {
                     $promoter->decrement('frozen_commission', $withdraw->amount);
+
+                    // 解除关联：把关联到本次提现的 commission 记录 withdraw_id 置空、保持 status=0
+                    \App\Models\Commission::where('withdraw_id', $withdraw->id)
+                        ->update(['withdraw_id' => null]);
                 }
             }
         });

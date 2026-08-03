@@ -24,7 +24,9 @@ const result = ref({
   scores: [] as { name: string; score: number; isMain: boolean }[],
 })
 
-const getToken = (): string => localStorage.getItem('token') || ''
+import { getToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getToken() || ''
 
 // 体质类型对应颜色
 const constitutionColor = computed(() => {

@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
+import { getAuthToken } from '@/utils/auth'
 
 const router = useRouter()
 const loading = ref(false)
@@ -36,13 +37,11 @@ const payTypeMap: Record<string, string> = {
 
 const withdrawList = ref<WithdrawItem[]>([])
 
-const getToken = (): string => localStorage.getItem('token') || localStorage.getItem('admin_token') || ''
-
 const loadWithdraws = async () => {
   loading.value = true
   try {
     const res = await safeFetch('/api/v1/promoter/withdraw-history?limit=50', {
-      headers: { Authorization: `Bearer ${getToken()}`, Accept: 'application/json' },
+      headers: { Authorization: `Bearer ${getAuthToken()}`, Accept: 'application/json' },
     })
     const data = await res.json()
     if (data.code === 0) {

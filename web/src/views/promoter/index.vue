@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { Money, Wallet, Refresh, Share } from '@element-plus/icons-vue'
 import { toMoney } from '@/utils'
 import { safeFetch } from '@/utils/fetch'
+import { getAuthToken } from '@/utils/auth'
 
 const router = useRouter()
 
@@ -18,8 +19,6 @@ const stats = ref({
   totalOrders: 0,
   pendingCommission: '0.00',
 })
-
-const getToken = (): string => localStorage.getItem('token') || localStorage.getItem('admin_token') || ''
 
 const tools = ref([
   { icon: 'qr', title: '推广二维码', action: 'poster' },
@@ -39,7 +38,7 @@ const loadPromoterInfo = async () => {
   try {
     const res = await safeFetch('/api/v1/promoter/info', {
       headers: {
-        'Authorization': `Bearer ${getToken()}`,
+        'Authorization': `Bearer ${getAuthToken()}`,
         'Accept': 'application/json',
       },
     })

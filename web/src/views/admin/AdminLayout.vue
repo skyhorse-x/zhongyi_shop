@@ -26,9 +26,6 @@ const menuItems = shallowRef([
   { title: '系统设置', icon: Setting, path: '/admin/settings' },
 ])
 
-// 获取认证token
-const getAdminToken = (): string => localStorage.getItem('admin_token') || ''
-
 // 加载待接入客服数量
 const loadWaitingCount = async () => {
   try {
@@ -61,7 +58,7 @@ const navigateTo = (path: string) => {
 }
 
 const handleLogout = () => {
-  localStorage.removeItem('admin_token')
+  clearAdminToken()
   router.push('/admin/login')
 }
 

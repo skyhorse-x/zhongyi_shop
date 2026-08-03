@@ -18,7 +18,8 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
     })->name('login');
     
     // ===== 公开接口 =====
-    Route::prefix('auth')->group(function () {
+    // 认证相关接口限速更严格：每分钟 10 次（防爆破）
+    Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
         Route::post('register', [V1\AuthController::class, 'register']);
         Route::post('login', [V1\AuthController::class, 'login']);
         Route::post('sms-code', [V1\AuthController::class, 'sendSmsCode']);
@@ -27,8 +28,11 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
     });
 
     // ===== 管理后台公开接口 =====
+    // 管理员登录也加限速：每分钟 10 次
     Route::prefix('admin')->group(function () {
-        Route::post('auth/login', [V1\AdminController::class, 'login']);
+        Route::middleware('throttle:10,1')->group(function () {
+            Route::post('auth/login', [V1\AdminController::class, 'login']);
+        });
     });
 
     // ===== 需要登录的接口 =====
@@ -97,6 +101,30 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::post('{id}/read', [V1\SystemMessageController::class, 'markAsRead']);
         });
 
+        // 用户反馈
+        Route::prefix('feedback')->group(function () {
+            Route::get('/',        [V1\FeedbackController::class, 'index']);
+            Route::post('/',       [V1\FeedbackController::class, 'store']);
+            Route::get('/{id}',    [V1\FeedbackController::class, 'show']);
+        });
+
+        // AI 申诉
+        Route::prefix('appeals')->group(function () {
+            Route::get('/',     [V1\AppealController::class, 'index']);
+            Route::post('/',    [V1\AppealController::class, 'store']);
+            Route::get('/{id}', [V1\AppealController::class, 'show']);
+        });
+
+        // 退款
+        Route::prefix('refunds')->group(function () {
+            Route::get('/',                 [V1\RefundController::class, 'index']);
+            Route::post('/',                [V1\RefundController::class, 'store']);
+            Route::get('/{id}',             [V1\RefundController::class, 'show']);
+        });
+
+        // 客服评价
+        Route::post('customer-service/sessions/{sessionNo}/rate', [V1\CustomerServiceRatingController::class, 'store']);
+
         // 次数包
         Route::prefix('packages')->group(function () {
             Route::get('/', [V1\PackageController::class, 'index']);
@@ -124,7 +152,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::get('poster', [V1\PromoterController::class, 'poster']);
             Route::get('commissions', [V1\PromoterController::class, 'commissions']);
             Route::get('withdraw-history', [V1\PromoterController::class, 'withdrawHistory']);
-            Route::post('withdraw', [V1\PromoterController::class, 'withdraw']);
+            Route::post('withdraw', [V1\PromoterController::class, 'withdraw'])->middleware('risk:withdraw');
 
             // 邀请追踪
             Route::post('track-click', [V1\PromoterController::class, 'trackClick']);
@@ -255,6 +283,67 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
                 
                 // 发送系统消息到客服会话
                 Route::post('sessions/{sessionNo}/system-message', [V1\Admin\CustomerServiceManageController::class, 'sendSessionSystemMessage']);
+            });
+
+            // 数据分析 BI
+            Route::prefix('analytics')->group(function () {
+                Route::get('overview',           [V1\Admin\AnalyticsController::class, 'overview']);
+                Route::get('funnel',             [V1\Admin\AnalyticsController::class, 'funnel']);
+                Route::get('retention',          [V1\Admin\AnalyticsController::class, 'retention']);
+                Route::get('revenue',            [V1\Admin\AnalyticsController::class, 'revenue']);
+                Route::get('user-growth',        [V1\Admin\AnalyticsController::class, 'userGrowth']);
+                Route::get('top-promoters',      [V1\Admin\AnalyticsController::class, 'topPromoters']);
+                Route::get('analysis-distribution', [V1\Admin\AnalyticsController::class, 'analysisDistribution']);
+                Route::get('refund-rate',         [V1\Admin\AnalyticsController::class, 'refundRate']);
+                Route::get('package-sales',       [V1\Admin\AnalyticsController::class, 'packageSales']);
+                Route::get('promotion-conversion',[V1\Admin\AnalyticsController::class, 'promotionConversion']);
+                Route::get('satisfaction',        [V1\Admin\AnalyticsController::class, 'satisfaction']);
+            });
+
+            // 退款管理
+            Route::prefix('refunds')->group(function () {
+                Route::get('/',           [V1\Admin\RefundController::class, 'index']);
+                Route::get('/{id}',       [V1\Admin\RefundController::class, 'show']);
+                Route::post('/{id}/approve', [V1\Admin\RefundController::class, 'approve']);
+                Route::post('/{id}/reject',  [V1\Admin\RefundController::class, 'reject']);
+            });
+
+            // 客服评价管理
+            Route::prefix('customer-service')->group(function () {
+                Route::get('ratings',     [V1\Admin\CustomerServiceRatingController::class, 'index']);
+                Route::get('ratings-stats', [V1\Admin\CustomerServiceRatingController::class, 'statistics']);
+            });
+
+            // 风控管理
+            Route::prefix('risk')->group(function () {
+                // 规则
+                Route::get('rules',         [V1\Admin\RiskController::class, 'indexRules']);
+                Route::post('rules',        [V1\Admin\RiskController::class, 'storeRule']);
+                Route::put('rules/{id}',    [V1\Admin\RiskController::class, 'updateRule']);
+                Route::delete('rules/{id}', [V1\Admin\RiskController::class, 'destroyRule']);
+                // 事件
+                Route::get('events', [V1\Admin\RiskController::class, 'indexEvents']);
+                // 黑名单
+                Route::get('blacklists',                 [V1\Admin\RiskController::class, 'indexBlacklists']);
+                Route::post('blacklists',                [V1\Admin\RiskController::class, 'storeBlacklist']);
+                Route::delete('blacklists/{type}/{value}', [V1\Admin\RiskController::class, 'destroyBlacklist']);
+                // 统计
+                Route::get('statistics', [V1\Admin\RiskController::class, 'statistics']);
+            });
+
+            // 用户反馈
+            Route::prefix('feedback')->group(function () {
+                Route::get('/',                 [V1\Admin\FeedbackController::class, 'index']);
+                Route::get('/{id}',             [V1\Admin\FeedbackController::class, 'show']);
+                Route::post('/{id}/reply',      [V1\Admin\FeedbackController::class, 'reply']);
+                Route::post('/{id}/close',      [V1\Admin\FeedbackController::class, 'close']);
+            });
+
+            // AI 申诉
+            Route::prefix('appeals')->group(function () {
+                Route::get('/',                    [V1\Admin\AppealController::class, 'index']);
+                Route::get('/{id}',                [V1\Admin\AppealController::class, 'show']);
+                Route::post('/{id}/audit',         [V1\Admin\AppealController::class, 'audit']);
             });
         });
     });

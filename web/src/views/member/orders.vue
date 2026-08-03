@@ -56,7 +56,7 @@ const pagination = ref({ page: 1, per_page: 10, total: 0 })
 const fetchOrders = async () => {
   loading.value = true
   try {
-    const token = localStorage.getItem('token') || localStorage.getItem('admin_token') || ''
+    const token = getToken() || ''
     const params = new URLSearchParams({
       page: String(pagination.value.page),
       per_page: String(pagination.value.per_page),

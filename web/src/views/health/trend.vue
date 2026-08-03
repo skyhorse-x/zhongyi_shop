@@ -31,7 +31,9 @@ const tabs = [
   { key: 'year', title: '本年', days: 365 },
 ]
 
-const getToken = (): string => localStorage.getItem('token') || ''
+import { getToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getToken() || ''
 
 // 从后端加载趋势数据（无任何硬编码）
 const fetchTrendData = async () => {

@@ -24,7 +24,9 @@ const loading = ref(false)
 const messageListRef = ref<HTMLElement | null>(null)
 
 // 获取认证token
-const getToken = (): string => localStorage.getItem('token') || ''
+import { getToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getToken() || ''
 
 // 创建新会话
 const createSession = async (): Promise<string> => {

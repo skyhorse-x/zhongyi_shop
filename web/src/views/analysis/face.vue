@@ -11,7 +11,9 @@ const fileName = ref('')
 const loading = ref(false)
 const aiText = ref('')
 
-const getToken = (): string => localStorage.getItem('token') || ''
+import { getToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getToken() || ''
 
 const handleFileChange = (uploadFile: any) => {
   if (uploadFile.raw) {

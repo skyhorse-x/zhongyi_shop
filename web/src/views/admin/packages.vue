@@ -49,7 +49,9 @@ const typeOptions = [
   { value: 'face', label: '面诊' },
 ]
 
-const getToken = (): string => localStorage.getItem('admin_token') || ''
+import { getAdminToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getAdminToken() || ''
 
 const typeName = (type: string) => typeOptions.find(t => t.value === type)?.label || type
 

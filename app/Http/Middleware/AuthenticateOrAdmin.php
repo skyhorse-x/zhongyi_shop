@@ -12,7 +12,13 @@ use Symfony\Component\HttpFoundation\Response;
 class AuthenticateOrAdmin
 {
     /**
-     * 允许用户或管理员访问（通过 token 判断）
+     * 允许用户或管理员通过 token 认证访问
+     *
+     * - User token:  auth()->user()  返回 User 实例
+     * - Admin token: auth()->user()  返回 Admin 实例
+     *
+     * 注意：本中间件不再做"管理员关联到 User"的隐式创建，
+     * 调用方需要根据 auth()->user() 的实际类型分别处理。
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -25,7 +31,6 @@ class AuthenticateOrAdmin
             ], 401);
         }
 
-        // 查找 token 记录
         $token = PersonalAccessToken::findToken($bearerToken);
 
         if (!$token) {
@@ -35,7 +40,6 @@ class AuthenticateOrAdmin
             ], 401);
         }
 
-        // 获取关联的用户（User 或 Admin）
         $tokenable = $token->tokenable;
 
         if (!$tokenable) {
@@ -45,26 +49,16 @@ class AuthenticateOrAdmin
             ], 401);
         }
 
-        // 根据 tokenable 类型设置对应的 guard
-        if ($tokenable instanceof Admin) {
-            // 管理员 token - 创建或获取关联的用户
-            $user = User::where('phone', $tokenable->phone)->first();
-            if (!$user) {
-                // 如果没有关联的用户，使用管理员的基本信息创建一个用户记录
-                $user = User::firstOrCreate(
-                    ['phone' => $tokenable->phone],
-                    [
-                        'nickname' => $tokenable->name,
-                        'password' => bcrypt(uniqid()),
-                    ]
-                );
-            }
-            // 设置当前认证用户
-            auth()->setUser($user);
-        } else {
-            // 普通用户 token
-            auth()->setUser($tokenable);
+        // 仅允许 User 或 Admin 通过
+        if (!($tokenable instanceof User) && !($tokenable instanceof Admin)) {
+            return response()->json([
+                'code' => 401,
+                'message' => '无效的认证身份',
+            ], 401);
         }
+
+        // 直接将 token 关联的实例设置为当前认证用户
+        auth()->setUser($tokenable);
 
         return $next($request);
     }

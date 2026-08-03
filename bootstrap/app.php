@@ -9,6 +9,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Illuminate\Support\Facades\Log;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -22,18 +23,24 @@ return Application::configure(basePath: dirname(__DIR__))
         // CORS 中间件
         $middleware->prepend(\Illuminate\Http\Middleware\HandleCors::class);
 
+        // 风控中间件别名
+        $middleware->alias([
+            'risk' => \App\Http\Middleware\RiskControlMiddleware::class,
+        ]);
+
         // 注册路由中间件别名
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'super_admin' => \App\Http\Middleware\SuperAdminMiddleware::class,
             'auth.or.admin' => \App\Http\Middleware\AuthenticateOrAdmin::class,
+            'throttle.auth'  => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         ]);
 
         // 全局API请求日志中间件
         $middleware->append(\App\Http\Middleware\RequestLogMiddleware::class);
 
-        // API 速率限制（已禁用：取消全局 throttle）
-        // $middleware->throttleApi('api');
+        // 全局 API 速率限制：默认每分钟 60 次（可在 routes 中通过 middleware('throttle:...') 覆盖）
+        $middleware->throttleApi('60,1');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // API请求返回JSON格式错误
@@ -116,6 +123,24 @@ return Application::configure(basePath: dirname(__DIR__))
                     'code' => 405,
                     'message' => '请求方法不允许',
                 ], 405);
+            }
+        });
+
+        // 限速异常处理
+        $exceptions->render(function (TooManyRequestsHttpException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                $retryAfter = $e->getHeaders()['Retry-After'] ?? 60;
+                Log::channel('request')->warning('Rate limit exceeded', [
+                    'url' => $request->fullUrl(),
+                    'ip' => $request->ip(),
+                    'retry_after' => $retryAfter,
+                ]);
+
+                return response()->json([
+                    'code' => 429,
+                    'message' => "请求过于频繁，请 {$retryAfter} 秒后再试",
+                    'retry_after' => (int) $retryAfter,
+                ], 429, ['Retry-After' => (string) $retryAfter]);
             }
         });
 

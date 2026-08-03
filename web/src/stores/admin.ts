@@ -2,9 +2,10 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { MenuItem } from '@/types'
 import { TrendCharts, UserFilled, Tickets, Cpu, Promotion, Money, Document, Setting, Avatar } from '@element-plus/icons-vue'
+import { getAdminToken, setAdminToken as persistAdminToken, clearAdminToken } from '@/utils/auth'
 
 export const useAdminStore = defineStore('admin', () => {
-  const token = ref(localStorage.getItem('admin_token') || '')
+  const token = ref(getAdminToken() || '')
   const adminInfo = ref<any>(null)
   const permissions = ref<string[]>([])
 
@@ -24,14 +25,14 @@ export const useAdminStore = defineStore('admin', () => {
 
   const setToken = (t: string) => {
     token.value = t
-    localStorage.setItem('admin_token', t)
+    persistAdminToken(t)
   }
 
   const logout = () => {
     token.value = ''
     adminInfo.value = null
     permissions.value = []
-    localStorage.removeItem('admin_token')
+    clearAdminToken()
   }
 
   return { token, adminInfo, permissions, menuItems, isLoggedIn, setToken, logout }

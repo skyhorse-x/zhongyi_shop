@@ -461,35 +461,74 @@ class PromoterController extends Controller
             ], 422);
         }
 
-        $promoter = Promoter::where('user_id', $request->user()->id)->first();
-        $available = $promoter->total_commission - $promoter->frozen_commission - $promoter->withdrawn_commission;
+        $amount = round((float) $request->amount, 2);
+        $userId = $request->user()->id;
 
-        if ($request->amount > $available) {
+        try {
+            $withdraw = DB::transaction(function () use ($userId, $amount, $request) {
+                // 行锁：避免并发申请时余额判断与冻结出现竞态
+                $promoter = Promoter::where('user_id', $userId)->lockForUpdate()->first();
+                if (!$promoter) {
+                    throw new \Exception('您还不是推广员');
+                }
+
+                $available = round(
+                    (float) $promoter->total_commission
+                    - (float) $promoter->frozen_commission
+                    - (float) $promoter->withdrawn_commission,
+                    2
+                );
+
+                if ($amount > $available) {
+                    throw new \Exception('可提现余额不足');
+                }
+
+                $withdraw = Withdraw::create([
+                    'withdraw_no'  => 'WD' . date('Ymd') . Str::random(8),
+                    'user_id'      => $userId,
+                    'promoter_id'  => $promoter->id,
+                    'amount'       => $amount,
+                    'pay_type'     => $request->pay_type,
+                    'pay_account'  => $request->pay_account,
+                    'status'       => 0,
+                ]);
+
+                // 冻结佣金（在事务内执行，失败会一起回滚）
+                $promoter->increment('frozen_commission', $amount);
+
+                // 按金额匹配冻结中的佣金记录，关联 withdraw_id（精确追溯）
+                $remaining = $amount;
+                $commissions = Commission::where('promoter_id', $promoter->id)
+                    ->where('status', 0) // 冻结中
+                    ->whereNull('withdraw_id')
+                    ->orderBy('created_at', 'asc')
+                    ->lockForUpdate()
+                    ->get();
+
+                foreach ($commissions as $commission) {
+                    if ($remaining <= 0) {
+                        break;
+                    }
+                    // 把 commission 关联到本次提现上
+                    $commission->update(['withdraw_id' => $withdraw->id]);
+                    $remaining -= (float) $commission->amount;
+                }
+
+                return $withdraw;
+            });
+        } catch (\Exception $e) {
             return response()->json([
-                'code' => 400,
-                'message' => '可提现余额不足',
-            ], 400);
+                'code' => $e->getMessage() === '可提现余额不足' ? 400 : 422,
+                'message' => $e->getMessage(),
+            ], $e->getMessage() === '可提现余额不足' ? 400 : 422);
         }
-
-        $withdraw = Withdraw::create([
-            'withdraw_no' => 'WD' . date('Ymd') . Str::random(8),
-            'user_id' => $request->user()->id,
-            'promoter_id' => $promoter->id,
-            'amount' => $request->amount,
-            'pay_type' => $request->pay_type,
-            'pay_account' => $request->pay_account,
-            'status' => 0,
-        ]);
-
-        // 冻结佣金
-        $promoter->increment('frozen_commission', $request->amount);
 
         return response()->json([
             'code' => 0,
             'message' => '提现申请已提交',
             'data' => [
                 'withdraw_no' => $withdraw->withdraw_no,
-                'amount' => $withdraw->amount,
+                'amount' => (float) $withdraw->amount,
                 'status' => $withdraw->status,
             ],
         ]);
@@ -643,13 +682,23 @@ class PromoterController extends Controller
 
     /**
      * 生成唯一推广码
+     *
+     * 使用 8 位大写字母+数字组合（比 6 位碰撞率低 1296 倍），
+     * 最多尝试 10 次，超过后抛异常，避免极端情况下死循环。
      */
     private function generateInviteCode(): string
     {
-        do {
-            $code = strtoupper(Str::random(6));
-        } while (Promoter::where('invite_code', $code)->exists());
+        $maxAttempts = 10;
+        for ($i = 0; $i < $maxAttempts; $i++) {
+            $code = strtoupper(Str::random(8));
+            if (!Promoter::where('invite_code', $code)->exists()) {
+                return $code;
+            }
+        }
 
-        return $code;
+        Log::error('Failed to generate unique invite code after max attempts', [
+            'max_attempts' => $maxAttempts,
+        ]);
+        throw new \RuntimeException('推广码生成失败，请稍后重试');
     }
 }

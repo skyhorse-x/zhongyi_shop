@@ -85,4 +85,35 @@ class AnalysisTimesService
     {
         return (int) $user->analysis_times;
     }
+
+    /**
+     * 返还分析次数（AI 失败 / 退款 / 异常补偿）
+     *
+     * @return bool
+     */
+    public function refundTimes(User $user, int $count, string $type, string $remark = ''): bool
+    {
+        if ($count <= 0) {
+            return false;
+        }
+
+        return DB::transaction(function () use ($user, $count, $type, $remark) {
+            $fresh = User::lockForUpdate()->find($user->id);
+            $before = (int) $fresh->analysis_times;
+            $after  = $before + $count;
+
+            $fresh->update(['analysis_times' => $after]);
+
+            UserAnalysisLog::create([
+                'user_id' => $user->id,
+                'change'  => $count,
+                'before'  => $before,
+                'after'   => $after,
+                'type'    => $type, // refund / compensate / admin
+                'remark'  => $remark ?: "返还 +{$count}次",
+            ]);
+
+            return true;
+        });
+    }
 }

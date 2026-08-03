@@ -25,7 +25,9 @@ const constitutionList = ref<ConstitutionType[]>([])
 const loading = ref(false)
 const lastTestDate = ref('')
 
-const getToken = (): string => localStorage.getItem('token') || ''
+import { getToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getToken() || ''
 
 // 九种体质的元数据（描述/特征/颜色是中医知识库，不算业务硬编码）
 const CONSTITUTION_META: Record<string, { description: string; features: string[]; color: string; advice: ConstitutionType['advice'] }> = {

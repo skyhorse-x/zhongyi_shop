@@ -48,7 +48,9 @@ const result = ref<AnalysisResult | null>(null)
 const exportRef = ref<HTMLElement | null>(null)
 const downloading = ref(false)
 
-const getToken = (): string => localStorage.getItem('token') || ''
+import { getToken } from '@/utils/auth'
+
+const getAuthToken = (): string => getToken() || ''
 
 const fetchStatus = async () => {
   try {

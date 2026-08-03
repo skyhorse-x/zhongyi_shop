@@ -209,6 +209,12 @@ class AnalysisController extends Controller
      */
     protected function processAnalysis(AnalysisTask $task): void
     {
+        // 幂等：已完成的任务不再处理（防止队列重试重复扣次数）
+        if ($task->status === 2) {
+            Log::info('Analysis task already completed, skip', ['task_no' => $task->task_no]);
+            return;
+        }
+
         try {
             $task->update(['status' => 1]); // 处理中
 
@@ -246,6 +252,36 @@ class AnalysisController extends Controller
             ]);
         } catch (\Exception $e) {
             $task->update(['status' => 3]); // 失败
+
+            // 失败/超时/异常：返还次数（避免用户资金损失）
+            try {
+                app(\App\Services\AnalysisTimesService::class)->refundTimes(
+                    $task->user,
+                    1,
+                    'refund',
+                    "AI分析失败返还：{$e->getMessage()}"
+                );
+                Log::info('Analysis times refunded due to failure', [
+                    'task_no' => $task->task_no,
+                    'user_id' => $task->user_id,
+                ]);
+            } catch (\Throwable $refundErr) {
+                Log::error('退还分析次数失败', [
+                    'task_no' => $task->task_no,
+                    'refund_error' => $refundErr->getMessage(),
+                ]);
+            }
+
+            // 通知用户
+            try {
+                app(\App\Services\NotificationService::class)->sendSystemMessage(
+                    $task->user_id,
+                    'AI 分析失败',
+                    "您的分析任务（{$task->task_no}）失败，已自动返还 1 次分析次数。",
+                    ['type' => 'reminder']
+                );
+            } catch (\Throwable $ne) {}
+
             Log::error('Analysis task failed', [
                 'task_no' => $task->task_no,
                 'error' => $e->getMessage(),
