@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document, List, Clock, CircleCheck, CircleClose, ShoppingBag, Refresh } from '@element-plus/icons-vue'
 import { toMoney } from '@/utils'
 import { safeFetch } from '@/utils/fetch'
+import { getToken } from '@/utils/auth'
 
 const router = useRouter()
 const loading = ref(false)

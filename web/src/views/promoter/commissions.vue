@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
-import { getAuthToken } from '@/utils/auth'
+import { getToken } from '@/utils/auth'
 
 const router = useRouter()
 
@@ -36,7 +36,7 @@ const loadCommissions = async () => {
   loading.value = true
   try {
     const res = await safeFetch('/api/v1/promoter/commissions?limit=50', {
-      headers: { Authorization: `Bearer ${getAuthToken()}`, Accept: 'application/json' },
+      headers: { Authorization: `Bearer ${getToken()}`, Accept: 'application/json' },
     })
     const data = await res.json()
     if (data.code === 0) {

@@ -123,7 +123,7 @@ onMounted(load)
             <el-table-column label="动作" width="100">
               <template #default="{ row }">
                 <el-tag :type="row.action === 'deny' ? 'danger' : row.action === 'review' ? 'warning' : 'success'">
-                  {{ { deny: '拒绝', review: '审核', allow: '放行' }[row.action] }}
+                  {{ ({ deny: '拒绝', review: '审核', allow: '放行' } as Record<string, string>)[row.action] }}
                 </el-tag>
               </template>
             </el-table-column>

@@ -2,6 +2,7 @@
 import { ref, shallowRef, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { safeFetch } from '@/utils/fetch'
+import { getAdminToken, clearAdminToken } from '@/utils/auth'
 import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service } from '@element-plus/icons-vue'
 
 const router = useRouter()

@@ -73,19 +73,19 @@ onMounted(() => {
         </div>
       </template>
 
-      <el-tabs v-model="activeTab" @tab-change="(name) => name === 'feedback' ? loadFeedbacks() : loadAppeals()">
+      <el-tabs v-model="activeTab" @tab-change="(name: string) => name === 'feedback' ? loadFeedbacks() : loadAppeals()">
         <el-tab-pane label="我的反馈" name="feedback">
           <el-table :data="feedbacks" stripe>
             <el-table-column prop="title" label="标题" />
             <el-table-column prop="type" label="类型" width="100">
               <template #default="{ row }">
-                <el-tag>{{ { bug: 'Bug', suggestion: '建议', complaint: '投诉', other: '其他' }[row.type] }}</el-tag>
+                <el-tag>{{ ({ bug: 'Bug', suggestion: '建议', complaint: '投诉', other: '其他' } as Record<string, string>)[row.type] }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
-                <el-tag :type="{ pending: 'warning', processing: 'info', replied: 'success', closed: 'info' }[row.status]">
-                  {{ { pending: '待处理', processing: '处理中', replied: '已回复', closed: '已关闭' }[row.status] }}
+                <el-tag :type="({ pending: 'warning', processing: 'info', replied: 'success', closed: 'info' } as Record<string, string>)[row.status]">
+                  {{ ({ pending: '待处理', processing: '处理中', replied: '已回复', closed: '已关闭' } as Record<string, string>)[row.status] }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -107,8 +107,8 @@ onMounted(() => {
             <el-table-column prop="reason" label="原因" />
             <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
-                <el-tag :type="{ pending: 'warning', approved: 'success', rejected: 'danger' }[row.status]">
-                  {{ { pending: '待审核', approved: '已采纳', rejected: '已拒绝' }[row.status] }}
+                <el-tag :type="({ pending: 'warning', approved: 'success', rejected: 'danger' } as Record<string, string>)[row.status]">
+                  {{ ({ pending: '待审核', approved: '已采纳', rejected: '已拒绝' } as Record<string, string>)[row.status] }}
                 </el-tag>
               </template>
             </el-table-column>
