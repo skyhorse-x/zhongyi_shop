@@ -38,5 +38,5 @@ export const logout = () => {
 
 // 微信登录
 export const wechatLogin = (code: string) => {
-  return request.post('/auth/wechat-login', { code })
+  return request.post('/auth/wechat', { code })
 }

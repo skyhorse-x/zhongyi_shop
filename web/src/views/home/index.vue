@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, h } from 'vue'
+import { ref, h, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Avatar, User, List, ChatLineRound, FirstAidKit, Money } from '@element-plus/icons-vue'
+import { ArrowRight, Avatar, User, ChatLineRound, FirstAidKit, Money, Wallet } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
+import { safeFetch } from '@/utils/fetch'
+import { getToken } from '@/utils/auth'
 
 const router = useRouter()
 
@@ -16,13 +18,40 @@ interface FeatureItem {
 const features = ref<FeatureItem[]>([
   { icon: FirstAidKit, title: '舌诊分析', desc: 'AI智能舌诊，了解身体状况', path: '/analysis/tongue' },
   { icon: User, title: '面诊分析', desc: '面色面诊，洞察健康密码', path: '/analysis/face' },
-  { icon: List, title: '体质测试', desc: '中医体质辨识，个性化调理', path: '/constitution/test' },
   { icon: ChatLineRound, title: '健康问答', desc: 'AI在线问答，专业指导', path: '/qa/chat' },
 ])
 
 const goToFeature = (path: string) => {
   router.push(path)
 }
+
+// 当前剩余分析次数（未登录时为 null，不显示）
+const analysisTimes = ref<number | null>(null)
+
+const fetchAnalysisTimes = async () => {
+  try {
+    const res = await safeFetch('/api/v1/user/info', {
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      analysisTimes.value = data.data?.analysis_times ?? 0
+    }
+  } catch (e) {
+    // 未登录等情况忽略
+  }
+}
+
+const goRecharge = () => {
+  router.push('/recharge')
+}
+
+onMounted(() => {
+  fetchAnalysisTimes()
+})
 </script>
 
 <template>
@@ -47,6 +76,21 @@ const goToFeature = (path: string) => {
         <div class="feature-title">{{ item.title }}</div>
         <div class="feature-desc">{{ item.desc }}</div>
       </div>
+    </div>
+
+    <!-- 充值积分面板 -->
+    <div class="recharge-entry" @click="goRecharge">
+      <div class="entry-icon">
+        <el-icon><Wallet /></el-icon>
+      </div>
+      <div class="entry-content">
+        <div class="recharge-entry-title">充值积分</div>
+        <div class="recharge-entry-desc">
+          <template v-if="analysisTimes !== null">当前剩余 {{ analysisTimes }} 次分析次数，点击充值</template>
+          <template v-else>充值分析次数，畅享 AI 健康分析</template>
+        </div>
+      </div>
+      <el-button class="recharge-btn" round size="small" type="primary">立即充值</el-button>
     </div>
 
     <!-- 健康档案入口 -->
@@ -172,7 +216,8 @@ const goToFeature = (path: string) => {
 
 /* 快捷入口卡片 */
 .health-entry,
-.promote-entry {
+.promote-entry,
+.recharge-entry {
   background: #fff;
   border-radius: 12px;
   padding: 14px 16px;
@@ -184,8 +229,44 @@ const goToFeature = (path: string) => {
 }
 
 .health-entry:active,
-.promote-entry:active {
+.promote-entry:active,
+.recharge-entry:active {
   transform: scale(0.99);
+}
+
+/* 充值积分面板 */
+.recharge-entry {
+  background: linear-gradient(135deg, #07c160 0%, #04a152 100%);
+  color: #fff;
+}
+
+.recharge-entry .entry-icon {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.recharge-entry-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.recharge-entry-desc {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+.recharge-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: #fff;
+  color: #07c160;
+  border: none;
+  font-weight: 500;
+}
+
+.recharge-btn:hover {
+  background: #f0f9f4;
+  color: #07c160;
 }
 
 .entry-icon {

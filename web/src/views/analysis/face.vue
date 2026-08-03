@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { CameraFilled, ChatLineRound } from '@element-plus/icons-vue'
+import { CameraFilled, ChatLineRound, User } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
@@ -10,10 +10,33 @@ const imageUrl = ref('')
 const fileName = ref('')
 const loading = ref(false)
 const aiText = ref('')
+const analysisTimes = ref(0)
+const gender = ref<number | null>(null)
+const age = ref<number | null>(null)
 
 import { getToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getToken() || ''
+// 获取用户剩余分析次数
+const fetchAnalysisTimes = async () => {
+  try {
+    const res = await safeFetch('/api/v1/user/info', {
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      analysisTimes.value = data.data?.analysis_times ?? 0
+    }
+  } catch (e) {
+    console.error('获取分析次数失败:', e)
+  }
+}
+
+onMounted(() => {
+  fetchAnalysisTimes()
+})
 
 const handleFileChange = (uploadFile: any) => {
   if (uploadFile.raw) {
@@ -42,7 +65,7 @@ const uploadImage = async (blob: Blob, name: string): Promise<string> => {
 }
 
 // 提交分析任务
-const submitAnalysis = async (imageUrl: string, type: 'tongue' | 'face', text: string) => {
+const submitAnalysis = async (imageUrl: string, type: 'tongue' | 'face', text: string, gender: number, age: number) => {
   const res = await safeFetch('/api/v1/analysis/submit', {
     method: 'POST',
     headers: {
@@ -54,6 +77,8 @@ const submitAnalysis = async (imageUrl: string, type: 'tongue' | 'face', text: s
       type: type,
       image_url: imageUrl,
       text: text,
+      gender: gender,
+      age: age,
     }),
   })
   const data = await res.json()
@@ -64,6 +89,14 @@ const submitAnalysis = async (imageUrl: string, type: 'tongue' | 'face', text: s
 }
 
 const handleSubmit = async () => {
+  if (!gender.value) {
+    ElMessage.warning('请选择性别')
+    return
+  }
+  if (!age.value || age.value <= 0) {
+    ElMessage.warning('请输入年龄')
+    return
+  }
   if (!imageUrl.value && !aiText.value.trim()) {
     ElMessage.warning('请上传面部照片或输入症状描述')
     return
@@ -79,7 +112,7 @@ const handleSubmit = async () => {
     }
 
     // 2. 提交分析任务
-    const taskNo = await submitAnalysis(uploadedUrl, 'face', aiText.value)
+    const taskNo = await submitAnalysis(uploadedUrl, 'face', aiText.value, gender.value, age.value)
 
     ElMessage.success('分析已提交')
     router.push(`/analysis/result/${taskNo}`)
@@ -104,6 +137,25 @@ const handleSubmit = async () => {
 
 <template>
   <div class="face-page" v-loading="loading">
+    <!-- 基本信息（必填） -->
+    <div class="profile-section">
+      <div class="ai-text-header">
+        <el-icon><User /></el-icon>
+        <span>基本信息 <span class="required-tip">*</span></span>
+      </div>
+      <div class="profile-row">
+        <span class="profile-label">性别</span>
+        <el-radio-group v-model="gender">
+          <el-radio :value="1">男</el-radio>
+          <el-radio :value="2">女</el-radio>
+        </el-radio-group>
+      </div>
+      <div class="profile-row">
+        <span class="profile-label">年龄</span>
+        <el-input v-model="age" type="number" min="1" max="150" placeholder="请输入年龄" style="width: 120px;" />
+      </div>
+    </div>
+
     <!-- 症状描述（必填） -->
     <div class="ai-text-section">
       <div class="ai-text-header">
@@ -126,6 +178,10 @@ const handleSubmit = async () => {
         <span class="optional-tag">可选</span> 上传清晰的面部照片可获得更精准的分析结果
       </div>
 
+      <div v-if="imageUrl" class="image-preview">
+        <el-image :src="imageUrl" alt="面部照片" style="max-width: 100%; border-radius: 12px;" />
+      </div>
+
       <el-upload
         :auto-upload="false"
         accept="image/*"
@@ -140,10 +196,6 @@ const handleSubmit = async () => {
           </div>
         </template>
       </el-upload>
-
-      <div v-if="imageUrl" class="image-preview">
-        <el-image :src="imageUrl" alt="面部照片" style="max-width: 100%; border-radius: 12px;" />
-      </div>
     </div>
 
     <div class="actions">
@@ -151,11 +203,18 @@ const handleSubmit = async () => {
         round
         type="primary"
         :loading="loading"
+        :disabled="analysisTimes <= 0"
         @click="handleSubmit"
         style="width: 100%"
       >
         开始分析
       </el-button>
+      <div v-if="analysisTimes > 0" class="free-tip">
+        剩余 {{ analysisTimes }} 次分析次数
+      </div>
+      <div v-else class="free-tip">
+        分析次数不足，请先购买套餐
+      </div>
     </div>
   </div>
 </template>
@@ -168,6 +227,24 @@ const handleSubmit = async () => {
 /* 文本输入区 */
 .ai-text-section {
   margin-bottom: 24px;
+}
+
+/* 基本信息区 */
+.profile-section {
+  margin-bottom: 24px;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.profile-label {
+  font-size: 14px;
+  color: #323233;
+  min-width: 48px;
 }
 
 .ai-text-header {
@@ -215,7 +292,7 @@ const handleSubmit = async () => {
 
 .upload-area {
   width: 100%;
-  height: 200px;
+  height: 120px;
   border: 2px dashed #dcdee0;
   border-radius: 12px;
   display: flex;
@@ -232,11 +309,18 @@ const handleSubmit = async () => {
 }
 
 .image-preview {
-  margin-top: 16px;
+  margin-bottom: 16px;
   text-align: center;
 }
 
 .actions {
   margin-top: 32px;
+}
+
+.free-tip {
+  text-align: center;
+  font-size: 12px;
+  color: #969799;
+  margin-top: 8px;
 }
 </style>

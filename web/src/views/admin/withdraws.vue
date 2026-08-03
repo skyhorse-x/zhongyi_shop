@@ -42,7 +42,7 @@ const tableData = ref<WithdrawRecord[]>([])
 
 import { getAdminToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getAdminToken() || ''
+const getToken = (): string => getAdminToken() || ''
 
 // 加载提现列表
 const loadWithdraws = async () => {

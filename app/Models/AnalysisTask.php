@@ -12,6 +12,8 @@ class AnalysisTask extends Model
         'task_no',
         'user_id',
         'type',
+        'gender',
+        'age',
         'image_url',
         'image_urls',
         'image_md5',
@@ -32,6 +34,8 @@ class AnalysisTask extends Model
     {
         return [
             'status' => 'integer',
+            'gender' => 'integer',
+            'age' => 'integer',
             'tokens' => 'integer',
             'cost' => 'decimal:4',
             'result' => 'array',

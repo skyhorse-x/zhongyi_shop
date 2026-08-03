@@ -33,7 +33,7 @@ return new class extends Migration {
         Schema::create('analysis_appeals', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('analysis_id')->nullable()->constrained('analysis')->nullOnDelete();
+            $table->foreignId('analysis_id')->nullable()->constrained('analysis_tasks')->nullOnDelete();
             $table->string('task_no', 64)->nullable()->comment('冗余字段');
             $table->string('reason', 200)->comment('申诉原因分类');
             $table->text('description')->comment('详细说明');

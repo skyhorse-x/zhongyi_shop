@@ -18,12 +18,13 @@ class SystemConfigService
     ];
 
     /**
-     * 获取配置值（自动解密 + 走 Redis 缓存）
+     * 获取配置值（自动解密 + 走文件缓存）
      */
     public static function get(string $key, $default = null)
     {
         $value = CacheService::namespace('sys:config')->get($key, null);
-        if ($value !== null) {
+        // 敏感配置缓存的是占位符，需要从数据库读取解密
+        if ($value !== null && $value !== '__ENCRYPTED__') {
             return $value;
         }
 
@@ -44,7 +45,7 @@ class SystemConfigService
             }
         }
 
-        // 缓存到 Redis（敏感配置不缓存明文，缓存空串占位避免重复查 DB）
+        // 缓存到文件缓存（敏感配置不缓存明文，缓存占位符避免重复查 DB）
         CacheService::namespace('sys:config')->put(
             $key,
             in_array($key, self::$encryptedKeys) ? '__ENCRYPTED__' : $value

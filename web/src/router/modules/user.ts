@@ -37,6 +37,13 @@ const userRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/packages/index.vue'),
     meta: { title: '购买次数包', needAuth: true },
   },
+  // 闲鱼充值
+  {
+    path: '/recharge',
+    name: 'Recharge',
+    component: () => import('@/views/recharge/index.vue'),
+    meta: { title: '充值中心', needAuth: true },
+  },
   // 会员中心
   {
     path: '/member',

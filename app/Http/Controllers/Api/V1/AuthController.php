@@ -83,11 +83,11 @@ class AuthController extends Controller
                 ], 500);
             }
         } else {
+            // 手机号非必填，如果提供则验证格式和唯一性
             $validator = Validator::make($request->all(), [
-                'mobile' => 'required|regex:/^1[3-9]\d{9}$/|unique:users',
+                'mobile' => 'nullable|regex:/^1[3-9]\d{9}$/|unique:users',
                 'password' => 'required|min:6|confirmed',
             ], [
-                'mobile.required' => '手机号不能为空',
                 'mobile.regex' => '手机号格式不正确',
                 'mobile.unique' => '手机号已注册',
                 'password.required' => '密码不能为空',
@@ -110,12 +110,17 @@ class AuthController extends Controller
             try {
                 DB::beginTransaction();
 
+                $mobile = $request->input('mobile');
+                $username = $mobile ? '用户' . substr($mobile, -4) : '用户' . date('Ymd') . rand(1000, 9999);
+                $email = $mobile ? $mobile . '@mobile.local' : 'user_' . date('Ymd') . rand(1000, 9999) . '@user.local';
+
                 $user = User::create([
-                    'name' => '用户' . substr($request->mobile, -4),
-                    'email' => $request->mobile . '@mobile.local',
-                    'mobile' => $request->mobile,
+                    'name' => $username,
+                    'email' => $email,
+                    'mobile' => $mobile,
                     'password' => Hash::make($request->password),
-                    'nickname' => '用户' . substr($request->mobile, -4),
+                    'username' => $username,
+                    'nickname' => $username,
                     'parent_id' => $parentId,
                     'parent_locked' => (bool) $parentId, // 有邀请人即锁定
                     'parent_locked_at' => $parentId ? now() : null,

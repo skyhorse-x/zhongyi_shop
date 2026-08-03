@@ -32,19 +32,21 @@ class AiService
     /**
      * 舌诊分析（基于图片）
      *
-     * @param string $imageUrl 舌象图片URL
+     * @param array $imageUrls 舌象图片URL列表（可多张，如舌面、舌下）
+     * @param int $gender 性别:1男 2女
+     * @param int $age 年龄
      * @return array
      * @throws \Exception
      */
-    public function analyzeTongue(string $imageUrl): array
+    public function analyzeTongue(array $imageUrls, int $gender = 0, int $age = 0): array
     {
-        Log::info('Starting tongue analysis', ['image_url' => $imageUrl]);
+        Log::info('Starting tongue analysis', ['image_urls' => $imageUrls]);
 
-        $prompt = $this->getTongueAnalysisPrompt();
+        $prompt = $this->getTongueAnalysisPrompt($gender, $age);
 
         try {
             // 优先使用豆包视觉模型
-            $result = $this->callVisionApi($imageUrl, $prompt, 'tongue');
+            $result = $this->callVisionApi($imageUrls, $prompt, 'tongue');
 
             Log::info('Tongue analysis completed', [
                 'result_length' => strlen($result['content'] ?? ''),
@@ -54,7 +56,7 @@ class AiService
         } catch (\Exception $e) {
             Log::error('Tongue analysis failed', [
                 'error' => $e->getMessage(),
-                'image_url' => $imageUrl,
+                'image_urls' => $imageUrls,
             ]);
             throw $e;
         }
@@ -64,17 +66,17 @@ class AiService
      * 舌诊分析（基于文字描述，无图片）
      *
      * @param string $text 用户文字描述
+     * @param int $gender 性别:1男 2女
+     * @param int $age 年龄
      * @return array
      * @throws \Exception
      */
-    public function analyzeTongueByText(string $text): array
+    public function analyzeTongueByText(string $text, int $gender = 0, int $age = 0): array
     {
         Log::info('Starting tongue analysis by text', ['text_length' => strlen($text)]);
 
-        $prompt = $this->getTongueTextSystemPrompt($text);
-
         try {
-            $result = $this->callTextApi($prompt, 'tongue');
+            $result = $this->callTextApi($text, 'tongue', $gender, $age);
 
             Log::info('Tongue text analysis completed', [
                 'result_length' => strlen($result['content'] ?? ''),
@@ -93,14 +95,16 @@ class AiService
      * 面诊分析（基于图片）
      *
      * @param string $imageUrl 面部图片URL
+     * @param int $gender 性别:1男 2女
+     * @param int $age 年龄
      * @return array
      * @throws \Exception
      */
-    public function analyzeFace(string $imageUrl): array
+    public function analyzeFace(string $imageUrl, int $gender = 0, int $age = 0): array
     {
         Log::info('Starting face analysis', ['image_url' => $imageUrl]);
 
-        $prompt = $this->getFaceAnalysisPrompt();
+        $prompt = $this->getFaceAnalysisPrompt($gender, $age);
 
         try {
             $result = $this->callVisionApi($imageUrl, $prompt, 'face');
@@ -123,15 +127,17 @@ class AiService
      * 面诊分析（基于文字描述，无图片）
      *
      * @param string $text 用户文字描述
+     * @param int $gender 性别:1男 2女
+     * @param int $age 年龄
      * @return array
      * @throws \Exception
      */
-    public function analyzeFaceByText(string $text): array
+    public function analyzeFaceByText(string $text, int $gender = 0, int $age = 0): array
     {
         Log::info('Starting face analysis by text', ['text_length' => strlen($text)]);
 
         try {
-            $result = $this->callTextApi($text, 'face');
+            $result = $this->callTextApi($text, 'face', $gender, $age);
 
             Log::info('Face text analysis completed', [
                 'result_length' => strlen($result['content'] ?? ''),
@@ -202,7 +208,7 @@ class AiService
      * @return array
      * @throws \Exception
      */
-    protected function callTextApi(string $userMessage, string $type): array
+    protected function callTextApi(string $userMessage, string $type, int $gender = 0, int $age = 0): array
     {
         // 获取AI模型配置（复用qa类型的对话模型）
         $model = AiModel::where('analysis_type', $type)
@@ -222,8 +228,8 @@ class AiService
 
         try {
             $systemPrompt = $type === 'tongue'
-                ? $this->getTongueTextSystemPrompt()
-                : $this->getFaceTextSystemPrompt();
+                ? $this->getTongueTextSystemPrompt($gender, $age)
+                : $this->getFaceTextSystemPrompt($gender, $age);
 
             $messages = [
                 ['role' => 'system', 'content' => $systemPrompt],
@@ -247,7 +253,7 @@ class AiService
                 throw new \Exception('AI 模型未配置 API Key，请在管理后台 [系统设置] 或 [AI 管理] 中配置有效的 API Key');
             }
 
-            $response = Http::withHeaders([
+            $response = Http::withOptions(['verify' => false])->withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
             ])->timeout($this->timeout)->post($apiUrl, $data);
@@ -279,13 +285,13 @@ class AiService
     /**
      * 调用视觉API（豆包）
      *
-     * @param string $imageUrl
+     * @param string|array $imageUrl 图片URL（单张字符串或多张数组）
      * @param string $prompt
      * @param string $type
      * @return array
      * @throws \Exception
      */
-    protected function callVisionApi(string $imageUrl, string $prompt, string $type): array
+    protected function callVisionApi(string|array $imageUrl, string $prompt, string $type): array
     {
         // 获取AI模型配置：优先从 ai_models 表读取，如果没有则从 system_configs 读取
         $model = AiModel::where('analysis_type', $type)
@@ -302,24 +308,29 @@ class AiService
             $apiKey = $model?->api_key ?? SystemConfigService::get('llm_api_key', '');
             $modelName = $model?->model ?? SystemConfigService::get('llm_model', 'doubao-vision');
 
+            // 规范化图片列表（兼容单张字符串与多张数组）
+            $imageUrls = is_array($imageUrl) ? $imageUrl : [$imageUrl];
+            $content = [];
+            foreach ($imageUrls as $url) {
+                $content[] = [
+                    'type' => 'image_url',
+                    'image_url' => [
+                        'url' => $url,
+                    ],
+                ];
+            }
+            $content[] = [
+                'type' => 'text',
+                'text' => $prompt,
+            ];
+
             // 构建请求数据
             $data = [
                 'model' => $modelName,
                 'messages' => [
                     [
                         'role' => 'user',
-                        'content' => [
-                            [
-                                'type' => 'image_url',
-                                'image_url' => [
-                                    'url' => $imageUrl,
-                                ],
-                            ],
-                            [
-                                'type' => 'text',
-                                'text' => $prompt,
-                            ],
-                        ],
+                        'content' => $content,
                     ],
                 ],
                 'max_tokens' => 2000,
@@ -330,7 +341,7 @@ class AiService
                 throw new \Exception('视觉分析模型未配置 API Key，请在管理后台 [系统设置] 或 [AI 管理] 中配置有效的 API Key');
             }
 
-            $response = Http::withHeaders([
+            $response = Http::withOptions(['verify' => false])->withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
             ])->timeout($this->timeout)->post($apiUrl, $data);
@@ -393,10 +404,10 @@ class AiService
             ];
 
             if (empty($apiKey)) {
-                throw new \Exception('AI 对话模型未配置 API Key，请在管理后台 [系统设置] 或 [AI 管理] 中配置有效的 API Key');
+                throw new \Exception('AI 对话接口没有配置 API Key');
             }
 
-            $response = Http::withHeaders([
+            $response = Http::withOptions(['verify' => false])->withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
             ])->timeout($this->timeout)->post($apiUrl, $data);
@@ -474,10 +485,11 @@ class AiService
      *
      * @return string
      */
-    protected function getTongueAnalysisPrompt(): string
+    protected function getTongueAnalysisPrompt(int $gender = 0, int $age = 0): string
     {
         return <<<PROMPT
-你是一位资深的中医专家，请根据提供的舌象图片进行中医舌诊分析。
+你是一位资深的中医专家，请根据提供的舌象图片（可能包含舌面、舌下等多张照片）进行中医舌诊分析。
+{$this->userProfileContext($gender, $age)}
 
 请按照以下格式输出分析结果：
 
@@ -508,10 +520,11 @@ PROMPT;
      *
      * @return string
      */
-    protected function getTongueTextSystemPrompt(): string
+    protected function getTongueTextSystemPrompt(int $gender = 0, int $age = 0): string
     {
         return <<<PROMPT
 你是一位资深的中医专家，擅长根据用户口述的症状描述进行舌诊相关的中医辨证分析。
+{$this->userProfileContext($gender, $age)}
 
 注意：
 - 用户没有提供舌象图片，请完全根据用户的文字描述进行推断分析
@@ -548,10 +561,11 @@ PROMPT;
      *
      * @return string
      */
-    protected function getFaceAnalysisPrompt(): string
+    protected function getFaceAnalysisPrompt(int $gender = 0, int $age = 0): string
     {
         return <<<PROMPT
 你是一位资深的中医专家，请根据提供的面部图片进行中医面诊分析。
+{$this->userProfileContext($gender, $age)}
 
 请按照以下格式输出分析结果：
 
@@ -582,10 +596,11 @@ PROMPT;
      *
      * @return string
      */
-    protected function getFaceTextSystemPrompt(): string
+    protected function getFaceTextSystemPrompt(int $gender = 0, int $age = 0): string
     {
         return <<<PROMPT
 你是一位资深的中医专家，擅长根据用户口述的面部状况进行面诊相关的中医辨证分析。
+{$this->userProfileContext($gender, $age)}
 
 注意：
 - 用户没有提供面部图片，请完全根据用户的文字描述进行推断分析
@@ -645,5 +660,29 @@ PROMPT;
 
 请用简洁、专业的语言回答用户的问题。
 PROMPT;
+    }
+
+    /**
+     * 生成用户基本信息上下文（性别/年龄），供提示词注入
+     *
+     * @param int $gender 性别:1男 2女 0未知
+     * @param int $age 年龄
+     * @return string
+     */
+    protected function userProfileContext(int $gender = 0, int $age = 0): string
+    {
+        $parts = [];
+        if ($gender === 1) {
+            $parts[] = '性别：男';
+        } elseif ($gender === 2) {
+            $parts[] = '性别：女';
+        }
+        if ($age > 0 && $age < 150) {
+            $parts[] = '年龄：' . $age . '岁';
+        }
+        if (empty($parts)) {
+            return '';
+        }
+        return '用户基本信息：' . implode('，', $parts) . '。请在分析中结合用户的性别与年龄特点进行针对性辨证与建议。';
     }
 }

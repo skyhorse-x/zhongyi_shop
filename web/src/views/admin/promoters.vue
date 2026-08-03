@@ -74,7 +74,7 @@ const stats = computed(() => {
 
 import { getAdminToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getAdminToken() || ''
+const getToken = (): string => getAdminToken() || ''
 
 // 加载推广员列表
 const loadPromoters = async () => {
@@ -540,7 +540,7 @@ onMounted(() => {
       </div>
     </el-card>
 
-    <el-dialog v-model="detailVisible" title="推广员详情" width="680px" v-loading="detailLoading">
+    <el-dialog v-model="detailVisible" title="推广员详情" width="680px">
       <template v-if="detailData">
         <!-- 基本信息 -->
         <h4 class="detail-section-title">基本信息</h4>

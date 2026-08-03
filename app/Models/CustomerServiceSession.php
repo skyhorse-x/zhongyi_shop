@@ -39,7 +39,7 @@ class CustomerServiceSession extends Model
     public const WELCOME_MESSAGE = '您好！欢迎使用AI中医健康平台，我是您的专属客服。请问有什么可以帮助您的吗？您可以咨询健康问题、了解套餐服务或反馈使用体验。';
 
     /**
-     * 发送欢迎消息
+     * 发送欢迎消息（读取后台配置：欢迎内容 + 自动欢迎开关）
      */
     public function sendWelcomeMessage(): bool
     {
@@ -47,11 +47,20 @@ class CustomerServiceSession extends Model
             return false;
         }
 
+        // 自动欢迎开关（后台配置，默认开启）
+        $autoWelcome = CustomerServiceConfig::getValue('auto_welcome', 'true');
+        if ($autoWelcome === 'false') {
+            return false;
+        }
+
+        // 欢迎内容（后台配置，未配置时用默认文案）
+        $content = CustomerServiceConfig::getValue('welcome_message', self::WELCOME_MESSAGE);
+
         $message = $this->messages()->create([
             'sender_id' => 0, // 系统发送
             'sender_type' => 'system',
-            'content' => self::WELCOME_MESSAGE,
-            'msg_type' => 'text',
+            'content' => $content,
+            'message_type' => 'text',
         ]);
 
         $this->update(['welcome_sent' => true]);

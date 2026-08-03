@@ -18,10 +18,10 @@ const load = async () => {
   loading.value = true
   try {
     const [s, e, b, r] = await Promise.all([
-      request.get('/risk/statistics'),
-      request.get('/risk/events', { params: { per_page: 20 } }),
-      request.get('/risk/blacklists', { params: { per_page: 50 } }),
-      request.get('/risk/rules', { params: { per_page: 50 } }),
+      request.get('/admin/risk/statistics'),
+      request.get('/admin/risk/events', { params: { per_page: 20 } }),
+      request.get('/admin/risk/blacklists', { params: { per_page: 50 } }),
+      request.get('/admin/risk/rules', { params: { per_page: 50 } }),
     ])
     stats.value = s
     events.value = (e as any).data || e || []
@@ -39,7 +39,7 @@ const addBlacklist = async () => {
       cancelButtonText: '取消',
     })
     const type = value.includes('@') ? 'mobile' : /^\d+$/.test(value) ? 'mobile' : value.includes('.') ? 'ip' : 'device'
-    await request.post('/risk/blacklists', { type, value, reason: '管理员手动封禁' })
+    await request.post('/admin/risk/blacklists', { type, value, reason: '管理员手动封禁' })
     ElMessage.success('已加入黑名单')
     load()
   } catch (e) {
@@ -50,14 +50,14 @@ const addBlacklist = async () => {
 const removeBlacklist = async (type: string, value: string) => {
   try {
     await ElMessageBox.confirm(`确认解禁 ${type}: ${value}？`, '提示', { type: 'warning' })
-    await request.delete(`/risk/blacklists/${type}/${value}`)
+    await request.delete(`/admin/risk/blacklists/${type}/${value}`)
     ElMessage.success('已解禁')
     load()
   } catch (e) {}
 }
 
 const toggleRule = async (rule: any) => {
-  await request.put(`/risk/rules/${rule.id}`, { enabled: !rule.enabled })
+  await request.put(`/admin/risk/rules/${rule.id}`, { enabled: !rule.enabled })
   ElMessage.success(rule.enabled ? '已禁用' : '已启用')
   load()
 }

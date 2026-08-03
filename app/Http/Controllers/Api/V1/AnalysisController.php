@@ -115,6 +115,8 @@ class AnalysisController extends Controller
     {
         $validated = $request->validate([
             'type' => 'required|in:tongue,face',
+            'gender' => 'required|in:1,2',
+            'age' => 'required|integer|min:1|max:150',
             'image_urls' => 'nullable|array',
             'image_urls.*' => 'nullable|url',
             'text' => 'nullable|string|max:1000',
@@ -131,9 +133,8 @@ class AnalysisController extends Controller
         }
 
         try {
-            // 获取分析模式配置
-            $analysisMode = SystemConfig::getValue('analysis_mode', 'paid');
-            $isPaid = $analysisMode === 'free' ? 1 : 0;
+            // 按次数计费模式：扣除次数即视为已授权查看报告
+            $isPaid = 1;
 
             // 扣除分析次数（事务内行级锁，含流水记录）
             $timesService = app(\App\Services\AnalysisTimesService::class);
@@ -158,6 +159,8 @@ class AnalysisController extends Controller
                 'task_no' => 'TK' . date('Ymd') . substr(md5(uniqid()), 0, 8),
                 'user_id' => $request->user()->id,
                 'type' => $validated['type'],
+                'gender' => (int) $validated['gender'],
+                'age' => (int) $validated['age'],
                 'image_url' => $imageUrls[0] ?? null,
                 'image_urls' => $imageUrls ?: null,
                 'text' => $validated['text'] ?? null,
@@ -223,11 +226,11 @@ class AnalysisController extends Controller
             // 调用AI服务（根据是否上传图片选择不同分析方法）
             $result = match ($task->type) {
                 'tongue' => $hasImages
-                    ? $this->aiService->analyzeTongue($task->image_url)
-                    : $this->aiService->analyzeTongueByText($task->text ?? ''),
+                    ? $this->aiService->analyzeTongue($task->image_urls ?: [$task->image_url], $task->gender, $task->age)
+                    : $this->aiService->analyzeTongueByText($task->text ?? '', $task->gender, $task->age),
                 'face' => $hasImages
-                    ? $this->aiService->analyzeFace($task->image_url)
-                    : $this->aiService->analyzeFaceByText($task->text ?? ''),
+                    ? $this->aiService->analyzeFace($task->image_url, $task->gender, $task->age)
+                    : $this->aiService->analyzeFaceByText($task->text ?? '', $task->gender, $task->age),
                 default => throw new \InvalidArgumentException("Unknown analysis type: {$task->type}"),
             };
 
@@ -375,18 +378,7 @@ class AnalysisController extends Controller
             ], 404);
         }
 
-        // 检查是否已付费
-        if (!$task->is_paid) {
-            return response()->json([
-                'code' => 402,
-                'message' => '请先支付查看报告',
-                'data' => [
-                    'task_no' => $task->task_no,
-                    'summary' => $task->result['summary'] ?? null,
-                ],
-            ], 402);
-        }
-
+        // 按次数计费模式：次数已扣除，直接返回完整报告
         return response()->json([
             'code' => 0,
             'message' => 'success',

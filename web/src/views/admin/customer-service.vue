@@ -134,7 +134,7 @@ const tabs = [
 // 获取认证token
 import { getAdminToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getAdminToken() || ''
+const getToken = (): string => getAdminToken() || ''
 
 // 播放提示音
 const playNotificationSound = () => {

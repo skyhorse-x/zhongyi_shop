@@ -20,7 +20,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
   // 提交分析
   const submitTongue = async (imageData: string): Promise<AnalysisTask> => {
-    const data: any = await request.post('/analysis/tongue', { image: imageData })
+    const data: any = await request.post('/analysis/submit', { type: 'tongue', image: imageData })
     const task: AnalysisTask = {
       taskNo: data.task_no,
       type: 'tongue',
@@ -32,7 +32,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   }
 
   const submitFace = async (imageData: string): Promise<AnalysisTask> => {
-    const data: any = await request.post('/analysis/face', { image: imageData })
+    const data: any = await request.post('/analysis/submit', { type: 'face', image: imageData })
     const task: AnalysisTask = {
       taskNo: data.task_no,
       type: 'face',

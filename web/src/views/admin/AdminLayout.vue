@@ -18,6 +18,7 @@ const menuItems = shallowRef([
   { title: '用户管理', icon: UserFilled, path: '/admin/users' },
   { title: '订单管理', icon: Tickets, path: '/admin/orders' },
   { title: '次数包管理', icon: Goods, path: '/admin/packages' },
+  { title: '闲鱼商品管理', icon: Goods, path: '/admin/xianyu-products' },
   { title: 'AI管理', icon: Cpu, path: '/admin/ai' },
   { title: '推广管理', icon: Promotion, path: '/admin/promoters' },
   { title: '提现审核', icon: Money, path: '/admin/withdraws' },

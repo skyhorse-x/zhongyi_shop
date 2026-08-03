@@ -158,13 +158,13 @@ class CustomerServiceController extends Controller
                 'sender_id' => $admin->id,
                 'sender_type' => 'admin',
                 'content' => '',
-                'msg_type' => 'image',
+                'message_type' => 'image',
                 'file_url' => $url,
                 'file_name' => $file->getClientOriginalName(),
                 'file_size' => $file->getSize(),
             ]);
             
-            $session->admin_id = $admin->id;
+            $session->staff_id = $admin->id;
             $session->message_count += 1;
             $session->user_unread += 1;
             $session->last_message_at = now();

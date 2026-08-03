@@ -6,7 +6,7 @@ import { Edit, Refresh, Wallet, Promotion } from '@element-plus/icons-vue'
 
 const form = ref({
   phone: '',
-  nickname: '',
+  username: '',
   status: '',
 })
 
@@ -18,7 +18,7 @@ const loading = ref(false)
 
 import { getAdminToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getAdminToken() || ''
+const getToken = (): string => getAdminToken() || ''
 
 // ===== 新增用户 =====
 const createDialogVisible = ref(false)
@@ -26,7 +26,7 @@ const createLoading = ref(false)
 const createForm = reactive({
   mobile: '',
   password: '',
-  nickname: '',
+  username: '',
   name: '',
   email: '',
   gender: 0 as 0 | 1 | 2,
@@ -39,7 +39,7 @@ const openCreate = () => {
   Object.assign(createForm, {
     mobile: '',
     password: '',
-    nickname: '',
+    username: '',
     name: '',
     email: '',
     gender: 0,
@@ -76,8 +76,8 @@ const submitCreate = async () => {
     ElMessage.warning('密码长度不能少于 6 位')
     return
   }
-  if (!createForm.nickname?.trim()) {
-    ElMessage.warning('请输入昵称')
+  if (!createForm.username?.trim()) {
+    ElMessage.warning('请输入用户名')
     return
   }
   if (createForm.email && !/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(createForm.email)) {
@@ -97,7 +97,7 @@ const submitCreate = async () => {
       body: JSON.stringify({
         mobile: createForm.mobile,
         password: createForm.password,
-        nickname: createForm.nickname,
+        username: createForm.username,
         name: createForm.name || null,
         email: createForm.email || null,
         gender: createForm.gender,
@@ -130,7 +130,7 @@ const loadUsers = async () => {
       per_page: pageSize.value.toString(),
     })
     if (form.value.phone) params.append('phone', form.value.phone)
-    if (form.value.nickname) params.append('nickname', form.value.nickname)
+    if (form.value.username) params.append('username', form.value.username)
     if (form.value.status) params.append('status', form.value.status)
 
     const res = await safeFetch(`/api/v1/admin/users?${params}`, {
@@ -144,10 +144,9 @@ const loadUsers = async () => {
       const list = data.data.data || data.data
       tableData.value = list.map((user: any) => ({
         id: user.id,
-        username: user.name || user.email || '-',
+        username: user.username || user.name || user.email || '-',
         phone: user.phone || user.mobile || '-',
         mobile: user.mobile || '',
-        nickname: user.nickname || user.name || '-',
         email: user.email || '',
         avatar: user.avatar || '',
         gender: user.gender ?? 0,
@@ -182,7 +181,7 @@ const handleSearch = () => {
 }
 
 const handleReset = () => {
-  form.value = { phone: '', nickname: '', status: '' }
+  form.value = { phone: '', username: '', status: '' }
   currentPage.value = 1
   loadUsers()
 }
@@ -212,7 +211,7 @@ const handleToggleStatus = async (row: any) => {
   const newStatus = row.statusValue === 1 ? 0 : 1
   const actionText = newStatus === 1 ? '启用' : '禁用'
   try {
-    await ElMessageBox.confirm(`确定要${actionText}用户「${row.nickname}」吗？`, `${actionText}确认`, {
+    await ElMessageBox.confirm(`确定要${actionText}用户「${row.username}」吗？`, `${actionText}确认`, {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning',
@@ -298,7 +297,7 @@ const editDialogVisible = ref(false)
 const editLoading = ref(false)
 const editForm = reactive({
   id: 0,
-  nickname: '',
+  username: '',
   name: '',
   mobile: '',
   email: '',
@@ -324,7 +323,7 @@ const openEdit = async (row: any) => {
       const u = data.data
       Object.assign(editForm, {
         id: u.id,
-        nickname: u.nickname || '',
+        username: u.username || u.name || '',
         name: u.name || '',
         mobile: u.mobile || '',
         email: u.email || '',
@@ -337,7 +336,7 @@ const openEdit = async (row: any) => {
       // 失败时回退到列表行数据
       Object.assign(editForm, {
         id: row.id,
-        nickname: row.nickname === '-' ? '' : row.nickname,
+        username: row.username === '-' ? '' : row.username,
         name: row.username === '-' ? '' : row.username,
         mobile: row.mobile,
         email: row.email,
@@ -350,7 +349,7 @@ const openEdit = async (row: any) => {
   } catch {
     Object.assign(editForm, {
       id: row.id,
-      nickname: row.nickname === '-' ? '' : row.nickname,
+      username: row.username === '-' ? '' : row.username,
       name: row.username === '-' ? '' : row.username,
       mobile: row.mobile,
       email: row.email,
@@ -365,8 +364,8 @@ const openEdit = async (row: any) => {
 }
 
 const submitEdit = async () => {
-  if (!editForm.nickname?.trim()) {
-    ElMessage.warning('请输入昵称')
+  if (!editForm.username?.trim()) {
+    ElMessage.warning('请输入用户名')
     return
   }
   if (editForm.mobile && !/^1[3-9]\d{9}$/.test(editForm.mobile)) {
@@ -388,7 +387,7 @@ const submitEdit = async () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        nickname: editForm.nickname,
+        username: editForm.username,
         name: editForm.name || null,
         mobile: editForm.mobile || null,
         email: editForm.email || null,
@@ -459,7 +458,7 @@ const submitAdjust = async () => {
     await ElMessageBox.confirm(
       `确认要「${adjustForm.type === 'recharge' ? '充值' : '扣减'}」¥${amt.toFixed(
         2
-      )} 给用户「${adjustForm.user?.nickname}」？`,
+      )} 给用户「${adjustForm.user?.username}」？`,
       `${adjustForm.type === 'recharge' ? '充值' : '扣减'}确认`,
       { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
     )
@@ -586,8 +585,8 @@ const loadLogs = async (row?: any) => {
           </el-form-item>
         </el-col>
         <el-col :span="6">
-          <el-form-item label="昵称">
-            <el-input v-model="form.nickname" placeholder="请输入昵称" clearable />
+          <el-form-item label="用户名">
+            <el-input v-model="form.username" placeholder="请输入用户名" clearable />
           </el-form-item>
         </el-col>
         <el-col :span="6">
@@ -609,7 +608,7 @@ const loadLogs = async (row?: any) => {
 
     <el-table :data="tableData" border stripe style="width: 100%" v-loading="loading">
       <el-table-column prop="id" label="ID" width="60" align="center" />
-      <el-table-column prop="nickname" label="昵称" width="120" />
+      <el-table-column prop="username" label="用户名" width="120" />
       <el-table-column prop="phone" label="手机号" width="130" />
       <el-table-column label="头像" width="80" align="center">
         <template #default="scope">
@@ -696,7 +695,7 @@ const loadLogs = async (row?: any) => {
     <el-dialog v-model="viewDialogVisible" title="用户详情" width="600px">
       <el-descriptions :column="2" border>
         <el-descriptions-item label="ID">{{ viewData.id }}</el-descriptions-item>
-        <el-descriptions-item label="昵称">{{ viewData.nickname }}</el-descriptions-item>
+        <el-descriptions-item label="用户名">{{ viewData.username }}</el-descriptions-item>
         <el-descriptions-item label="手机号">{{ viewData.phone }}</el-descriptions-item>
         <el-descriptions-item label="性别">{{ viewData.gender }}</el-descriptions-item>
         <el-descriptions-item label="状态">
@@ -717,7 +716,6 @@ const loadLogs = async (row?: any) => {
       title="编辑用户"
       width="600px"
       :close-on-click-modal="false"
-      v-loading="editLoading"
     >
       <el-alert
         :title="`编辑用户 #${editForm.id} 的信息`"
@@ -729,8 +727,8 @@ const loadLogs = async (row?: any) => {
       <el-form :model="editForm" label-width="100px">
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="昵称" required>
-              <el-input v-model="editForm.nickname" placeholder="请输入昵称" maxlength="50" show-word-limit />
+            <el-form-item label="用户名" required>
+              <el-input v-model="editForm.username" placeholder="请输入用户名" maxlength="50" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -809,7 +807,7 @@ const loadLogs = async (row?: any) => {
       :close-on-click-modal="false"
     >
       <el-alert
-        :title="`即将重置用户「${resetPwdData.user?.nickname}」的密码`"
+        :title="`即将重置用户「${resetPwdData.user?.username}」的密码`"
         type="warning"
         :closable="false"
         show-icon
@@ -843,10 +841,9 @@ const loadLogs = async (row?: any) => {
       :title="adjustForm.type === 'recharge' ? '用户充值' : '用户扣减'"
       width="480px"
       :close-on-click-modal="false"
-      v-loading="adjustLoading"
     >
       <el-alert
-        :title="`用户「${adjustForm.user?.nickname}」当前余额：¥${formatMoney(adjustForm.user?.balance)}`"
+        :title="`用户「${adjustForm.user?.username}」当前余额：¥${formatMoney(adjustForm.user?.balance)}`"
         :type="adjustForm.type === 'recharge' ? 'success' : 'warning'"
         :closable="false"
         show-icon
@@ -910,7 +907,6 @@ const loadLogs = async (row?: any) => {
       title="新增用户"
       width="600px"
       :close-on-click-modal="false"
-      v-loading="createLoading"
     >
       <el-alert
         title="创建新用户账号，手机号将作为登录账号"
@@ -927,8 +923,8 @@ const loadLogs = async (row?: any) => {
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="昵称" required>
-              <el-input v-model="createForm.nickname" placeholder="请输入昵称" maxlength="50" />
+            <el-form-item label="用户名" required>
+              <el-input v-model="createForm.username" placeholder="请输入用户名" maxlength="50" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -1013,7 +1009,7 @@ const loadLogs = async (row?: any) => {
     <!-- 余额流水弹窗 -->
     <el-dialog
       v-model="logsDialogVisible"
-      :title="`用户「${adjustForm.user?.nickname}」余额流水`"
+      :title="`用户「${adjustForm.user?.username}」余额流水`"
       width="780px"
       :close-on-click-modal="false"
     >

@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -66,9 +67,14 @@ return new class extends Migration {
 
     private function addIndexIfMissing(string $table, array $columns, string $indexName): void
     {
-        $sm = Schema::getConnection()->getDoctrineSchemaManager();
-        $indexes = $sm->listTableIndexes($table);
-        if (!array_key_exists($indexName, $indexes)) {
+        $exists = DB::selectOne(
+            "SELECT COUNT(*) AS c FROM information_schema.statistics
+             WHERE table_schema = DATABASE()
+               AND table_name = ?
+               AND index_name = ?",
+            [$table, $indexName]
+        );
+        if ((int)($exists->c ?? 0) === 0) {
             Schema::table($table, function (Blueprint $t) use ($columns, $indexName) {
                 $t->index($columns, $indexName);
             });
@@ -77,16 +83,15 @@ return new class extends Migration {
 
     private function addForeignKeyIfMissing(string $table, string $fkName, array $columns, string $refColumn, string $refTable, string $onDelete): void
     {
-        $sm = Schema::getConnection()->getDoctrineSchemaManager();
-        try {
-            $fks = $sm->listTableForeignKeys($table);
-            foreach ($fks as $fk) {
-                if (in_array($fkName, $fk->getLocalColumns(), true) || $fk->getName() === $fkName) {
-                    return; // 已存在
-                }
-            }
-        } catch (\Throwable $e) {
-            // ignore
+        $exists = DB::selectOne(
+            "SELECT COUNT(*) AS c FROM information_schema.table_constraints
+             WHERE constraint_schema = DATABASE()
+               AND table_name = ?
+               AND constraint_name = ?",
+            [$table, $fkName]
+        );
+        if ((int)($exists->c ?? 0) > 0) {
+            return;
         }
 
         Schema::table($table, function (Blueprint $t) use ($columns, $refColumn, $refTable, $onDelete, $fkName) {

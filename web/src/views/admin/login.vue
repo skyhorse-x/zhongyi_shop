@@ -3,6 +3,7 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
+import { setAdminToken } from '@/utils/auth'
 import { UserFilled, Lock } from '@element-plus/icons-vue'
 
 const router = useRouter()

@@ -38,9 +38,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // 全局API请求日志中间件
         $middleware->append(\App\Http\Middleware\RequestLogMiddleware::class);
-
-        // 全局 API 速率限制：默认每分钟 60 次（可在 routes 中通过 middleware('throttle:...') 覆盖）
-        $middleware->throttleApi('60,1');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // API请求返回JSON格式错误

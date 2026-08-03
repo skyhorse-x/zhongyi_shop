@@ -50,8 +50,6 @@ const downloading = ref(false)
 
 import { getToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getToken() || ''
-
 const fetchStatus = async () => {
   try {
     const res = await safeFetch(`/api/v1/analysis/status/${taskNo.value}`, {

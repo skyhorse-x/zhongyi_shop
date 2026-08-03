@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
  * 系统配置 Eloquent 模型
  *
  * ⚠️ 业务代码应优先通过 SystemConfigService::get()/set() 读写配置
- *    该服务已集成 Redis 缓存 + 敏感字段加密
+ *    该服务已集成文件缓存 + 敏感字段加密
  *
  * 本类仅保留纯 DB 操作（用于数据迁移、Seeder、Admin 后台等）
  */

@@ -13,7 +13,7 @@ export const useOrderStore = defineStore('order', () => {
   const fetchOrders = async (params: any = {}) => {
     loading.value = true
     try {
-      const data: any = await request.get('/orders', { params })
+      const data: any = await request.get('/user/orders', { params })
       orders.value = data?.list || data || []
       total.value = data?.total || 0
       return data
@@ -23,11 +23,11 @@ export const useOrderStore = defineStore('order', () => {
   }
 
   const createOrder = async (packageId: number, payChannel: string) => {
-    return request.post('/orders', { package_id: packageId, pay_channel: payChannel })
+    return request.post('/packages/buy', { package_id: packageId, pay_channel: payChannel })
   }
 
   const cancelOrder = async (orderNo: string) => {
-    return request.post(`/orders/${orderNo}/cancel`)
+    return request.post(`/user/orders/${orderNo}/cancel`)
   }
 
   return { orders, loading, total, fetchOrders, createOrder, cancelOrder }

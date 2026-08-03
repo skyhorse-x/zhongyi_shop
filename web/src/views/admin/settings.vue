@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
-import { Connection, Setting, Money, Promotion, Cpu, ChatDotRound, Message, Wallet, Switch } from '@element-plus/icons-vue'
+import { Connection, Setting, Money, Promotion, Cpu, ChatDotRound, Message, Wallet, Switch, Link } from '@element-plus/icons-vue'
 import { buildAdminHeaders, getAdminToken } from '@/utils/auth'
 
 const form = ref({
@@ -11,6 +11,7 @@ const form = ref({
   siteDescription: '',
   siteUrl: '',
   adminEmail: '',
+  xianyuProductLink: '',
   // 费用设置
   analysisMode: 'paid',
   analysisPrice: 9.99,
@@ -155,6 +156,7 @@ const loadConfigs = async () => {
             site_description: 'siteDescription',
             site_url: 'siteUrl',
             admin_email: 'adminEmail',
+            xianyu_product_link: 'xianyuProductLink',
             analysis_mode: 'analysisMode',
             analysis_price: 'analysisPrice',
             ai_cost_per_time: 'aiCostPerTime',
@@ -239,6 +241,7 @@ const handleSave = async () => {
       site_name: form.value.siteName,
       site_description: form.value.siteDescription,
       admin_email: form.value.adminEmail,
+      xianyu_product_link: form.value.xianyuProductLink,
       analysis_mode: form.value.analysisMode,
       analysis_price: form.value.analysisPrice,
       ai_cost_per_time: form.value.aiCostPerTime,
@@ -318,6 +321,14 @@ onMounted(() => {
           </el-form-item>
           <el-form-item label="管理员邮箱">
             <el-input v-model="form.adminEmail" placeholder="请输入管理员邮箱" style="max-width: 400px" />
+          </el-form-item>
+          <el-form-item label="闲鱼商品链接">
+            <el-input v-model="form.xianyuProductLink" placeholder="如：https://www.goofish.com/item/xxxx" style="max-width: 400px">
+              <template #prefix>
+                <el-icon><Link /></el-icon>
+              </template>
+            </el-input>
+            <div class="form-tip">前台充值页展示的闲鱼商品入口链接（可留空，也可在「闲鱼商品管理」中配置多个商品）</div>
           </el-form-item>
         </el-form>
       </el-tab-pane>

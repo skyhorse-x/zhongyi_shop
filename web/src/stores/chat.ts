@@ -19,7 +19,7 @@ export const useChatStore = defineStore('chat', () => {
   const unreadCount = ref(0)
 
   const loadSession = async (sessionNo: string) => {
-    const data: any = await request.get(`/customer-service/sessions/${sessionNo}`)
+    const data: any = await request.get('/customer-service/session')
     currentSession.value = sessionNo
     messages.value = data.messages || []
     return data

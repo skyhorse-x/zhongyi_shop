@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { CameraFilled, ChatLineRound, Delete } from '@element-plus/icons-vue'
+import { CameraFilled, ChatLineRound, Delete, User } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
@@ -16,17 +16,16 @@ interface ImageItem {
 const imageList = ref<ImageItem[]>([])
 const loading = ref(false)
 const aiText = ref('')
-const analysisMode = ref('paid')
-const analysisPrice = ref(9.99)
+const analysisTimes = ref(0)
+const gender = ref<number | null>(null)
+const age = ref<number | null>(null)
 
 import { getToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getToken() || ''
-
-// 获取分析模式配置
-const fetchAnalysisMode = async () => {
+// 获取用户剩余分析次数
+const fetchAnalysisTimes = async () => {
   try {
-    const res = await safeFetch('/api/v1/analysis/config', {
+    const res = await safeFetch('/api/v1/user/info', {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -34,11 +33,10 @@ const fetchAnalysisMode = async () => {
     })
     const data = await res.json()
     if (data.code === 0) {
-      analysisMode.value = data.data.analysis_mode || 'paid'
-      analysisPrice.value = data.data.analysis_price || 9.99
+      analysisTimes.value = data.data?.analysis_times ?? 0
     }
   } catch (e) {
-    console.error('获取分析配置失败:', e)
+    console.error('获取分析次数失败:', e)
   }
 }
 
@@ -78,7 +76,7 @@ const uploadSingleImage = async (file: File): Promise<string> => {
 }
 
 // 提交分析任务
-const submitAnalysis = async (imageUrls: string[], type: 'tongue' | 'face', text: string) => {
+const submitAnalysis = async (imageUrls: string[], type: 'tongue' | 'face', text: string, gender: number, age: number) => {
   const res = await safeFetch('/api/v1/analysis/submit', {
     method: 'POST',
     headers: {
@@ -90,6 +88,8 @@ const submitAnalysis = async (imageUrls: string[], type: 'tongue' | 'face', text
       type: type,
       image_urls: imageUrls,
       text: text,
+      gender: gender,
+      age: age,
     }),
   })
   const data = await res.json()
@@ -100,6 +100,14 @@ const submitAnalysis = async (imageUrls: string[], type: 'tongue' | 'face', text
 }
 
 const handleSubmit = async () => {
+  if (!gender.value) {
+    ElMessage.warning('请选择性别')
+    return
+  }
+  if (!age.value || age.value <= 0) {
+    ElMessage.warning('请输入年龄')
+    return
+  }
   if (imageList.value.length === 0 && !aiText.value.trim()) {
     ElMessage.warning('请至少上传一张舌头照片或输入症状描述')
     return
@@ -114,7 +122,7 @@ const handleSubmit = async () => {
     }
 
     // 2. 提交分析任务
-    const taskNo = await submitAnalysis(uploadedUrls, 'tongue', aiText.value)
+    const taskNo = await submitAnalysis(uploadedUrls, 'tongue', aiText.value, gender.value, age.value)
 
     ElMessage.success('分析已提交')
     router.push(`/analysis/result/${taskNo}`)
@@ -137,12 +145,31 @@ const handleSubmit = async () => {
 }
 
 onMounted(() => {
-  fetchAnalysisMode()
+  fetchAnalysisTimes()
 })
 </script>
 
 <template>
   <div class="tongue-page" v-loading="loading">
+    <!-- 基本信息（必填） -->
+    <div class="profile-section">
+      <div class="ai-text-header">
+        <el-icon><User /></el-icon>
+        <span>基本信息 <span class="required-tip">*</span></span>
+      </div>
+      <div class="profile-row">
+        <span class="profile-label">性别</span>
+        <el-radio-group v-model="gender">
+          <el-radio :value="1">男</el-radio>
+          <el-radio :value="2">女</el-radio>
+        </el-radio-group>
+      </div>
+      <div class="profile-row">
+        <span class="profile-label">年龄</span>
+        <el-input v-model="age" type="number" min="1" max="150" placeholder="请输入年龄" style="width: 120px;" />
+      </div>
+    </div>
+
     <!-- AI 文本输入框 -->
     <div class="ai-text-section">
       <div class="ai-text-header">
@@ -166,24 +193,7 @@ onMounted(() => {
         <span class="optional-tag">可选</span> 拍摄清晰的舌头照片可获得更精准的分析结果
       </div>
       
-      <el-upload
-        :auto-upload="false"
-        accept="image/*"
-        capture="environment"
-        :show-file-list="false"
-        @change="handleFileChange"
-        multiple
-      >
-        <template #trigger>
-          <div class="upload-area">
-            <el-icon :size="48"><CameraFilled /></el-icon>
-            <div class="upload-text">点击拍摄或上传</div>
-            <div class="upload-hint">已上传 {{ imageList.length }} 张</div>
-          </div>
-        </template>
-      </el-upload>
-
-      <!-- 多张图片预览 -->
+      <!-- 多张图片预览（展示在上传按钮前面） -->
       <div v-if="imageList.length > 0" class="image-preview-grid">
         <div 
           v-for="(img, index) in imageList" 
@@ -201,6 +211,23 @@ onMounted(() => {
           </div>
         </div>
       </div>
+
+      <el-upload
+        :auto-upload="false"
+        accept="image/*"
+        capture="environment"
+        :show-file-list="false"
+        @change="handleFileChange"
+        multiple
+      >
+        <template #trigger>
+          <div class="upload-area">
+            <el-icon :size="48"><CameraFilled /></el-icon>
+            <div class="upload-text">点击拍摄或上传</div>
+            <div class="upload-hint">已上传 {{ imageList.length }} 张</div>
+          </div>
+        </template>
+      </el-upload>
     </div>
 
     <div class="actions">
@@ -208,13 +235,17 @@ onMounted(() => {
         round
         type="primary"
         :loading="loading"
+        :disabled="analysisTimes <= 0"
         @click="handleSubmit"
         style="width: 100%"
       >
-        {{ analysisMode === 'free' ? '开始分析' : `开始分析 ¥${analysisPrice}` }}
+        开始分析
       </el-button>
-      <div v-if="analysisMode === 'free'" class="free-tip">
-        当前为免费分析模式
+      <div v-if="analysisTimes > 0" class="free-tip">
+        剩余 {{ analysisTimes }} 次分析次数
+      </div>
+      <div v-else class="free-tip">
+        分析次数不足，请先购买套餐
       </div>
     </div>
   </div>
@@ -228,6 +259,23 @@ onMounted(() => {
 .ai-text-section {
   margin-top: 16px;
   margin-bottom: 24px;
+}
+
+.profile-section {
+  margin-bottom: 24px;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.profile-label {
+  font-size: 14px;
+  color: #323233;
+  min-width: 48px;
 }
 
 .ai-text-header {
@@ -306,7 +354,7 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-top: 16px;
+  margin-bottom: 16px;
 }
 
 .image-preview-item {

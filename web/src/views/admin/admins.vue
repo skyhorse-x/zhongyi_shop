@@ -17,7 +17,7 @@ const loading = ref(false)
 
 import { getAdminToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getAdminToken() || ''
+const getToken = (): string => getAdminToken() || ''
 
 // 加载管理员列表
 const loadAdmins = async () => {

@@ -5,7 +5,7 @@ import { ElMessage } from 'element-plus'
 import { Money, Wallet, Refresh, Share } from '@element-plus/icons-vue'
 import { toMoney } from '@/utils'
 import { safeFetch } from '@/utils/fetch'
-import { getAuthToken } from '@/utils/auth'
+import { getToken } from '@/utils/auth'
 
 const router = useRouter()
 
@@ -38,7 +38,7 @@ const loadPromoterInfo = async () => {
   try {
     const res = await safeFetch('/api/v1/promoter/info', {
       headers: {
-        'Authorization': `Bearer ${getAuthToken()}`,
+        'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
       },
     })

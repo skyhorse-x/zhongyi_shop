@@ -121,7 +121,7 @@ class CustomerServiceController extends Controller
                 'sender_id' => $user->id,
                 'sender_type' => 'user',
                 'content' => $request->input('content', ''),
-                'msg_type' => 'text',
+                'message_type' => 'text',
             ]);
             
             // 更新会话
@@ -185,7 +185,7 @@ class CustomerServiceController extends Controller
                 'sender_id' => $user->id,
                 'sender_type' => 'user',
                 'content' => '',
-                'msg_type' => 'image',
+                'message_type' => 'image',
                 'file_url' => $url,
                 'file_name' => $file->getClientOriginalName(),
                 'file_size' => $file->getSize(),

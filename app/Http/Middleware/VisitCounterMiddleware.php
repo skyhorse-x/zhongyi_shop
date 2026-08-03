@@ -11,9 +11,9 @@ class VisitCounterMiddleware
 {
     /**
      * 访问量统计中间件
-     * - 按天自增访问量（走 stats 命名空间，存于 Redis）
+     * - 按天自增访问量（走 stats 命名空间，存于 file cache）
      * - 排除 API 内部调用、静态资源
-     * - 失败自动降级到 file/database（CacheService 内部处理）
+     * - 失败自动降级（CacheService 内部处理）
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -32,7 +32,8 @@ class VisitCounterMiddleware
 
             // 如果是首次写入（count=1），补上当天结束前的过期时间
             if ($count === 1) {
-                $statsCache->put($key, $count, now()->endOfDay());
+                $ttl = max(60, now()->endOfDay()->getTimestamp() - time());
+                $statsCache->put($key, $count, $ttl);
             }
         }
 

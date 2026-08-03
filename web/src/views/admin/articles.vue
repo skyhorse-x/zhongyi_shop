@@ -16,7 +16,7 @@ const loading = ref(false)
 
 import { getAdminToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getAdminToken() || ''
+const getToken = (): string => getAdminToken() || ''
 
 // 加载文章列表
 const loadArticles = async () => {

@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\Log;
  * 缓存策略：
  *   - 规则列表走 risk:rule 命名空间（TTL 60s）
  *   - 窗口计数走 risk:count 命名空间（TTL = window/10）
- *   - 通过 CacheService 统一走 Redis，失败自动降级
+ *   - 通过 CacheService 统一走 file cache，失败自动降级
  */
 class RiskControlService
 {

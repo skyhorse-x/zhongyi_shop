@@ -18,8 +18,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
     })->name('login');
     
     // ===== 公开接口 =====
-    // 认证相关接口限速更严格：每分钟 10 次（防爆破）
-    Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
+    Route::prefix('auth')->group(function () {
         Route::post('register', [V1\AuthController::class, 'register']);
         Route::post('login', [V1\AuthController::class, 'login']);
         Route::post('sms-code', [V1\AuthController::class, 'sendSmsCode']);
@@ -28,12 +27,16 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
     });
 
     // ===== 管理后台公开接口 =====
-    // 管理员登录也加限速：每分钟 10 次
     Route::prefix('admin')->group(function () {
-        Route::middleware('throttle:10,1')->group(function () {
-            Route::post('auth/login', [V1\AdminController::class, 'login']);
-        });
+        Route::post('auth/login', [V1\AdminController::class, 'login']);
     });
+
+    // ===== 其他公开接口 =====
+    // 邀请播报（公开访问，用于会员中心展示）
+    Route::get('invite-marquee', [V1\AdminController::class, 'inviteMarquee']);
+
+    // 闲鱼充值商品（公开访问，用于前台充值页展示）
+    Route::get('xianyu/products', [V1\XianyuProductController::class, 'index']);
 
     // ===== 需要登录的接口 =====
         Route::middleware('auth.or.admin')->group(function () {
@@ -163,9 +166,6 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
         // 推广海报生成（公开访问，无需登录）
         Route::get('promoter/poster-image', [V1\PromoterController::class, 'posterImage']);
 
-        // 邀请播报（公开访问，用于会员中心展示）
-        Route::get('invite-marquee', [V1\AdminController::class, 'inviteMarquee']);
-
         // 文章
         Route::prefix('articles')->group(function () {
             Route::get('/', [V1\ArticleController::class, 'index']);
@@ -242,6 +242,12 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::put('packages/{id}', [V1\AdminController::class, 'packageUpdate']);
             Route::delete('packages/{id}', [V1\AdminController::class, 'packageDestroy']);
             Route::post('packages/{id}/toggle', [V1\AdminController::class, 'packageToggle']);
+
+            // 闲鱼充值商品管理
+            Route::get('xianyu-products', [V1\Admin\XianyuProductController::class, 'index']);
+            Route::post('xianyu-products', [V1\Admin\XianyuProductController::class, 'store']);
+            Route::put('xianyu-products/{id}', [V1\Admin\XianyuProductController::class, 'update']);
+            Route::delete('xianyu-products/{id}', [V1\Admin\XianyuProductController::class, 'destroy']);
 
             // 体质题目管理
             Route::get('constitution/questions', [V1\AdminController::class, 'constitutionQuestions']);

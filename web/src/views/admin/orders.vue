@@ -19,7 +19,7 @@ const loading = ref(false)
 
 import { getAdminToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getAdminToken() || ''
+const getToken = (): string => getAdminToken() || ''
 
 // 状态映射
 const statusMap: Record<number, { type: string; label: string; color: string }> = {

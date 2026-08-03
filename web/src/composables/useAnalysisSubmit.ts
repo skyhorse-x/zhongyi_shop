@@ -11,7 +11,7 @@ export const useAnalysisSubmit = () => {
   const submitTongue = async (imageData: string): Promise<string | null> => {
     submitting.value = true
     try {
-      const data: any = await request.post('/analysis/tongue', { image: imageData })
+      const data: any = await request.post('/analysis/submit', { type: 'tongue', image: imageData })
       return data.task_no || data.taskNo || null
     } catch (e: any) {
       ElMessage.error(e.message || '提交失败')
@@ -24,7 +24,7 @@ export const useAnalysisSubmit = () => {
   const submitFace = async (imageData: string): Promise<string | null> => {
     submitting.value = true
     try {
-      const data: any = await request.post('/analysis/face', { image: imageData })
+      const data: any = await request.post('/analysis/submit', { type: 'face', image: imageData })
       return data.task_no || data.taskNo || null
     } catch (e: any) {
       ElMessage.error(e.message || '提交失败')

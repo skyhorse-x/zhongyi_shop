@@ -627,9 +627,12 @@ class AdminController extends Controller
         // 白名单：只允许修改这些配置
         $allowedKeys = [
             'site_name', 'site_logo', 'site_description',
+            'site_url', 'admin_email', 'xianyu_product_link',
             'wechat_appid', 'wechat_secret', 'wechat_mch_id', 'wechat_pay_key',
             'alipay_app_id', 'alipay_private_key', 'alipay_public_key',
-            'ai_model_id', 'analysis_mode',
+            'ai_model_id', 'analysis_mode', 'analysis_price', 'ai_cost_per_time',
+            'user_free_analysis_times',
+            'commission_rate', 'commission_min_amount', 'commission_settle_days',
             'sms_bao_user', 'sms_bao_pass',
             'cos_region', 'cos_bucket', 'cos_secret_id', 'cos_secret_key',
             'commission_level1', 'commission_level2',

@@ -2,7 +2,7 @@
 import { ref, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Plus, List } from '@element-plus/icons-vue'
+import { Plus, List, Coin } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
 
 const route = useRoute()
@@ -22,11 +22,30 @@ const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
 const loading = ref(false)
 const messageListRef = ref<HTMLElement | null>(null)
+const analysisTimes = ref<number>(0)
 
 // 获取认证token
 import { getToken } from '@/utils/auth'
 
 const getAuthToken = (): string => getToken() || ''
+
+// 加载用户剩余积分
+const loadUserInfo = async () => {
+  try {
+    const res = await safeFetch('/api/v1/user/info', {
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      analysisTimes.value = data.data?.analysis_times ?? 0
+    }
+  } catch (e) {
+    // 忽略错误
+  }
+}
 
 // 创建新会话
 const createSession = async (): Promise<string> => {
@@ -72,11 +91,40 @@ const loadMessages = async (sNo: string) => {
   }
 }
 
+// 格式化 AI 回复内容（支持简单 Markdown）
+const formatContent = (content: string): string => {
+  if (!content) return ''
+  return content
+    // 代码块
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="lang-$1">$2</code></pre>')
+    // 行内代码
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // 加粗
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    // 斜体
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    // 标题
+    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+    // 列表项
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
+    // 换行
+    .replace(/\n/g, '<br>')
+}
+
 // 发送消息
 const sendMessage = async () => {
   const text = inputText.value.trim()
   if (!text) {
     ElMessage.info('请输入您的问题')
+    return
+  }
+
+  // 检查剩余积分
+  if (analysisTimes.value <= 0) {
+    ElMessage.warning('您的分析次数已用完，请先购买套餐')
     return
   }
 
@@ -124,6 +172,8 @@ const sendMessage = async () => {
         timestamp: data.data.created_at || Date.now(),
       }
       messages.value.push(assistantMessage)
+      // 刷新剩余积分
+      await loadUserInfo()
     } else {
       ElMessage.error(data.message || '发送失败')
       // 移除失败的用户消息
@@ -168,6 +218,8 @@ const formatTime = (timestamp: number | string): string => {
 }
 
 onMounted(async () => {
+  // 加载用户信息（积分）
+  await loadUserInfo()
   // 如果有 sessionNo，加载历史消息
   if (sessionNo.value) {
     await loadMessages(sessionNo.value)
@@ -177,10 +229,19 @@ onMounted(async () => {
 
 <template>
   <div class="qa-chat-page">
-    <!-- 操作按钮 -->
-    <div class="action-bar">
-      <el-icon @click="startNewChat" class="action-btn" title="新建对话"><Plus /></el-icon>
-      <el-icon @click="goToSessions" class="action-btn" title="对话列表"><List /></el-icon>
+    <!-- 顶部信息栏 -->
+    <div class="header-bar">
+      <div class="header-left">
+        <span class="header-title">健康问答</span>
+      </div>
+      <div class="header-right">
+        <div class="credits-badge">
+          <el-icon class="credits-icon"><Coin /></el-icon>
+          <span class="credits-text">剩余 {{ analysisTimes }} 次</span>
+        </div>
+        <el-icon @click="startNewChat" class="action-btn" title="新建对话"><Plus /></el-icon>
+        <el-icon @click="goToSessions" class="action-btn" title="对话列表"><List /></el-icon>
+      </div>
     </div>
 
     <!-- 消息列表 -->
@@ -214,8 +275,7 @@ onMounted(async () => {
           {{ msg.role === 'user' ? '👤' : '🌿' }}
         </div>
         <div class="message-content">
-          <div class="message-bubble">
-            {{ msg.content }}
+          <div class="message-bubble" v-html="msg.role === 'assistant' ? formatContent(msg.content) : msg.content">
           </div>
           <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
         </div>
@@ -264,33 +324,67 @@ onMounted(async () => {
   background-color: #f7f8fa;
 }
 
-.action-bar {
-  position: fixed;
-  top: 52px;
-  right: 16px;
-  z-index: 50;
+/* 顶部信息栏 */
+.header-bar {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #07c160 0%, #04a152 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(7, 193, 96, 0.2);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.header-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
+.credits-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.credits-icon {
+  font-size: 14px;
+}
+
+.credits-text {
+  font-weight: 500;
+}
+
 .action-btn {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #07c160;
-  font-size: 18px;
+  font-size: 16px;
   transition: all 0.2s ease;
 }
 
 .action-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(7, 193, 96, 0.2);
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
 }
 
 .message-list {
@@ -338,6 +432,12 @@ onMounted(async () => {
   text-align: left;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-item:hover {
+  background: #e8f5e9;
+  transform: translateX(4px);
 }
 
 .quick-item:active {
@@ -377,17 +477,70 @@ onMounted(async () => {
   border-radius: 12px;
   font-size: 14px;
   line-height: 1.6;
-  word-break: break-all;
+  word-break: break-word;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
+/* AI 回复样式 */
 .assistant .message-bubble {
   background: #fff;
   color: #323233;
   border-top-left-radius: 4px;
 }
 
+.assistant .message-bubble :deep(h2),
+.assistant .message-bubble :deep(h3),
+.assistant .message-bubble :deep(h4) {
+  margin: 12px 0 8px;
+  color: #07c160;
+  font-weight: 600;
+}
+
+.assistant .message-bubble :deep(h2) { font-size: 18px; }
+.assistant .message-bubble :deep(h3) { font-size: 16px; }
+.assistant .message-bubble :deep(h4) { font-size: 15px; }
+
+.assistant .message-bubble :deep(strong) {
+  color: #07c160;
+  font-weight: 600;
+}
+
+.assistant .message-bubble :deep(em) {
+  color: #666;
+  font-style: italic;
+}
+
+.assistant .message-bubble :deep(li) {
+  margin: 4px 0;
+  padding-left: 8px;
+}
+
+.assistant .message-bubble :deep(code) {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #e83e8c;
+}
+
+.assistant .message-bubble :deep(pre) {
+  background: #2d2d2d;
+  color: #f8f8f2;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.assistant .message-bubble :deep(pre code) {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+/* 用户消息样式 */
 .user .message-bubble {
-  background: #1989fa;
+  background: linear-gradient(135deg, #07c160 0%, #04a152 100%);
   color: #fff;
   border-top-right-radius: 4px;
 }
@@ -414,7 +567,7 @@ onMounted(async () => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #1989fa;
+  background: #07c160;
   animation: typing 1.4s infinite;
 }
 
@@ -456,5 +609,7 @@ onMounted(async () => {
 
 .send-btn {
   flex-shrink: 0;
+  background: linear-gradient(135deg, #07c160 0%, #04a152 100%);
+  border: none;
 }
 </style>

@@ -2,8 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { safeFetch } from '@/utils/fetch'
-import { getAuthToken } from '@/utils/auth'
+import request from '@/api/request'
 
 const router = useRouter()
 
@@ -31,20 +30,10 @@ const canWithdraw = computed(() => {
 const loadPromoterInfo = async () => {
   fetchingBalance.value = true
   try {
-    const res = await safeFetch('/api/v1/promoter/info', {
-      headers: {
-        'Authorization': `Bearer ${getAuthToken()}`,
-        'Accept': 'application/json',
-      },
-    })
-    const data = await res.json()
-    if (data.code === 0) {
-      balance.value = data.data.available_commission || 0
-    } else {
-      ElMessage.error(data.message || '加载推广信息失败')
-    }
+    const data: any = await request.get('/promoter/info')
+    balance.value = data?.available_commission || 0
   } catch (e: any) {
-    ElMessage.error(e.message || '加载推广信息失败')
+    ElMessage.error(e?.message || '加载推广信息失败')
   } finally {
     fetchingBalance.value = false
   }
@@ -75,29 +64,16 @@ const handleWithdraw = async () => {
 
   loading.value = true
   try {
-    const res = await safeFetch('/api/v1/promoter/withdraw', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${getAuthToken()}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount: amount,
-        pay_type: form.value.withdrawType,
-        pay_account: form.value.payAccount,
-      }),
+    await request.post('/promoter/withdraw', {
+      amount: amount,
+      pay_type: form.value.withdrawType,
+      pay_account: form.value.payAccount,
     })
-    const data = await res.json()
-
-    if (data.code === 0) {
-      ElMessage.success('提现申请已提交，请等待审核')
-      router.push('/promoter')
-    } else {
-      ElMessage.error(data.message || '提现失败')
-    }
+    ElMessage.success('提现申请已提交，请等待审核')
+    router.push('/promoter')
   } catch (e: any) {
-    ElMessage.error(e.message || '提现失败，请稍后重试')
+    // 业务错误已由 request 拦截器统一 ElMessage 提示，此处仅兜底
+    ElMessage.error(e?.message || '提现失败，请稍后重试')
   } finally {
     loading.value = false
   }

@@ -42,7 +42,7 @@ class CustomerServiceManageController extends Controller
             $keyword = $request->keyword;
             $query->where(function ($q) use ($keyword) {
                 $q->where('title', 'like', "%{$keyword}%")
-                  ->orWhere('content', 'like', "%{$keyword}%');
+                  ->orWhere('content', 'like', "%{$keyword}%");
             });
         }
 
@@ -287,7 +287,7 @@ class CustomerServiceManageController extends Controller
     {
         $data = $request->validate([
             'content' => 'required|string',
-            'msg_type' => 'nullable|string|in,text',
+            'msg_type' => 'nullable|string|in:text,image',
         ]);
 
         $session = CustomerServiceSession::where('session_no', $sessionNo)->firstOrFail();
@@ -297,7 +297,7 @@ class CustomerServiceManageController extends Controller
             'sender_id' => 0,
             'sender_type' => 'system',
             'content' => $data['content'],
-            'msg_type' => $data['msg_type'] ?? 'text',
+            'message_type' => $data['msg_type'] ?? 'text',
         ]);
 
         // 更新会话

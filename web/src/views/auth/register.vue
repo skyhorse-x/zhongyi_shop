@@ -310,7 +310,7 @@ onUnmounted(() => {
 
 .type-tab.active {
   color: #fff;
-  background: #1989fa;
+  background: linear-gradient(135deg, #07c160 0%, #04a152 100%);
   font-weight: bold;
 }
 
@@ -322,7 +322,7 @@ onUnmounted(() => {
   margin-top: 16px;
   text-align: center;
   font-size: 14px;
-  color: #1989fa;
+  color: #07c160;
   cursor: pointer;
 }
 </style>

@@ -35,7 +35,7 @@ class CustomerServiceRatingController extends Controller
         $rating = CustomerServiceRating::create(array_merge($data, [
             'session_no' => $sessionNo,
             'user_id'    => Auth::id(),
-            'admin_id'   => $session->admin_id,
+            'admin_id'   => $session->staff_id,
         ]));
 
         $session->update([

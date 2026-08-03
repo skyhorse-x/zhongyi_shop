@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
  * 设计目标：
  *   1. 集中所有缓存 key 命名空间，避免 key 散落
  *   2. 提供按 namespace 一键清空
- *   3. 自动 fallback：当 Redis 不可用时降级到 file/database
+ *   3. 统一走 file cache（项目不使用 Redis）
  *   4. 统一 TTL 管理
  *   5. 缓存击穿保护（单飞锁）
  *
@@ -70,7 +70,7 @@ class CacheService
         try {
             return Cache::remember($fullKey, $ttl, $callback);
         } catch (\Throwable $e) {
-            // Redis 故障时回退到 file cache
+            // 缓存异常时直接回退到回调
             Log::warning('Cache::remember failed, fallback to direct callback', [
                 'key' => $fullKey,
                 'error' => $e->getMessage(),
@@ -105,7 +105,7 @@ class CacheService
     }
 
     /**
-     * 获取（带 fallback：Redis 故障时返回 default）
+     * 获取（带 try/catch 降级，失败返回 default）
      */
     public function get(string $key, mixed $default = null): mixed
     {
@@ -121,7 +121,7 @@ class CacheService
     }
 
     /**
-     * 设置（带 fallback：Redis 故障时静默失败）
+     * 设置（带 try/catch 降级，失败静默跳过）
      */
     public function put(string $key, mixed $value, ?int $ttl = null): void
     {
@@ -144,7 +144,7 @@ class CacheService
     }
 
     /**
-     * 忘记（带 fallback：Redis 故障时静默失败）
+     * 忘记（带 try/catch 降级，失败静默跳过）
      */
     public function forget(string $key): void
     {
@@ -159,31 +159,18 @@ class CacheService
     }
 
     /**
-     * 清空整个命名空间（按前缀模糊删除）
+     * 清空整个命名空间
      *
-     * 注意：file/database driver 需扫表
-     * Redis driver 使用 SCAN
+     * file driver 下 Cache::flush() 不可用，因此按已知名清理。
      */
     public function flush(): void
     {
-        $prefix = config('cache.prefix', '') . ":{$this->namespace}:";
-
-        try {
-            $store = Cache::getStore();
-            if (method_exists($store, 'connection') || get_class($store) === 'Illuminate\Cache\RedisStore') {
-                // Redis: 用 SCAN
-                $this->flushRedis($prefix);
-            } else {
-                // file / database: 通过 Cache::flush() 不可用，只能按已知名清
-                $this->flushFallback();
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Cache flush failed', ['namespace' => $this->namespace, 'error' => $e->getMessage()]);
-        }
+        $prefix = "{$this->namespace}:";
+        $this->flushFallback($prefix);
     }
 
     /**
-     * 自增（带 fallback：Redis 故障时返回 0）
+     * 自增（带 try/catch 降级，失败返回 0）
      */
     public function increment(string $key, int $step = 1, ?int $ttl = null): int
     {
@@ -218,35 +205,23 @@ class CacheService
         return 300; // 默认 5 分钟
     }
 
-    protected function flushRedis(string $prefix): void
+    /**
+     * 把任意 ttl 表达式规范化为秒数
+     */
+    protected function normalizeTtl(int|\DateTimeInterface|null $ttl): ?int
     {
-        try {
-            $redis = \Illuminate\Support\Facades\Redis::connection('cache');
-            $cursor = 0;
-            do {
-                $result = $redis->scan($cursor, ['MATCH' => $prefix . '*', 'COUNT' => 200]);
-                // 兼容 phpredis / predis
-                if (is_array($result) && count($result) === 2) {
-                    [$cursor, $keys] = $result;
-                } else {
-                    $cursor = 0;
-                    $keys = [];
-                }
-                foreach ($keys as $k) {
-                    $redis->del($k);
-                }
-            } while ($cursor != 0);
-        } catch (\Throwable $e) {
-            Log::warning('Redis flush failed', ['error' => $e->getMessage()]);
-        }
+        if ($ttl === null) return null;
+        if (is_int($ttl)) return $ttl;
+        $seconds = $ttl->getTimestamp() - now()->getTimestamp();
+        return max(1, $seconds);
     }
 
-    protected function flushFallback(): void
+    protected function flushFallback(string $prefix): void
     {
-        // file/database: 仅清理约定的 keys（保守）
+        // file driver：仅清理约定的 namespace 根 key（保守）
         $patterns = array_keys(self::TTL);
         foreach ($patterns as $p) {
-            Cache::forget("{$this->namespace}:{$p}");
+            Cache::forget("{$prefix}{$p}");
         }
     }
 

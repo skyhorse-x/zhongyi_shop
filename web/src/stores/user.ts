@@ -15,20 +15,26 @@ export const useUserStore = defineStore('user', () => {
   // 登录
   const loginAction = async (account: string, password: string) => {
     const res: any = await login({ account, password })
-    token.value = res.token
-    userInfo.value = res.user
-    setToken(res.token)
-    setUserInfo(res.user)
+    const data = res?.data || res
+    const tokenVal = data?.token || res?.token
+    const userVal = data?.user || res?.user
+    token.value = tokenVal
+    userInfo.value = userVal
+    if (tokenVal) setToken(tokenVal)
+    if (userVal) setUserInfo(userVal)
     return res
   }
 
   // 注册
   const registerAction = async (data: any) => {
     const res: any = await register(data)
-    token.value = res.token
-    userInfo.value = res.user
-    setToken(res.token)
-    setUserInfo(res.user)
+    const r = res?.data || res
+    const tokenVal = r?.token || res?.token
+    const userVal = r?.user || res?.user
+    token.value = tokenVal
+    userInfo.value = userVal
+    if (tokenVal) setToken(tokenVal)
+    if (userVal) setUserInfo(userVal)
     return res
   }
 

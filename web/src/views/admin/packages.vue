@@ -51,7 +51,7 @@ const typeOptions = [
 
 import { getAdminToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getAdminToken() || ''
+const getToken = (): string => getAdminToken() || ''
 
 const typeName = (type: string) => typeOptions.find(t => t.value === type)?.label || type
 

@@ -52,7 +52,7 @@ const CATEGORIES = [
 
 import { getAdminToken } from '@/utils/auth'
 
-const getAuthToken = (): string => getAdminToken() || ''
+const getToken = (): string => getAdminToken() || ''
 
 const fetchQuestions = async () => {
   loading.value = true

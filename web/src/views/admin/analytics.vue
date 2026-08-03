@@ -20,13 +20,13 @@ const load = async () => {
   loading.value = true
   try {
     const [o, f, r, rev, ug, tp, d] = await Promise.all([
-      request.get('/analytics/overview'),
-      request.get('/analytics/funnel', { params: { days: 30 } }),
-      request.get('/analytics/retention', { params: { days: 7 } }),
-      request.get('/analytics/revenue', { params: { days: 30 } }),
-      request.get('/analytics/user-growth', { params: { days: 30 } }),
-      request.get('/analytics/top-promoters', { params: { limit: 10 } }),
-      request.get('/analytics/analysis-distribution', { params: { days: 30 } }),
+      request.get('/admin/analytics/overview'),
+      request.get('/admin/analytics/funnel', { params: { days: 30 } }),
+      request.get('/admin/analytics/retention', { params: { days: 7 } }),
+      request.get('/admin/analytics/revenue', { params: { days: 30 } }),
+      request.get('/admin/analytics/user-growth', { params: { days: 30 } }),
+      request.get('/admin/analytics/top-promoters', { params: { limit: 10 } }),
+      request.get('/admin/analytics/analysis-distribution', { params: { days: 30 } }),
     ])
     overview.value = (o as any).today || o
     funnel.value = f

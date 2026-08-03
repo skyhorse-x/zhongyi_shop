@@ -85,10 +85,10 @@ class QaController extends Controller
                 'content' => $validated['content'],
             ]);
 
-            // 获取历史消息
+            // 获取历史消息（减少到5条，提升响应速度）
             $history = $session->messages()
                 ->orderBy('id', 'desc')
-                ->limit(10)
+                ->limit(5)
                 ->get()
                 ->reverse()
                 ->map(fn ($msg) => ['role' => $msg->role, 'content' => $msg->content])
