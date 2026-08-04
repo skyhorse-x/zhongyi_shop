@@ -8,6 +8,8 @@ use App\Models\SystemConfig;
 use App\Services\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
@@ -103,5 +105,75 @@ class PaymentController extends Controller
                 'paid_at'  => $order->paid_at,
             ],
         ]);
+    }
+
+    /**
+     * POST /api/v1/payment/notify/wechat
+     * 微信支付异步回调
+     */
+    public function wechatNotify(Request $request): Response
+    {
+        Log::info('Wechat pay notify received', [
+            'headers' => $request->headers->all(),
+            'body' => $request->getContent(),
+        ]);
+
+        try {
+            // 获取回调数据
+            $notifyData = $request->toArray();
+
+            // 如果是 V3 加密回调，从 header 获取验签信息
+            if (empty($notifyData['out_trade_no']) && $request->getContent()) {
+                $notifyData = json_decode($request->getContent(), true) ?: [];
+            }
+
+            $result = $this->paymentService->handleWechatNotify($notifyData);
+
+            if ($result) {
+                // 返回微信成功的 XML 格式
+                return response('<xml><return_code><![CDATA[SUCCESS]]></return_code><return_msg><![CDATA[OK]]></return_msg></xml>', 200)
+                    ->header('Content-Type', 'text/xml');
+            }
+
+            return response('<xml><return_code><![CDATA[FAIL]]></return_code><return_msg><![CDATA[处理失败]]></return_msg></xml>', 200)
+                ->header('Content-Type', 'text/xml');
+        } catch (\Throwable $e) {
+            Log::error('Wechat notify handling failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response('<xml><return_code><![CDATA[FAIL]]></return_code><return_msg><![CDATA[' . $e->getMessage() . ']]></return_msg></xml>', 200)
+                ->header('Content-Type', 'text/xml');
+        }
+    }
+
+    /**
+     * POST /api/v1/payment/notify/alipay
+     * 支付宝支付异步回调
+     */
+    public function alipayNotify(Request $request): Response
+    {
+        Log::info('Alipay pay notify received', [
+            'data' => $request->toArray(),
+        ]);
+
+        try {
+            $notifyData = $request->toArray();
+
+            $result = $this->paymentService->handleAlipayNotify($notifyData);
+
+            if ($result) {
+                // 返回支付宝成功的标识
+                return response('success', 200);
+            }
+
+            return response('fail', 200);
+        } catch (\Throwable $e) {
+            Log::error('Alipay notify handling failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response('fail', 200);
+        }
     }
 }

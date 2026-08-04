@@ -252,6 +252,16 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::get('withdraws', [V1\AdminController::class, 'withdraws']);
             Route::post('withdraws/{id}/audit', [V1\AdminController::class, 'withdrawAudit']);
 
+            // 用户余额管理
+            Route::get('user-balances', [V1\Admin\UserBalanceController::class, 'index']);
+            Route::get('user-balances/{userId}/logs', [V1\Admin\UserBalanceController::class, 'logs']);
+
+            // 支付流水
+            Route::get('payment-logs', [V1\Admin\UserBalanceController::class, 'paymentLogs']);
+
+            // 退款流水
+            Route::get('refund-logs', [V1\Admin\UserBalanceController::class, 'refundLogs']);
+
             // 文章管理
             Route::get('articles', [V1\AdminController::class, 'articles']);
             Route::post('articles', [V1\AdminController::class, 'articleStore']);

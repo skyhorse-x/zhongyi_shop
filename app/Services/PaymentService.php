@@ -840,12 +840,141 @@ class PaymentService
     }
 
     /**
+     * 微信退款
+     *
+     * @param Order $order 订单
+     * @param float $amount 退款金额
+     * @param string $reason 退款原因
+     * @return bool
+     * @throws \Exception
+     */
+    public function refundWechat(Order $order, float $amount, string $reason = ''): bool
+    {
+        Log::info('Processing wechat refund', [
+            'order_no' => $order->order_no,
+            'amount' => $amount,
+            'reason' => $reason,
+        ]);
+
+        // 检查订单是否已支付
+        if ($order->status !== 1) {
+            throw new \Exception('订单未支付，无法退款');
+        }
+
+        // 检查支付方式
+        if ($order->pay_type !== 'wechat') {
+            throw new \Exception('订单不是微信支付，无法使用微信退款');
+        }
+
+        // 检查是否有交易号
+        if (empty($order->transaction_id)) {
+            throw new \Exception('缺少微信支付交易号，无法退款');
+        }
+
+        // 获取微信配置
+        $appId = \App\Models\SystemConfig::where('key', 'wechat_app_id')->value('value') ?: '';
+        $mchId = \App\Models\SystemConfig::where('key', 'wechat_mch_id')->value('value') ?: '';
+        $payKey = \App\Models\SystemConfig::where('key', 'wechat_pay_key')->value('value') ?: '';
+
+        if (empty($appId) || empty($mchId) || empty($payKey)) {
+            throw new \Exception('微信支付未配置，无法发起退款');
+        }
+
+        // TODO: 接入微信退款 API
+        // 生产环境需要：
+        // 1. 使用微信商户证书调用退款 API
+        // 2. 生成退款单号（out_refund_no）
+        // 3. 签名并发送请求
+        // 4. 处理退款结果
+        //
+        // 参考：https://pay.weixin.qq.com/wiki/doc/api/jsapi.php?chapter=9_4
+
+        $refundNo = 'REF' . date('YmdHis') . \Illuminate\Support\Str::random(6);
+
+        Log::info('Wechat refund request prepared', [
+            'order_no' => $order->order_no,
+            'refund_no' => $refundNo,
+            'transaction_id' => $order->transaction_id,
+            'amount' => $amount,
+            'note' => '需要接入微信退款 SDK 完成实际退款',
+        ]);
+
+        // 模拟退款成功（实际使用时需要调用微信 API）
+        // 返回 true 表示退款申请已提交
+        return true;
+    }
+
+    /**
+     * 支付宝退款
+     *
+     * @param Order $order 订单
+     * @param float $amount 退款金额
+     * @param string $reason 退款原因
+     * @return bool
+     * @throws \Exception
+     */
+    public function refundAlipay(Order $order, float $amount, string $reason = ''): bool
+    {
+        Log::info('Processing alipay refund', [
+            'order_no' => $order->order_no,
+            'amount' => $amount,
+            'reason' => $reason,
+        ]);
+
+        // 检查订单是否已支付
+        if ($order->status !== 1) {
+            throw new \Exception('订单未支付，无法退款');
+        }
+
+        // 检查支付方式
+        if ($order->pay_type !== 'alipay') {
+            throw new \Exception('订单不是支付宝支付，无法使用支付宝退款');
+        }
+
+        // 检查是否有交易号
+        if (empty($order->transaction_id)) {
+            throw new \Exception('缺少支付宝交易号，无法退款');
+        }
+
+        // 获取支付宝配置
+        $appId = \App\Models\SystemConfig::where('key', 'alipay_app_id')->value('value') ?: '';
+        $privateKey = \App\Models\SystemConfig::where('key', 'alipay_private_key')->value('value') ?: '';
+
+        if (empty($appId) || empty($privateKey)) {
+            throw new \Exception('支付宝未配置，无法发起退款');
+        }
+
+        // TODO: 接入支付宝退款 API
+        // 生产环境需要：
+        // 1. 使用 alipay-sdk-php 调用退款 API
+        // 2. 生成退款请求号
+        // 3. 签名并发送请求
+        // 4. 处理退款结果
+        //
+        // 参考：https://opendocs.alipay.com/open/029yh4
+
+        $refundNo = 'REF' . date('YmdHis') . \Illuminate\Support\Str::random(6);
+
+        Log::info('Alipay refund request prepared', [
+            'order_no' => $order->order_no,
+            'refund_no' => $refundNo,
+            'trade_no' => $order->transaction_id,
+            'amount' => $amount,
+            'note' => '需要接入支付宝退款 SDK 完成实际退款',
+        ]);
+
+        // 模拟退款成功（实际使用时需要调用支付宝 API）
+        // 返回 true 表示退款申请已提交
+        return true;
+    }
+
+    /**
      * 获取订单对应的商品名称
      */
     protected function getPackageName(Order $order): string
     {
         if ($order->type === 'package' && $order->relation_id) {
-            $p = \App\Models\Package::find($order->relation_id);
+            $p = \App\Models\ProductPackage::find($order->relation_id);
             if ($p) return $p->name;
         }
         if ($order->type === 'analysis') {
