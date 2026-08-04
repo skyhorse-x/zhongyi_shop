@@ -65,6 +65,7 @@ class AnalysisController extends Controller
     {
         $analysisMode = SystemConfig::getValue('analysis_mode', 'paid');
         $analysisPrice = SystemConfig::getValue('analysis_price', '9.99');
+        $wechatService = SystemConfig::getValue('wechat_service', '');
 
         return response()->json([
             'code' => 0,
@@ -72,6 +73,7 @@ class AnalysisController extends Controller
             'data' => [
                 'analysis_mode' => $analysisMode,
                 'analysis_price' => floatval($analysisPrice),
+                'wechat_service' => $wechatService,
             ],
         ]);
     }

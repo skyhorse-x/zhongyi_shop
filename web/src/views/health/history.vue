@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
-import { User, Sunny } from '@element-plus/icons-vue'
+import { User, Sunny, Histogram } from '@element-plus/icons-vue'
 
 const router = useRouter()
 
@@ -68,7 +68,12 @@ const viewDetail = (record: AnalysisRecord) => {
     ElMessage.info('分析进行中，请稍后再查看')
     return
   }
-  router.push(`/analysis/result/${record.task_no}`)
+  // 根据类型跳转到不同的结果页面
+  if (record.type === 'constitution') {
+    router.push(`/constitution/result/${record.task_no}`)
+  } else {
+    router.push(`/analysis/result/${record.task_no}`)
+  }
 }
 
 const getStatusTagType = (status: number) => {
@@ -102,6 +107,7 @@ onMounted(() => {
         <div class="record-header">
           <div class="record-type">
             <el-icon v-if="record.type === 'face'" color="#07c160"><User /></el-icon>
+            <el-icon v-else-if="record.type === 'constitution'" color="#07c160"><Histogram /></el-icon>
             <el-icon v-else color="#07c160"><Sunny /></el-icon>
             <span>{{ record.type_name }}</span>
           </div>

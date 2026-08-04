@@ -38,6 +38,9 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
     // 闲鱼充值商品（公开访问，用于前台充值页展示）
     Route::get('xianyu/products', [V1\XianyuProductController::class, 'index']);
 
+    // 分析配置（公开访问，用于前台获取微信客服等配置）
+    Route::get('analysis/config', [V1\AnalysisController::class, 'getConfig']);
+
     // ===== 需要登录的接口 =====
         Route::middleware('auth.or.admin')->group(function () {
 
@@ -63,7 +66,6 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
 
         // AI分析
         Route::prefix('analysis')->group(function () {
-            Route::get('config', [V1\AnalysisController::class, 'getConfig']);
             Route::post('upload-url', [V1\AnalysisController::class, 'getUploadUrl']);
             Route::post('upload-image', [V1\AnalysisController::class, 'uploadImage']);
             Route::post('submit', [V1\AnalysisController::class, 'submit']);
@@ -231,6 +233,12 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             // AI提示词管理
             Route::get('ai/prompts', [V1\Admin\PromptController::class, 'index']);
             Route::put('ai/prompts/{id}', [V1\Admin\PromptController::class, 'update']);
+
+            // 健康管理档案
+            Route::get('health-archives/stats', [V1\Admin\HealthArchiveController::class, 'stats']);
+            Route::get('health-archives', [V1\Admin\HealthArchiveController::class, 'index']);
+            Route::get('health-archives/{id}', [V1\Admin\HealthArchiveController::class, 'show']);
+            Route::delete('health-archives/{id}', [V1\Admin\HealthArchiveController::class, 'destroy']);
 
             // 推广管理
             Route::get('promoters', [V1\AdminController::class, 'promoters']);

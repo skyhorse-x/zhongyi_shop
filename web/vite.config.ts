@@ -31,7 +31,8 @@ export default defineConfig(({ mode }) => {
     },
 
     build: {
-      outDir: 'dist',
+      outDir: '../public',
+      emptyOutDir: true,
       sourcemap: false,
       chunkSizeWarningLimit: 1500,
       rollupOptions: {

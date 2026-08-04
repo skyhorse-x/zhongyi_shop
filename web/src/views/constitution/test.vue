@@ -101,24 +101,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 免责声明 -->
-    <div class="disclaimer-section">
-      <el-alert
-        title="免责声明"
-        type="warning"
-        :closable="false"
-        show-icon
-      >
-        <template #default>
-          <div class="disclaimer-content">
-            <p>1. 本测试结果仅供参考，不能作为医疗诊断依据。</p>
-            <p>2. 如有健康问题，请咨询专业医疗机构或医师。</p>
-            <p>3. 体质调理建议在专业医师指导下进行。</p>
-          </div>
-        </template>
-      </el-alert>
-    </div>
-
+    <!-- 题目列表 -->
     <div class="question-list" v-loading="loading && questions.length === 0">
       <div v-if="questions.length === 0" class="empty-state">
         <el-empty description="暂无题目" />
@@ -148,6 +131,24 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- 免责声明 -->
+    <div class="disclaimer-section">
+      <el-alert
+        title="免责声明"
+        type="warning"
+        :closable="false"
+        show-icon
+      >
+        <template #default>
+          <div class="disclaimer-content">
+            <p>1. 本测试结果仅供参考，不能作为医疗诊断依据。</p>
+            <p>2. 如有健康问题，请咨询专业医疗机构或医师。</p>
+            <p>3. 体质调理建议在专业医师指导下进行。</p>
+          </div>
+        </template>
+      </el-alert>
+    </div>
+
     <div class="submit-section" v-if="questions.length > 0">
       <div class="submit-tip" v-if="!isAllAnswered">
         还未完成全部题目（{{ Object.keys(answers).length }} / {{ questions.length }}）
@@ -170,9 +171,10 @@ onMounted(() => {
 <style scoped>
 .constitution-test-page {
   padding: 16px;
-  padding-bottom: 140px;
+  padding-bottom: 32px;
   min-height: 100vh;
   background: #f7f8fa;
+  box-sizing: border-box;
 }
 
 .test-header {
@@ -271,15 +273,13 @@ onMounted(() => {
   background: #f6fdf9;
 }
 
+.question-card:last-child {
+  margin-bottom: 0;
+}
+
 .submit-section {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 12px 16px 16px;
-  background: #fff;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
-  z-index: 100;
+  margin-top: 24px;
+  padding: 0 0 16px;
 }
 
 .submit-tip {
@@ -321,7 +321,7 @@ onMounted(() => {
 
 /* 免责声明 */
 .disclaimer-section {
-  margin: 16px 0;
+  margin: 24px 0 16px;
 }
 
 .disclaimer-content {

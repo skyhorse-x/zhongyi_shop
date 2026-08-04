@@ -395,8 +395,114 @@ const handleRetry = () => {
   startPolling()
 }
 
-const handleShare = () => {
-  ElMessage.success('分享链接已复制到剪贴板')
+// 分享到社交平台
+const handleShare = async () => {
+  downloading.value = true
+  try {
+    if (!exportRef.value || !result.value) {
+      ElMessage.error('报告未加载完成')
+      return
+    }
+
+    // 等待 DOM 渲染完成
+    await nextTick()
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    const canvas = await html2canvas(exportRef.value, {
+      backgroundColor: '#f0f9f4',
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      windowWidth: exportRef.value.scrollWidth,
+      windowHeight: exportRef.value.scrollHeight,
+    })
+
+    const dataUrl = canvas.toDataURL('image/png', 1.0)
+
+    // 检查是否支持 Web Share API
+    if (navigator.share && navigator.canShare) {
+      const response = await fetch(dataUrl)
+      const blob = await response.blob()
+      const file = new File([blob], `${result.value.title}-${taskNo.value}.png`, { type: 'image/png' })
+
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: result.value.title,
+          text: `${result.value.title} - 健康评分：${result.value.healthScore}分`,
+          files: [file],
+        })
+        ElMessage.success('分享成功')
+        return
+      }
+    }
+
+    // 不支持 Web Share API，显示分享选项
+    showShareOptions(dataUrl)
+  } catch (e: any) {
+    if (e.name !== 'AbortError') {
+      console.error('分享失败:', e)
+      ElMessage.error('分享失败')
+    }
+  } finally {
+    downloading.value = false
+  }
+}
+
+// 显示分享选项
+const showShareOptions = (dataUrl: string) => {
+  const shareText = `${result.value?.title} - 健康评分：${result.value?.healthScore}分`
+  const shareUrl = window.location.href
+
+  const weiboUrl = `https://service.weibo.com/share/share.php?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(shareText)}`
+  const qqUrl = `https://connect.qq.com/widget/shareqq/index.html?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(shareText)}`
+
+  const shareOptions = [
+    { name: '新浪微博', url: weiboUrl, icon: '🔗' },
+    { name: 'QQ', url: qqUrl, icon: '💬' },
+    { name: '下载图片', url: '', icon: '📷', action: 'download' },
+  ]
+
+  const modal = document.createElement('div')
+  modal.className = 'share-modal'
+  modal.innerHTML = `
+    <div class="share-modal-overlay">
+      <div class="share-modal-content">
+        <div class="share-modal-title">分享到</div>
+        <div class="share-modal-options">
+          ${shareOptions.map(opt => `
+            <div class="share-option" data-url="${opt.url}" data-action="${opt.action || ''}">
+              <span class="share-option-icon">${opt.icon}</span>
+              <span class="share-option-name">${opt.name}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="share-modal-cancel">取消</div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+
+  modal.querySelectorAll('.share-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const url = (opt as HTMLElement).dataset.url
+      const action = (opt as HTMLElement).dataset.action
+      if (action === 'download') {
+        const link = document.createElement('a')
+        link.download = `${result.value?.title}-${taskNo.value}.png`
+        link.href = dataUrl
+        link.click()
+        ElMessage.success('图片已下载')
+      } else if (url) {
+        window.open(url, '_blank', 'width=600,height=500')
+      }
+      modal.remove()
+    })
+  })
+
+  modal.querySelector('.share-modal-overlay')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) modal.remove()
+  })
 }
 
 // 下载文本报告
@@ -487,15 +593,21 @@ onUnmounted(() => {
         <el-icon class="loading-icon" :size="40"><Loading /></el-icon>
       </div>
       <div class="loading-text">
-        <template v-if="taskStatus === 0">正在排队处理...</template>
+        <template v-if="taskStatus === 0">AI 分析中，请稍候...</template>
         <template v-else-if="taskStatus === 1">AI 分析中，请稍候...</template>
         <template v-else>加载中...</template>
       </div>
-      <div class="loading-tip">预计等待时间：30 秒</div>
+      <div class="loading-tip">正在为您生成分析报告</div>
     </div>
 
     <!-- 结果内容 -->
     <div v-else-if="result" class="result-content">
+      <!-- 顶部免责声明 -->
+      <div class="disclaimer-top">
+        <el-icon class="disclaimer-icon"><InfoFilled /></el-icon>
+        <span class="disclaimer-text">本报告基于 AI 舌象分析，仅供参考，不能替代专业医生诊断。</span>
+      </div>
+
       <!-- 顶部报告卡片 -->
       <div class="report-header">
         <div class="header-top">
@@ -656,12 +768,12 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- 温馨提示 -->
-      <div class="warm-tip">
+      <!-- 温馨提示（醒目提示） -->
+      <div class="warm-tip warm-tip--warning">
         <el-icon class="tip-icon"><InfoFilled /></el-icon>
         <div class="tip-content">
           <div class="tip-title">温馨提示</div>
-          <div class="tip-text">本报告由 AI 智能分析生成，仅供参考，不能替代专业医生的诊断和治疗。如有严重症状，请及时就医。</div>
+          <div class="tip-text">本报告基于舌象图片 AI 分析，仅用于传统健康管理参考，不能替代医生诊断。如有持续不适，请咨询专业医生。</div>
         </div>
       </div>
 
@@ -863,6 +975,30 @@ onUnmounted(() => {
   color: #969799;
 }
 
+/* 顶部免责声明 */
+.disclaimer-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #fff7e6 0%, #fff2d9 100%);
+  border: 1px solid #ffe4a3;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.disclaimer-icon {
+  color: #e6a23c;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.disclaimer-text {
+  font-size: 13px;
+  color: #8a6d3b;
+  line-height: 1.5;
+}
+
 /* 顶部报告卡片 */
 .report-header {
   background: #fff;
@@ -938,6 +1074,7 @@ onUnmounted(() => {
   gap: 4px;
   font-size: 12px;
   color: #969799;
+  margin-top: 8px;
 }
 
 .header-actions {
@@ -957,6 +1094,97 @@ onUnmounted(() => {
 .header-actions :deep(.el-button:hover) {
   background: #07c160;
   color: #fff;
+}
+
+/* 分享弹窗 */
+.share-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+}
+
+.share-modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.share-modal-content {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  max-width: 500px;
+  padding: 20px 20px 32px;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.share-modal-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #1a1a1a;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.share-modal-options {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 20px;
+}
+
+.share-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 12px 20px;
+  border-radius: 12px;
+  transition: background 0.2s;
+}
+
+.share-option:hover {
+  background: #f5f5f5;
+}
+
+.share-option-icon {
+  font-size: 32px;
+}
+
+.share-option-name {
+  font-size: 13px;
+  color: #646566;
+}
+
+.share-modal-cancel {
+  text-align: center;
+  font-size: 16px;
+  color: #969799;
+  padding: 12px;
+  cursor: pointer;
+  border-top: 1px solid #f0f0f0;
+}
+
+.share-modal-cancel:hover {
+  color: #646566;
 }
 
 /* 评分区域 */
@@ -998,7 +1226,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-direction: row;
+  flex-direction: column;
   gap: 2px;
 }
 
@@ -1009,9 +1237,9 @@ onUnmounted(() => {
 }
 
 .score-unit {
-  font-size: 16px;
-  color: #969799;
-  margin-top: 12px;
+  font-size: 14px;
+  color: #646566;
+  line-height: 1;
 }
 
 .score-detail {
@@ -1241,6 +1469,23 @@ onUnmounted(() => {
   border: 1px solid #ffe4a3;
 }
 
+.warm-tip--warning {
+  background: linear-gradient(135deg, #fef0f0 0%, #fde2e2 100%);
+  border: 1px solid #f5c6c6;
+  box-shadow: 0 2px 12px rgba(245, 108, 108, 0.1);
+}
+
+.warm-tip--warning .tip-icon {
+  color: #f56c6c;
+  font-size: 22px;
+}
+
+.warm-tip--warning .tip-title {
+  color: #d32f2f;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
 .tip-icon {
   font-size: 20px;
   flex-shrink: 0;
@@ -1307,6 +1552,7 @@ onUnmounted(() => {
   padding: 20px;
   margin-bottom: 16px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f0f0f0;
 }
 
 .score-reason-title {
@@ -1326,38 +1572,42 @@ onUnmounted(() => {
 
 .score-reason-list {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .score-reason-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 14px;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
 }
 
 .score-reason-item.positive {
-  background: #f0f9f4;
+  background: #e8f7ef;
   color: #07c160;
+  border: 1px solid #b3e4c8;
 }
 
 .score-reason-item.negative {
   background: #fef0f0;
   color: #f56c6c;
+  border: 1px solid #f5c6c6;
 }
 
 .score-reason-icon {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
   flex-shrink: 0;
 }
 
@@ -1372,8 +1622,7 @@ onUnmounted(() => {
 }
 
 .score-reason-text {
-  flex: 1;
-  color: #323233;
+  line-height: 1;
 }
 
 /* AI置信度 */
@@ -1515,6 +1764,9 @@ onUnmounted(() => {
 .export-title-area {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .export-title {
@@ -1596,7 +1848,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-direction: row;
+  flex-direction: column;
   gap: 2px;
 }
 
@@ -1608,8 +1860,8 @@ onUnmounted(() => {
 
 .export-score-unit {
   font-size: 14px;
-  color: #969799;
-  margin-top: 10px;
+  color: #646566;
+  line-height: 1;
 }
 
 .export-score-info {

@@ -83,6 +83,34 @@ class ProcessAnalysisJob implements ShouldQueue
                 'completed_at' => now(),
             ]);
 
+            // 创建健康档案报告
+            $content = $result['content'] ?? '';
+            $reportData = [
+                'task_id' => $task->id,
+                'user_id' => $task->user_id,
+                'type' => $task->type,
+                'health_score' => $this->calculateHealthScore($content),
+                'summary' => $this->extractSummary($content),
+                'content' => ['text' => $content],
+                'is_paid' => $task->is_paid ?? false,
+            ];
+
+            // 根据类型提取特定的分析字段
+            if ($task->type === 'tongue') {
+                $reportData['tongue_color'] = $this->extractField($content, '舌色');
+                $reportData['tongue_shape'] = $this->extractField($content, '舌形');
+                $reportData['tongue_coating'] = $this->extractField($content, '舌苔');
+                $reportData['sublingual_vein'] = $this->extractField($content, '舌下');
+                $reportData['tongue_analysis'] = $content;
+            } elseif ($task->type === 'face') {
+                $reportData['face_color'] = $this->extractField($content, '面色');
+                $reportData['lip_color'] = $this->extractField($content, '唇色');
+                $reportData['eye_analysis'] = $this->extractField($content, '眼部');
+                $reportData['face_analysis'] = $content;
+            }
+
+            \App\Models\AnalysisReport::create($reportData);
+
             Log::info('Analysis task completed', [
                 'task_no' => $task->task_no,
                 'type' => $task->type,
@@ -161,5 +189,23 @@ class ProcessAnalysisJob implements ShouldQueue
         }
 
         return $score;
+    }
+
+    /**
+     * 从AI分析内容中提取指定字段的值
+     */
+    protected function extractField(string $content, string $fieldName): string
+    {
+        // 匹配 "- 字段名：值" 或 "- 字段名:值" 格式
+        $pattern = '/[-•]\s*' . preg_quote($fieldName, '/') . '[：:]\s*(.+)/u';
+        if (preg_match($pattern, $content, $matches)) {
+            return trim($matches[1]);
+        }
+        // 匹配 "字段名：值" 格式
+        $pattern2 = '/' . preg_quote($fieldName, '/') . '[：:]\s*(.+)/u';
+        if (preg_match($pattern2, $content, $matches)) {
+            return trim($matches[1]);
+        }
+        return '';
     }
 }

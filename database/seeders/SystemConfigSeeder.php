@@ -17,11 +17,16 @@ class SystemConfigSeeder extends Seeder
             ['key' => 'site_name', 'value' => 'AI中医健康管理', 'name' => '站点名称', 'group_name' => 'basic', 'type' => 'text', 'remark' => '网站显示的名称'],
             ['key' => 'site_description', 'value' => '智能分析 · 科学养生 · 守护健康', 'name' => '站点描述', 'group_name' => 'basic', 'type' => 'textarea', 'remark' => '网站描述信息'],
             ['key' => 'admin_email', 'value' => 'admin@tcm.com', 'name' => '管理员邮箱', 'group_name' => 'basic', 'type' => 'text', 'remark' => '接收系统通知的邮箱'],
+            ['key' => 'wechat_service', 'value' => '', 'name' => '微信客服', 'group_name' => 'basic', 'type' => 'text', 'remark' => '微信号或客服二维码链接'],
 
             // 费用设置
             ['key' => 'analysis_mode', 'value' => 'paid', 'name' => '分析模式', 'group_name' => 'fee', 'type' => 'select', 'remark' => '付费分析或免费分析'],
             ['key' => 'analysis_price', 'value' => '9.99', 'name' => '单次分析价格', 'group_name' => 'fee', 'type' => 'number', 'remark' => '用户单次AI分析收费（元）'],
             ['key' => 'ai_cost_per_time', 'value' => '0.05', 'name' => 'AI分析成本', 'group_name' => 'fee', 'type' => 'number', 'remark' => '每次AI调用成本（元）'],
+            ['key' => 'tongue_points', 'value' => '1', 'name' => '舌诊分析积分', 'group_name' => 'fee', 'type' => 'number', 'remark' => '每次舌诊分析消耗的积分数'],
+            ['key' => 'face_points', 'value' => '1', 'name' => '面诊分析积分', 'group_name' => 'fee', 'type' => 'number', 'remark' => '每次面诊分析消耗的积分数'],
+            ['key' => 'constitution_points', 'value' => '1', 'name' => '体质分析积分', 'group_name' => 'fee', 'type' => 'number', 'remark' => '每次体质分析消耗的积分数'],
+            ['key' => 'qa_points', 'value' => '1', 'name' => '健康问答积分', 'group_name' => 'fee', 'type' => 'number', 'remark' => '每次健康问答消耗的积分数'],
 
             // 推广返利设置
             ['key' => 'commission_rate', 'value' => '15', 'name' => '推广佣金比例', 'group_name' => 'promotion', 'type' => 'number', 'remark' => '推广员佣金百分比（%）'],

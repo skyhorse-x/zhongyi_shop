@@ -22,6 +22,7 @@ const menuItems = shallowRef([
   { title: '次数包管理', icon: Goods, path: '/admin/packages' },
   { title: '闲鱼商品管理', icon: Goods, path: '/admin/xianyu-products' },
   { title: 'AI管理', icon: Cpu, path: '/admin/ai' },
+  { title: '健康管理档案', icon: FirstAidKit, path: '/admin/health-archives' },
   { title: '推广管理', icon: Promotion, path: '/admin/promoters' },
   { title: '提现审核', icon: Money, path: '/admin/withdraws' },
   { title: '文章管理', icon: Document, path: '/admin/articles' },

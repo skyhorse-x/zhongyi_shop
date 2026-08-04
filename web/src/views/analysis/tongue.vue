@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { CameraFilled, ChatLineRound, Delete, User } from '@element-plus/icons-vue'
+import { CameraFilled, ChatLineRound, Delete, User, ArrowDown, ArrowUp } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
@@ -19,6 +19,10 @@ const aiText = ref('')
 const analysisTimes = ref(0)
 const gender = ref<number | null>(null)
 const age = ref<number | null>(null)
+const textExpanded = ref(false) // 症状描述是否展开
+
+// 年龄选项 1-100岁
+const ageOptions = Array.from({ length: 100 }, (_, i) => i + 1)
 
 import { getToken } from '@/utils/auth'
 
@@ -100,16 +104,16 @@ const submitAnalysis = async (imageUrls: string[], type: 'tongue' | 'face', text
 }
 
 const handleSubmit = async () => {
+  if (imageList.value.length === 0) {
+    ElMessage.warning('请至少上传一张舌头照片')
+    return
+  }
   if (!gender.value) {
     ElMessage.warning('请选择性别')
     return
   }
   if (!age.value || age.value <= 0) {
-    ElMessage.warning('请输入年龄')
-    return
-  }
-  if (imageList.value.length === 0 && !aiText.value.trim()) {
-    ElMessage.warning('请至少上传一张舌头照片或输入症状描述')
+    ElMessage.warning('请选择年龄')
     return
   }
   loading.value = true
@@ -124,7 +128,7 @@ const handleSubmit = async () => {
     // 2. 提交分析任务
     const taskNo = await submitAnalysis(uploadedUrls, 'tongue', aiText.value, gender.value, age.value)
 
-    ElMessage.success('分析任务已提交，正在处理中...')
+    // 直接跳转到分析结果页面
     router.push(`/analysis/result/${taskNo}`)
   } catch (e: any) {
     const msg = e.message || '提交失败'
@@ -151,46 +155,10 @@ onMounted(() => {
 
 <template>
   <div class="tongue-page" v-loading="loading">
-    <!-- 基本信息（必填） -->
-    <div class="profile-section">
-      <div class="ai-text-header">
-        <el-icon><User /></el-icon>
-        <span>基本信息 <span class="required-tip">*</span></span>
-      </div>
-      <div class="profile-row">
-        <span class="profile-label">性别</span>
-        <el-radio-group v-model="gender">
-          <el-radio :value="1">男</el-radio>
-          <el-radio :value="2">女</el-radio>
-        </el-radio-group>
-      </div>
-      <div class="profile-row">
-        <span class="profile-label">年龄</span>
-        <el-input v-model="age" type="number" min="1" max="150" placeholder="请输入年龄" style="width: 120px;" />
-      </div>
-    </div>
-
-    <!-- AI 文本输入框 -->
-    <div class="ai-text-section">
-      <div class="ai-text-header">
-        <el-icon><ChatLineRound /></el-icon>
-        <span>症状描述 <span class="required-tip">*</span></span>
-      </div>
-      <el-input
-        v-model="aiText"
-        type="textarea"
-        :rows="4"
-        placeholder="请详细描述您的症状（如：最近睡眠不好、口干、舌苔发白等），AI将根据您的描述进行分析..."
-        resize="none"
-        maxlength="500"
-        show-word-limit
-      />
-    </div>
-
-    <!-- 图片上传区域（可选） -->
+    <!-- 图片上传区域（必填） -->
     <div class="upload-section">
       <div class="upload-tip">
-        <span class="optional-tag">可选</span> 拍摄清晰的舌头照片可获得更精准的分析结果
+        <span class="required-tag">必填</span> 拍摄清晰的舌头照片，至少上传一张
       </div>
       
       <!-- 多张图片预览（展示在上传按钮前面） -->
@@ -212,22 +180,75 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- 上传按钮 -->
       <el-upload
+        ref="uploadRef"
+        action="#"
         :auto-upload="false"
-        accept="image/*"
-        capture="environment"
+        :on-change="handleFileChange"
+        :on-remove="handleRemove"
         :show-file-list="false"
-        @change="handleFileChange"
+        accept="image/*"
         multiple
       >
-        <template #trigger>
-          <div class="upload-area">
-            <el-icon :size="48"><CameraFilled /></el-icon>
-            <div class="upload-text">点击拍摄或上传</div>
-            <div class="upload-hint">已上传 {{ imageList.length }} 张</div>
-          </div>
-        </template>
+        <div class="upload-trigger">
+          <el-icon class="upload-icon"><CameraFilled /></el-icon>
+          <span class="upload-text">{{ imageList.length > 0 ? '继续添加照片' : '点击上传舌头照片' }}</span>
+          <span class="upload-hint">支持多张上传，建议拍摄舌面、舌侧</span>
+        </div>
       </el-upload>
+    </div>
+
+    <!-- 基本信息（必填） -->
+    <div class="profile-section">
+      <div class="ai-text-header">
+        <el-icon><User /></el-icon>
+        <span>基本信息 <span class="required-tip">*</span></span>
+      </div>
+      <div class="profile-row">
+        <span class="profile-label">性别</span>
+        <el-radio-group v-model="gender">
+          <el-radio :value="1">男</el-radio>
+          <el-radio :value="2">女</el-radio>
+        </el-radio-group>
+      </div>
+      <div class="profile-row">
+        <span class="profile-label">年龄</span>
+        <el-select v-model="age" placeholder="请选择年龄" style="width: 120px;">
+          <el-option
+            v-for="ageVal in ageOptions"
+            :key="ageVal"
+            :label="ageVal + '岁'"
+            :value="ageVal"
+          />
+        </el-select>
+      </div>
+    </div>
+
+    <!-- AI 文本输入框（可折叠） -->
+    <div class="ai-text-section">
+      <div class="ai-text-header" @click="textExpanded = !textExpanded" style="cursor: pointer;">
+        <el-icon><ChatLineRound /></el-icon>
+        <span>症状描述</span>
+        <span class="optional-tag">可选</span>
+        <el-icon class="expand-icon" :class="{ expanded: textExpanded }">
+          <ArrowDown />
+        </el-icon>
+      </div>
+      <div v-show="textExpanded" class="ai-text-content">
+        <el-input
+          v-model="aiText"
+          type="textarea"
+          :rows="4"
+          placeholder="请详细描述您的症状（如：最近睡眠不好、口干、舌苔发白等），AI将根据您的描述进行分析..."
+          resize="none"
+          maxlength="500"
+          show-word-limit
+        />
+      </div>
+      <div v-if="!textExpanded" class="ai-text-hint">
+        点击展开输入症状描述（可选，已上传照片可不填）
+      </div>
     </div>
 
     <!-- 免责声明 -->
@@ -311,6 +332,39 @@ onMounted(() => {
   color: #60a5fa;
 }
 
+.expand-icon {
+  margin-left: auto;
+  transition: transform 0.3s;
+}
+
+.expand-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.ai-text-hint {
+  font-size: 13px;
+  color: #969799;
+  padding: 12px;
+  background: #f7f8fa;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.ai-text-content {
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 200px;
+  }
+}
+
 .upload-section {
   margin-bottom: 24px;
 }
@@ -326,6 +380,17 @@ onMounted(() => {
   display: inline-block;
   background: #e8f7ef;
   color: #07c160;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-right: 6px;
+  font-weight: 500;
+}
+
+.required-tag {
+  display: inline-block;
+  background: #fef0f0;
+  color: #f56c6c;
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 4px;

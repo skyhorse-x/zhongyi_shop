@@ -53,6 +53,6 @@ class AnalysisTask extends Model
 
     public function report(): HasOne
     {
-        return $this->hasOne(AnalysisReport::class);
+        return $this->hasOne(AnalysisReport::class, 'task_id');
     }
 }

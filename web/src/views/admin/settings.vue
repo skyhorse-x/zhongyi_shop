@@ -11,10 +11,16 @@ const form = ref({
   siteDescription: '',
   siteUrl: '',
   adminEmail: '',
+  wechatService: '', // 微信客服
   // 费用设置
   analysisMode: 'paid',
   analysisPrice: 9.99,
   aiCostPerTime: 0.05,
+  // 各分析类型积分消耗
+  tonguePoints: 1,
+  facePoints: 1,
+  constitutionPoints: 1,
+  qaPoints: 1,
   // 新用户注册赠送
   freeAnalysisTimes: 3,
   // 推广返利设置
@@ -155,9 +161,14 @@ const loadConfigs = async () => {
             site_description: 'siteDescription',
             site_url: 'siteUrl',
             admin_email: 'adminEmail',
+            wechat_service: 'wechatService',
             analysis_mode: 'analysisMode',
             analysis_price: 'analysisPrice',
             ai_cost_per_time: 'aiCostPerTime',
+            tongue_points: 'tonguePoints',
+            face_points: 'facePoints',
+            constitution_points: 'constitutionPoints',
+            qa_points: 'qaPoints',
             user_free_analysis_times: 'freeAnalysisTimes',
             commission_rate: 'commissionRate',
             commission_min_amount: 'commissionMinAmount',
@@ -210,9 +221,14 @@ const handleSave = async () => {
       site_description: form.value.siteDescription,
       site_url: form.value.siteUrl,
       admin_email: form.value.adminEmail,
+      wechat_service: form.value.wechatService,
       analysis_mode: form.value.analysisMode,
       analysis_price: form.value.analysisPrice,
       ai_cost_per_time: form.value.aiCostPerTime,
+      tongue_points: form.value.tonguePoints,
+      face_points: form.value.facePoints,
+      constitution_points: form.value.constitutionPoints,
+      qa_points: form.value.qaPoints,
       user_free_analysis_times: form.value.freeAnalysisTimes,
       commission_rate: form.value.commissionRate,
       commission_min_amount: form.value.commissionMinAmount,
@@ -315,6 +331,10 @@ onMounted(() => {
           <el-form-item label="管理员邮箱">
             <el-input v-model="form.adminEmail" placeholder="请输入管理员邮箱" />
           </el-form-item>
+          <el-form-item label="微信客服">
+            <el-input v-model="form.wechatService" placeholder="请输入微信号或客服二维码链接" />
+            <div class="form-tip">用户可在充值页面联系客服，微信号或二维码图片链接</div>
+          </el-form-item>
         </el-form>
       </el-tab-pane>
 
@@ -334,15 +354,33 @@ onMounted(() => {
             </el-radio-group>
             <div class="form-tip">付费分析需要用户支付费用，免费分析无需支付</div>
           </el-form-item>
-          <el-form-item label="单次分析价格" v-if="form.analysisMode === 'paid'">
-            <el-input-number v-model="form.analysisPrice" :min="0" :precision="2" style="width: 200px" />
-            <span class="form-unit">元</span>
-            <span class="form-tip">用户单次AI分析收费</span>
-          </el-form-item>
           <el-form-item label="新用户注册赠送">
             <el-input-number v-model="form.freeAnalysisTimes" :min="0" :max="1000" style="width: 200px" />
-            <span class="form-unit">次</span>
-            <span class="form-tip">每个新注册用户自动获得的免费分析次数（0 = 不赠送）</span>
+            <span class="form-unit">积分</span>
+            <span class="form-tip">每个新注册用户自动获得的免费分析积分（0 = 不赠送）</span>
+          </el-form-item>
+          
+          <el-divider />
+          <h4 style="margin: 16px 0; color: #333;">各分析类型积分消耗设置</h4>
+          <el-form-item label="舌诊分析积分">
+            <el-input-number v-model="form.tonguePoints" :min="1" :max="100" style="width: 200px" />
+            <span class="form-unit">积分</span>
+            <span class="form-tip">每次舌诊分析消耗的积分数</span>
+          </el-form-item>
+          <el-form-item label="面诊分析积分">
+            <el-input-number v-model="form.facePoints" :min="1" :max="100" style="width: 200px" />
+            <span class="form-unit">积分</span>
+            <span class="form-tip">每次面诊分析消耗的积分数</span>
+          </el-form-item>
+          <el-form-item label="体质分析积分">
+            <el-input-number v-model="form.constitutionPoints" :min="1" :max="100" style="width: 200px" />
+            <span class="form-unit">积分</span>
+            <span class="form-tip">每次体质分析消耗的积分数</span>
+          </el-form-item>
+          <el-form-item label="健康问答积分">
+            <el-input-number v-model="form.qaPoints" :min="1" :max="100" style="width: 200px" />
+            <span class="form-unit">积分</span>
+            <span class="form-tip">每次健康问答消耗的积分数</span>
           </el-form-item>
         </el-form>
       </el-tab-pane>

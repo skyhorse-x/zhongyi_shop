@@ -21,6 +21,7 @@ const loading = ref(false)
 const products = ref<XianyuProduct[]>([])
 const analysisTimes = ref(0)
 const systemLink = ref('')
+const wechatService = ref('') // 微信客服
 
 // 获取当前剩余分析次数
 const fetchUserInfo = async () => {
@@ -37,6 +38,21 @@ const fetchUserInfo = async () => {
     }
   } catch (e) {
     console.error('获取用户信息失败:', e)
+  }
+}
+
+// 获取微信客服配置
+const fetchWechatService = async () => {
+  try {
+    const res = await safeFetch('/api/v1/analysis/config', {
+      headers: { 'Accept': 'application/json' },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      wechatService.value = data.data?.wechat_service || ''
+    }
+  } catch (e) {
+    console.error('获取微信客服配置失败:', e)
   }
 }
 
@@ -91,12 +107,13 @@ const goBuy = (item: XianyuProduct) => {
 
 // 复制客服微信号
 const copyWechat = async () => {
+  const text = wechatService.value || '暂无客服信息'
   try {
-    await navigator.clipboard.writeText('TCM2026888')
+    await navigator.clipboard.writeText(text)
     ElMessage.success('微信号已复制')
   } catch {
     const input = document.createElement('input')
-    input.value = 'TCM2026888'
+    input.value = text
     document.body.appendChild(input)
     input.select()
     document.execCommand('copy')
@@ -108,6 +125,7 @@ const copyWechat = async () => {
 onMounted(() => {
   fetchUserInfo()
   fetchProducts()
+  fetchWechatService()
 })
 </script>
 
@@ -178,10 +196,14 @@ onMounted(() => {
       </div>
       <div class="contact-body">
         <div class="contact-tip">如闲鱼购买遇到问题，或需要其他充值方式，请添加客服微信：</div>
-        <div class="wechat-id">
+        <div v-if="wechatService" class="wechat-id">
           <el-icon><ChatLineRound /></el-icon>
-          <span>TCM2026888</span>
+          <span>{{ wechatService }}</span>
           <el-button link type="primary" size="small" @click="copyWechat">复制</el-button>
+        </div>
+        <div v-else class="wechat-id wechat-empty">
+          <el-icon><ChatLineRound /></el-icon>
+          <span>客服暂未配置，请联系管理员</span>
         </div>
       </div>
     </div>
@@ -471,5 +493,11 @@ onMounted(() => {
   font-weight: 600;
   color: #1a1a1a;
   letter-spacing: 0.5px;
+}
+
+.wechat-empty span {
+  color: #969799;
+  font-weight: 400;
+  font-size: 14px;
 }
 </style>
