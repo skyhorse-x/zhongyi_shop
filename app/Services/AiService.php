@@ -325,6 +325,9 @@ class AiService
                         ];
                         continue;
                     }
+                    // Base64转换失败，跳过这张图片（不发送给AI）
+                    Log::warning('Skip image due to base64 conversion failure', ['url' => $url]);
+                    continue;
                 }
                 $content[] = [
                     'type' => 'image_url',

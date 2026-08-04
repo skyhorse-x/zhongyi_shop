@@ -100,8 +100,8 @@ const isWeChat = computed(() => {
 // 是否显示顶部导航栏（微信环境下隐藏）
 const showNavbar = computed(() => !isWeChat.value)
 
-// 是否显示底部Tab栏（微信环境下隐藏）
-const showTabBar = computed(() => !isWeChat.value)
+// 是否显示底部Tab栏（始终显示）
+const showTabBar = computed(() => true)
 </script>
 
 <template>
@@ -332,8 +332,6 @@ const showTabBar = computed(() => !isWeChat.value)
 /* 内容区域 */
 .mini-content {
   flex: 1;
-  padding: 12px;
-  padding-bottom: 12px;
   overflow-y: auto;
 }
 
