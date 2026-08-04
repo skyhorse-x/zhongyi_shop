@@ -1,7 +1,7 @@
 # 性能设计
 
-> **版本**：v1.0  
-> **日期**：2026-07-28  
+> **版本**：v2.0  
+> **日期**：2026-08-04  
 > **对应 ai.md 阶段**：第九阶段（性能设计）
 
 ---
@@ -12,68 +12,34 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                      CDN缓存                             │
-│              静态资源、图片、JS/CSS                      │
+│                   浏览器缓存                             │
+│              静态资源、LocalStorage                      │
 ├─────────────────────────────────────────────────────────┤
-│                    Nginx缓存                             │
-│              页面缓存、代理缓存                          │
-├─────────────────────────────────────────────────────────┤
-│                    Redis缓存                             │
-│              数据缓存、会话、限流                        │
-├─────────────────────────────────────────────────────────┤
-│                  应用缓存                                │
-│              配置缓存、路由缓存                          │
+│                  应用缓存（文件缓存）                     │
+│              配置缓存、路由缓存、数据缓存                 │
 ├─────────────────────────────────────────────────────────┤
 │                  数据库缓存                              │
 │              查询缓存、连接池                            │
 └─────────────────────────────────────────────────────────┘
 ```
 
+> **说明**：当前使用 **文件缓存驱动**（`CACHE_DRIVER=file`），未使用 Redis。后续可根据需要切换为 Redis。
+
 ### 1.2 缓存数据清单
 
 | 数据 | 缓存方式 | 过期时间 | 更新策略 |
 |------|---------|---------|---------|
-| 用户信息 | Redis Hash | 1小时 | 更新时清除 |
-| 分析报告 | Redis String | 24小时 | 生成时写入 |
-| AI分析结果(图片MD5) | Redis String | 7天 | 分析时写入 |
-| 系统配置 | Redis String | 永久 | 更新时覆盖 |
-| 推广员信息 | Redis Hash | 30分钟 | 更新时清除 |
-| 文章列表 | Redis List | 10分钟 | 发布时清除 |
-| Banner列表 | Redis List | 30分钟 | 更新时清除 |
+| 系统配置 | 文件缓存 | 永久 | 更新时覆盖 |
+| 用户信息 | 文件缓存 | 10分钟 | 更新时清除 |
+| 分析报告 | 文件缓存 | 24小时 | 生成时写入 |
+| 体质题目 | 文件缓存 | 永久 | 更新时清除 |
 
-### 1.3 缓存实现
+### 1.3 缓存配置
 
-```php
-// app/Services/CacheService.php
-class CacheService
-{
-    /**
-     * 获取用户信息（带缓存）
-     */
-    public function getUserInfo(int $userId): array
-    {
-        $cacheKey = 'user:info:' . $userId;
-        
-        if (Cache::has($cacheKey)) {
-            return Cache::get($cacheKey);
-        }
-
-        $user = User::with('profile')->find($userId);
-        $info = $user->toArray();
-        
-        Cache::put($cacheKey, $info, 3600);
-        
-        return $info;
-    }
-
-    /**
-     * 清除用户缓存
-     */
-    public function clearUserCache(int $userId): void
-    {
-        Cache::forget('user:info:' . $userId);
-    }
-}
+```env
+# .env
+CACHE_DRIVER=file
+# 可选：redis, memcached, database
 ```
 
 ---
@@ -84,92 +50,89 @@ class CacheService
 
 | 表名 | 索引 | 场景 |
 |------|------|------|
-| users | idx_mobile | 手机号登录 |
-| users | idx_openid | 微信登录 |
-| analysis_tasks | idx_image_md5 | 图片缓存查询 |
+| users | users_mobile_unique | 手机号登录 |
+| users | users_username_unique | 用户名登录 |
+| users | idx_status | 状态筛选 |
+| users | idx_parent_id | 推广关系查询 |
 | analysis_tasks | idx_user_id_created_at | 历史记录查询 |
-| orders | idx_user_id_status | 订单列表查询 |
-| commissions | idx_promoter_id_status | 佣金查询 |
+| orders | idx_user_id | 订单查询 |
 
-### 2.2 慢查询优化
+### 2.2 数据库配置
 
-```sql
--- 开启慢查询日志
-SET GLOBAL slow_query_log = 'ON';
-SET GLOBAL long_query_time = 1;
+```env
+# .env（开发环境）
+DB_CONNECTION=sqlite
+DB_DATABASE=/path/to/database.sqlite
 
--- 分析慢查询
-EXPLAIN SELECT * FROM analysis_tasks 
-WHERE user_id = 10001 
-AND created_at > '2026-07-01' 
-ORDER BY created_at DESC;
+# .env（生产环境）
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=traditional_chinese_medicine
+DB_USERNAME=root
+DB_PASSWORD=
 ```
 
-### 2.3 读写分离
+### 2.3 查询优化
 
-```php
-// config/database.php
-'mysql' => [
-    'read' => [
-        'host' => ['192.168.1.2'],
-    ],
-    'write' => [
-        'host' => ['192.168.1.1'],
-    ],
-    'sticky' => true,
-],
-```
+- 使用 Laravel Debugbar 监控查询性能
+- 使用 `select()` 指定字段，避免 `SELECT *`
+- 大数据量查询使用分页
+- 关联查询使用 `with()` 预加载
 
 ---
 
-## 3. 异步处理
+## 3. 队列配置
 
-### 3.1 队列配置
+### 3.1 队列驱动
 
-| 队列名称 | 用途 | 并发数 |
-|---------|------|--------|
-| analysis | AI分析任务 | 5 |
-| payment | 支付通知 | 3 |
-| commission | 佣金结算 | 2 |
-| sms | 短信发送 | 3 |
-| withdraw | 提现处理 | 2 |
-
-### 3.2 Supervisor配置
-
-```ini
-// /etc/supervisor/conf.d/analysis.conf
-[program:analysis-worker]
-process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/api/artisan queue:work redis --queue=analysis --sleep=3 --tries=3
-autostart=true
-autorestart=true
-user=www-data
-numprocs=5
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/analysis-worker.log
+```env
+# .env
+QUEUE_CONNECTION=database
 ```
 
----
+> **说明**：当前使用 **数据库队列驱动**，未使用 Redis 队列。后续高并发场景可切换为 Redis。
 
-## 4. 对象存储优化
+### 3.2 队列使用场景
 
-### 4.1 图片处理
-
-| 操作 | 方案 |
+| 场景 | 说明 |
 |------|------|
-| 压缩 | 前端压缩至500KB以下 |
-| 裁剪 | 支持用户裁剪 |
-| 缩略图 | 生成100x100缩略图 |
-| 格式 | 统一转为WebP |
+| 支付回调通知 | 异步处理支付成功后续操作 |
+| 佣金结算 | 定时结算冻结佣金 |
 
-### 4.2 CDN加速
+### 3.3 队列处理命令
 
-| 资源类型 | CDN配置 |
-|---------|---------|
-| 静态资源 | 缓存30天 |
-| 用户图片 | 缓存7天 |
-| 推广海报 | 缓存1天 |
-| API响应 | 不缓存 |
+```bash
+# 处理队列（前台）
+php artisan queue:work
+
+# 处理队列（后台守护）
+php artisan queue:work --daemon
+```
+
+> **注意**：生产环境建议使用 Supervisor 或 systemd 管理队列进程（当前未配置）。
+
+---
+
+## 4. 文件存储优化
+
+### 4.1 文件存储
+
+```env
+# .env
+FILESYSTEM_DISK=local
+# 可选：public, s3, cos
+```
+
+> **说明**：当前使用 **本地存储**，文件存储在 `storage/app/public` 目录。
+
+### 4.2 图片处理建议
+
+| 操作 | 建议 |
+|------|------|
+| 压缩 | 前端压缩至500KB以下再上传 |
+| 格式 | 支持 JPG、PNG、WebP |
+| 大小限制 | 单文件最大 5MB |
 
 ---
 
@@ -179,23 +142,22 @@ stdout_logfile=/var/log/supervisor/analysis-worker.log
 
 | 接口 | 目标响应时间 | 说明 |
 |------|-------------|------|
-| 首页 | ≤ 200ms | 含缓存 |
-| 登录 | ≤ 300ms | 含短信验证 |
-| 提交分析 | ≤ 500ms | 仅创建任务 |
-| 查询状态 | ≤ 100ms | 含缓存 |
-| 查看报告 | ≤ 200ms | 含缓存 |
-| 创建订单 | ≤ 300ms | 含支付参数 |
-| 支付回调 | ≤ 500ms | 含业务处理 |
+| 首页 | ≤ 500ms | - |
+| 登录 | ≤ 300ms | - |
+| 提交分析 | ≤ 30s | 同步AI分析（取决于AI服务响应） |
+| 查看报告 | ≤ 200ms | - |
+| 创建订单 | ≤ 300ms | - |
+| 支付回调 | ≤ 500ms | - |
 
 ### 5.2 系统性能
 
 | 指标 | 目标 |
 |------|------|
-| 首页加载 | ≤ 2s |
-| 接口响应（P95） | ≤ 500ms |
-| AI分析（含排队） | ≤ 30s |
-| 并发支持 | ≥ 1000 QPS |
-| 系统可用性 | ≥ 99.9% |
+| 首页加载 | ≤ 3s |
+| 接口响应（P95） | ≤ 1s |
+| AI分析 | ≤ 30s |
+| 并发支持 | ≥ 100 QPS |
+| 系统可用性 | ≥ 99% |
 
 ---
 
@@ -206,66 +168,126 @@ stdout_logfile=/var/log/supervisor/analysis-worker.log
 | 资源 | 配置 | 月成本 |
 |------|------|--------|
 | 应用服务器 | 2核4G × 1 | ¥200 |
-| MySQL | 2核4G × 1 | ¥300 |
-| Redis | 1G × 1 | ¥100 |
-| 对象存储 | 50GB | ¥50 |
-| CDN | 100GB | ¥50 |
-| **合计** | | **¥700** |
+| 数据库 | SQLite / MySQL 2核4G | ¥0-300 |
+| 对象存储 | 本地 50GB | ¥0 |
+| CDN | 可选 | ¥0-50 |
+| **合计** | | **¥200-550** |
 
-### 6.2 成长期（1-10万用户）
+### 6.2 成长建议
 
-| 资源 | 配置 | 月成本 |
-|------|------|--------|
-| 应用服务器 | 4核8G × 2 | ¥800 |
-| MySQL | 4核8G × 1（主从） | ¥600 |
-| Redis | 2G × 1（主从） | ¥200 |
-| 对象存储 | 500GB | ¥200 |
-| CDN | 1TB | ¥200 |
-| **合计** | | **¥2000** |
+当用户量增长时，可考虑以下优化：
 
-### 6.3 成熟期（10-100万用户）
-
-| 资源 | 配置 | 月成本 |
-|------|------|--------|
-| 应用服务器 | 8核16G × 4 | ¥3200 |
-| MySQL | 8核16G × 1（主从） | ¥1200 |
-| Redis | 4G × 1（集群） | ¥400 |
-| 对象存储 | 5TB | ¥500 |
-| CDN | 10TB | ¥1000 |
-| **合计** | | **¥6300** |
+| 优化项 | 说明 |
+|--------|------|
+| Redis缓存 | 切换 `CACHE_DRIVER=redis` |
+| Redis队列 | 切换 `QUEUE_CONNECTION=redis` |
+| 对象存储 | 使用云存储（COS/OSS） |
+| CDN加速 | 静态资源使用CDN |
+| 数据库 | 升级MySQL配置，考虑读写分离 |
 
 ---
 
-## 7. 性能监控
+## 7. Laravel 优化
 
-### 7.1 监控指标
+### 7.1 推荐优化命令
 
-| 指标 | 工具 | 告警阈值 |
-|------|------|---------|
-| CPU使用率 | Prometheus | > 80% |
-| 内存使用率 | Prometheus | > 80% |
-| 接口响应时间 | Prometheus | > 1s |
-| 错误率 | Sentry | > 1% |
-| MySQL慢查询 | Prometheus | > 1s |
-| Redis内存 | Prometheus | > 80% |
-| RabbitMQ队列长度 | Prometheus | > 1000 |
+```bash
+# 配置缓存
+php artisan config:cache
 
-### 7.2 性能优化清单
+# 路由缓存
+php artisan route:cache
 
-- [ ] 开启OPcache
-- [ ] 开启Laravel配置缓存
-- [ ] 开启路由缓存
-- [ ] 开启数据库查询缓存
-- [ ] 开启CDN加速
-- [ ] 开启Gzip压缩
-- [ ] 开启HTTP/2
-- [ ] 图片懒加载
-- [ ] 接口分页查询
-- [ ] 数据库索引优化
+# 视图缓存
+php artisan view:cache
+
+# 自动加载优化
+composer dump-autoload --optimize
+```
+
+### 7.2 PHP 优化
+
+```ini
+; php.ini
+opcache.enable=1
+opcache.memory_consumption=256
+opcache.max_accelerated_files=10000
+opcache.validate_timestamps=0  ; 生产环境设为0
+```
+
+---
+
+## 8. 前端性能优化
+
+### 8.1 构建优化
+
+| 优化项 | 说明 |
+|--------|------|
+| 代码分割 | 路由懒加载 |
+| 资源压缩 | Vite 自动压缩 JS/CSS |
+| Tree Shaking | 移除未使用代码 |
+
+### 8.2 运行时优化
+
+| 优化项 | 说明 |
+|--------|------|
+| 组件懒加载 | `defineAsyncComponent` |
+| 图片懒加载 | `loading="lazy` |
+| 数据缓存 | Pinia 状态缓存 |
+| 请求防抖 | 搜索输入防抖 |
+
+---
+
+## 9. 监控建议
+
+### 9.1 日志监控
+
+```bash
+# Laravel 日志
+tail -f storage/logs/laravel.log
+
+# Nginx 访问日志
+tail -f /var/log/nginx/access.log
+
+# PHP-FPM 慢日志
+tail -f /var/log/php-fpm/slow.log
+```
+
+### 9.2 可选监控工具
+
+| 工具 | 用途 | 状态 |
+|------|------|------|
+| Laravel Debugbar | 开发调试 | ✅ 已安装（开发环境） |
+| Laravel Telescope | 应用监控 | ❌ 未安装 |
+| Sentry | 错误追踪 | ❌ 未安装 |
+| Prometheus | 系统监控 | ❌ 未安装 |
+
+---
+
+## 10. 性能优化清单
+
+### 10.1 已完成
+
+- [x] Laravel 配置缓存
+- [x] Laravel 路由缓存
+- [x] 路由懒加载（前端）
+- [x] 前端资源压缩（Vite）
+- [x] 数据库索引优化
+- [x] 文件上传大小限制
+
+### 10.2 待优化（按需）
+
+- [ ] 切换 Redis 缓存
+- [ ] 切换 Redis 队列
+- [ ] 接入云存储（COS/OSS）
+- [ ] 接入 CDN
+- [ ] 安装 Telescope 监控
+- [ ] 接入 Sentry 错误追踪
+- [ ] 数据库读写分离
+- [ ] 图片处理服务（缩略图、压缩）
 
 ---
 
 > **相关文档**：
 > - [系统架构设计](03-architecture.md)
 > - [后端设计](08-backend.md)
-> - [DevOps](15-devops.md)

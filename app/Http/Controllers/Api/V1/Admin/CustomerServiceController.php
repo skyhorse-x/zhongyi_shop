@@ -97,6 +97,7 @@ class CustomerServiceController extends Controller
                 'sender_type' => 'admin',
                 'content' => $request->input('content', ''),
                 'msg_type' => 'text',
+                'is_auto_reply' => $request->input('is_auto_reply', false),
             ]);
             
             // 更新会话

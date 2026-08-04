@@ -1,8 +1,8 @@
-# 前端设计 - 用户端H5
+# 前端设计 - 用户端
 
-> **版本**：v1.0  
-> **日期**：2026-07-28  
-> **对应 ai.md 阶段**：第五阶段（前端设计 - 官网）
+> **版本**：v2.0  
+> **日期**：2026-08-04  
+> **项目结构**：单一 web 项目（用户端+管理端）
 
 ---
 
@@ -10,111 +10,167 @@
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| Vue3 | ^3.4 | 框架 |
-| TypeScript | ^5.0 | 语言 |
-| Vite | ^5.0 | 构建工具 |
-| Pinia | ^2.0 | 状态管理 |
-| Vue Router | ^4.0 | 路由 |
-| Vant4 | ^4.0 | UI组件库 |
-| Axios | ^1.6 | HTTP请求 |
+| Vue | ^3.5.39 | 框架 |
+| TypeScript | ~6.0.2 | 语言 |
+| Vite | ^8.1.1 | 构建工具 |
+| Pinia | ^4.0.2 | 状态管理 |
+| Vue Router | ^4.6.4 | 路由 |
+| Element Plus | ^2.14.3 | UI组件库 |
+| TailwindCSS | ^4.3.3 | CSS框架 |
+| Axios | - | HTTP请求 |
+| postcss-px-to-viewport-8-plugin | ^1.2.5 | 移动端适配 |
 
 ---
 
 ## 2. 页面清单
 
+### 2.1 公共页面
+
 | 页面 | 路径 | 标题 | 认证 |
 |------|------|------|------|
-| 首页 | /home | 首页 | 否 |
+| 首页 | / | AI中医健康管理 | 否 |
 | 登录 | /auth/login | 登录 | 否 |
 | 注册 | /auth/register | 注册 | 否 |
-| 分析上传 | /analysis/index | AI分析 | 是 |
-| 分析中 | /analysis/processing | 分析中 | 是 |
-| 分析结果 | /analysis/result | 分析结果 | 是 |
-| 个人中心 | /profile/index | 我的 | 是 |
-| 历史记录 | /profile/history | 历史记录 | 是 |
-| 会员中心 | /member/index | 会员中心 | 是 |
+| 404 | /:pathMatch(.*)* | 页面不存在 | 否 |
+
+### 2.2 AI分析页面
+
+| 页面 | 路径 | 标题 | 认证 |
+|------|------|------|------|
+| 舌诊分析 | /analysis/tongue | 舌诊分析 | 是 |
+| 面诊分析 | /analysis/face | 面诊分析 | 是 |
+| 分析结果 | /analysis/result/:taskNo | 分析结果 | 是 |
+| 体质测试 | /constitution/test | 体质测试 | 是 |
+| 体质报告 | /constitution/result/:taskNo | 体质报告 | 是 |
+
+### 2.3 健康档案页面
+
+| 页面 | 路径 | 标题 | 认证 |
+|------|------|------|------|
+| 分析历史 | /health/history | 分析历史 | 是 |
+| 健康趋势 | /health/trend | 健康趋势 | 是 |
+| 体质档案 | /health/constitution | 体质档案 | 是 |
+
+### 2.4 健康问答页面
+
+| 页面 | 路径 | 标题 | 认证 |
+|------|------|------|------|
+| 问答聊天 | /qa/chat/:sessionNo? | 健康问答 | 是 |
+| 问答记录 | /qa/sessions | 问答记录 | 是 |
+
+### 2.5 消息中心页面
+
+| 页面 | 路径 | 标题 | 认证 |
+|------|------|------|------|
+| 消息中心 | /messages | 消息中心 | 是 |
+| 客服聊天 | /messages/customer-service | 客服聊天 | 是 |
+
+### 2.6 会员中心页面
+
+| 页面 | 路径 | 标题 | 认证 |
+|------|------|------|------|
+| 会员中心 | /member | 会员中心 | 是 |
 | 我的订单 | /member/orders | 我的订单 | 是 |
-| 开通推广员 | /member/promote/apply | 开通推广员 | 是 |
-| 推广中心 | /promoter/index | 推广中心 | 是 |
-| 推广海报 | /promoter/poster | 推广海报 | 是 |
+| 余额明细 | /member/balance | 余额明细 | 是 |
+
+### 2.7 次数包与充值页面
+
+| 页面 | 路径 | 标题 | 认证 |
+|------|------|------|------|
+| 购买次数包 | /packages | 购买次数包 | 是 |
+| 充值中心 | /recharge | 充值中心 | 是 |
+
+### 2.8 推广中心页面
+
+| 页面 | 路径 | 标题 | 认证 |
+|------|------|------|------|
+| 开通推广员 | /promoter/activate | 开通推广员 | 是 |
+| 推广中心 | /promoter | 推广中心 | 是 |
 | 佣金明细 | /promoter/commissions | 佣金明细 | 是 |
 | 提现 | /promoter/withdraw | 提现 | 是 |
 | 提现记录 | /promoter/withdraw-history | 提现记录 | 是 |
+
+### 2.9 用户服务页面
+
+| 页面 | 路径 | 标题 | 认证 |
+|------|------|------|------|
+| 反馈与申诉 | /user/feedback | 反馈与申诉 | 是 |
 
 ---
 
 ## 3. 路由配置
 
 ```typescript
-// src/router/index.ts
-const routes = [
-    { path: '/', redirect: '/home' },
-    { path: '/home', component: () => import('@/views/home/index.vue'), meta: { title: '首页' } },
-    { path: '/auth/login', component: () => import('@/views/auth/login.vue'), meta: { title: '登录' } },
-    { path: '/auth/register', component: () => import('@/views/auth/register.vue'), meta: { title: '注册' } },
-    { path: '/analysis/index', component: () => import('@/views/analysis/index.vue'), meta: { title: 'AI分析', needAuth: true } },
-    { path: '/analysis/processing', component: () => import('@/views/analysis/processing.vue'), meta: { title: '分析中', needAuth: true } },
-    { path: '/analysis/result', component: () => import('@/views/analysis/result.vue'), meta: { title: '分析结果', needAuth: true } },
-    { path: '/profile/index', component: () => import('@/views/profile/index.vue'), meta: { title: '我的', needAuth: true } },
-    { path: '/profile/history', component: () => import('@/views/profile/history.vue'), meta: { title: '历史记录', needAuth: true } },
-    { path: '/member/index', component: () => import('@/views/member/index.vue'), meta: { title: '会员中心', needAuth: true } },
-    { path: '/member/orders', component: () => import('@/views/member/orders.vue'), meta: { title: '我的订单', needAuth: true } },
-    { path: '/member/promote/apply', component: () => import('@/views/member/promote-apply.vue'), meta: { title: '开通推广员', needAuth: true } },
-    { path: '/promoter/index', component: () => import('@/views/promoter/index.vue'), meta: { title: '推广中心', needAuth: true } },
-    { path: '/promoter/poster', component: () => import('@/views/promoter/poster.vue'), meta: { title: '推广海报', needAuth: true } },
-    { path: '/promoter/commissions', component: () => import('@/views/promoter/commissions.vue'), meta: { title: '佣金明细', needAuth: true } },
-    { path: '/promoter/withdraw', component: () => import('@/views/promoter/withdraw.vue'), meta: { title: '提现', needAuth: true } },
-    { path: '/promoter/withdraw-history', component: () => import('@/views/promoter/withdraw-history.vue'), meta: { title: '提现记录', needAuth: true } },
+// src/router/modules/common.ts
+const commonRoutes = [
+  { path: '/', component: () => import('@/views/home/index.vue') },
+  { path: '/auth/login', component: () => import('@/views/auth/login.vue') },
+  { path: '/auth/register', component: () => import('@/views/auth/register.vue') },
+]
+
+// src/router/modules/analysis.ts
+const analysisRoutes = [
+  { path: '/analysis/tongue', component: () => import('@/views/analysis/tongue.vue') },
+  { path: '/analysis/face', component: () => import('@/views/analysis/face.vue') },
+  { path: '/analysis/result/:taskNo', component: () => import('@/views/analysis/result.vue') },
+  { path: '/constitution/test', component: () => import('@/views/constitution/test.vue') },
+  { path: '/constitution/result/:taskNo', component: () => import('@/views/constitution/result.vue') },
+  { path: '/health/history', component: () => import('@/views/health/history.vue') },
+  { path: '/health/trend', component: () => import('@/views/health/trend.vue') },
+  { path: '/health/constitution', component: () => import('@/views/health/constitution.vue') },
+]
+
+// src/router/modules/user.ts
+const userRoutes = [
+  { path: '/qa/chat/:sessionNo?', component: () => import('@/views/qa/chat.vue') },
+  { path: '/qa/sessions', component: () => import('@/views/qa/sessions.vue') },
+  { path: '/messages', component: () => import('@/views/messages/index.vue') },
+  { path: '/messages/customer-service', component: () => import('@/views/messages/customer-service.vue') },
+  { path: '/packages', component: () => import('@/views/packages/index.vue') },
+  { path: '/recharge', component: () => import('@/views/recharge/index.vue') },
+  { path: '/member', component: () => import('@/views/member/index.vue') },
+  { path: '/member/orders', component: () => import('@/views/member/orders.vue') },
+  { path: '/member/balance', component: () => import('@/views/member/balance.vue') },
+  { path: '/promoter/activate', component: () => import('@/views/promoter/activate.vue') },
+  { path: '/promoter', component: () => import('@/views/promoter/index.vue') },
+  { path: '/promoter/commissions', component: () => import('@/views/promoter/commissions.vue') },
+  { path: '/promoter/withdraw', component: () => import('@/views/promoter/withdraw.vue') },
+  { path: '/promoter/withdraw-history', component: () => import('@/views/promoter/withdraw-history.vue') },
+  { path: '/user/feedback', component: () => import('@/views/user/feedback.vue') },
 ]
 ```
 
 ---
 
-## 4. 状态管理
+## 4. 状态管理（Pinia Stores）
 
-### 4.1 用户状态（stores/user.ts）
+| Store | 文件 | 说明 |
+|-------|------|------|
+| auth | stores/auth.ts | 认证状态（token、用户信息） |
+| user | stores/user.ts | 用户信息 |
+| analysis | stores/analysis.ts | AI分析状态 |
+| chat | stores/chat.ts | 客服聊天状态 |
+| order | stores/order.ts | 订单状态 |
+| promoter | stores/promoter.ts | 推广员状态 |
+| admin | stores/admin.ts | 管理员状态 |
+
+### 4.1 认证状态（stores/auth.ts）
 
 ```typescript
-export const useUserStore = defineStore('user', {
+export const useAuthStore = defineStore('auth', {
     state: () => ({
         token: localStorage.getItem('token') || '',
-        refreshToken: localStorage.getItem('refresh_token') || '',
         userInfo: null as UserInfo | null,
     }),
     getters: {
         isLoggedIn: (state) => !!state.token,
-        isVip: (state) => state.userInfo?.is_vip || false,
-        isPromoter: (state) => state.userInfo?.is_promoter || false,
+        isAdmin: (state) => state.userInfo?.is_admin || false,
     },
     actions: {
-        async login(mobile: string, password: string) { /* ... */ },
+        async login(account: string, password: string) { /* ... */ },
         async register(data: RegisterForm) { /* ... */ },
+        async logout() { /* ... */ },
         async getUserInfo() { /* ... */ },
-        async wechatLogin(code: string) { /* ... */ },
-        logout() {
-            this.token = ''
-            this.refreshToken = ''
-            this.userInfo = null
-            localStorage.removeItem('token')
-            localStorage.removeItem('refresh_token')
-        },
-    },
-})
-```
-
-### 4.2 分析状态（stores/analysis.ts）
-
-```typescript
-export const useAnalysisStore = defineStore('analysis', {
-    state: () => ({
-        currentTask: null as Task | null,
-        historyList: [] as Task[],
-    }),
-    actions: {
-        async submitTask(imageUrl: string, type: string) { /* ... */ },
-        async getTaskStatus(taskNo: string) { /* ... */ },
-        async getReport(taskNo: string) { /* ... */ },
-        async getHistory(page: number = 1) { /* ... */ },
     },
 })
 ```
@@ -123,225 +179,96 @@ export const useAnalysisStore = defineStore('analysis', {
 
 ## 5. 组件设计
 
-### 5.1 公共组件
+### 5.1 基础组件（components/base/）
 
 | 组件 | 路径 | 说明 |
 |------|------|------|
-| NavBar | components/NavBar.vue | 顶部导航栏 |
-| TabBar | components/TabBar.vue | 底部标签栏 |
-| Loading | components/Loading.vue | 加载组件 |
-| Empty | components/Empty.vue | 空状态 |
-| PayModal | components/PayModal.vue | 支付弹窗 |
-| UploadImage | components/UploadImage.vue | 图片上传 |
+| BaseCard | components/base/BaseCard.vue | 卡片组件 |
+| BaseDialog | components/base/BaseDialog.vue | 对话框组件 |
+| BaseForm | components/base/BaseForm.vue | 表单组件 |
+| BasePagination | components/base/BasePagination.vue | 分页组件 |
+| BaseSearch | components/base/BaseSearch.vue | 搜索组件 |
+| BaseTable | components/base/BaseTable.vue | 表格组件 |
 
-### 5.2 页面组件
+### 5.2 分析组件（components/analysis/）
 
-| 页面 | 主要组件 | API调用 |
-|------|---------|---------|
-| 首页 | 功能入口、文章列表 | getArticles |
-| 登录 | 表单、短信验证码 | sendSmsCode, login |
-| 分析上传 | 图片上传、裁剪 | uploadUrl, submitTask |
-| 分析中 | 进度动画 | getTaskStatus |
-| 分析结果 | 报告卡片、支付按钮 | getReport, createPayment |
-| 推广中心 | 二维码、收益统计 | getPromoterInfo |
+| 组件 | 路径 | 说明 |
+|------|------|------|
+| ReportHeader | components/analysis/ReportHeader.vue | 报告头部 |
+| ReportSummary | components/analysis/ReportSummary.vue | 报告摘要 |
+| HealthAdvice | components/analysis/HealthAdvice.vue | 健康建议 |
 
----
+### 5.3 聊天组件（components/chat/）
 
-## 6. 核心页面设计
+| 组件 | 路径 | 说明 |
+|------|------|------|
+| MessageBubble | components/chat/MessageBubble.vue | 消息气泡 |
+| MessageInput | components/chat/MessageInput.vue | 消息输入 |
+| SessionListItem | components/chat/SessionListItem.vue | 会话列表项 |
 
-### 6.1 首页
+### 5.4 布局组件（layouts/）
 
-```
-┌─────────────────────────────────────┐
-│  [Logo]   AI中医健康管理    [搜索]  │
-├─────────────────────────────────────┤
-│                                     │
-│         ┌─────────────────┐         │
-│         │   立即分析       │         │
-│         └─────────────────┘         │
-│                                     │
-│  舌诊    面诊    体质测试   问答     │
-│  [icon]  [icon]  [icon]    [icon]  │
-│                                     │
-│  ────── 热门文章 ──────            │
-│  ┌─────┐ ┌─────┐ ┌─────┐          │
-│  │文章1│ │文章2│ │文章3│          │
-│  └─────┘ └─────┘ └─────┘          │
-│                                     │
-├─────────────────────────────────────┤
-│  首页    分析    推广    我的        │
-└─────────────────────────────────────┘
-```
-
-### 6.2 分析上传页
-
-```
-┌─────────────────────────────────────┐
-│  [返回]       AI舌诊分析            │
-├─────────────────────────────────────┤
-│                                     │
-│   ┌───────────────────────────┐     │
-│   │                           │     │
-│   │      [上传区域]           │     │
-│   │      点击拍照或选择相册    │     │
-│   │                           │     │
-│   └───────────────────────────┘     │
-│                                     │
-│   拍摄提示：                         │
-│   • 在自然光下拍摄                  │
-│   • 舌头自然伸出，不要用力          │
-│   • 保持手机稳定，避免模糊          │
-│                                     │
-│   ┌───────────────────────────┐     │
-│   │        开始分析            │     │
-│   └───────────────────────────┘     │
-│                                     │
-└─────────────────────────────────────┘
-```
-
-### 6.3 分析结果页
-
-```
-┌─────────────────────────────────────┐
-│  [返回]       分析结果              │
-├─────────────────────────────────────┤
-│                                     │
-│      ┌──────────────┐               │
-│      │  健康评分    │               │
-│      │    85       │               │
-│      └──────────────┘               │
-│                                     │
-│  ────── 舌象摘要 ──────            │
-│  舌质淡红，苔薄白，提示...          │
-│                                     │
-│  ─────────────────────────          │
-│  [点击下方按钮查看完整报告]          │
-│  ─────────────────────────          │
-│                                     │
-│  ┌───────────────────────────┐      │
-│  │  查看完整报告  ¥9.9       │      │
-│  └───────────────────────────┘      │
-│                                     │
-│  或购买次数包更划算：               │
-│  10次包 ¥69  |  月度会员 ¥39       │
-│                                     │
-└─────────────────────────────────────┘
-```
-
-### 6.4 会员中心页（含推广员开通）
-
-```
-┌─────────────────────────────────────┐
-│              会员中心                │
-├─────────────────────────────────────┤
-│  ┌───────────────────────────────┐  │
-│  │  昵称：张三                   │  │
-│  │  手机号：138****5678          │  │
-│  │  剩余次数：舌诊5 面诊3 体质2  │  │
-│  └───────────────────────────────┘  │
-│                                     │
-│  ────── 我的服务 ──────            │
-│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐   │
-│  │ 订单 │ │ 推广 │ │ 收藏 │ │ 客服 │   │
-│  └─────┘ └─────┘ └─────┘ └─────┘   │
-│                                     │
-│  ────── 推广联盟 ──────            │
-│  ┌───────────────────────────────┐  │
-│  │  💰 邀请好友 赚取佣金         │  │
-│  │  每邀请一位好友消费，获得15%佣金│  │
-│  │                               │  │
-│  │      【立即开通推广员】        │  │
-│  └───────────────────────────────┘  │
-│                                     │
-└─────────────────────────────────────┘
-```
-
-### 6.5 推广员中心页（开通后）
-
-```
-┌─────────────────────────────────────┐
-│            推广中心                  │
-├─────────────────────────────────────┤
-│  ┌───────────────────────────────┐  │
-│  │  推广码：ABC123               │  │
-│  │  [复制] [生成海报]            │  │
-│  └───────────────────────────────┘  │
-│                                     │
-│  ────── 收益统计 ──────            │
-│  ┌───────────────────────────────┐  │
-│  │  邀请人数：25人               │  │
-│  │  消费人数：8人                │  │
-│  │  累计佣金：¥126.50            │  │
-│  │  可提现：¥86.50              │  │
-│  │                               │  │
-│  │      [申请提现]               │  │
-│  └───────────────────────────────┘  │
-│                                     │
-│  ────── 最近佣金 ──────            │
-│  2026-07-28  +¥9.9  来自李四      │
-│  2026-07-27  +¥9.9  来自王五      │
-│                                     │
-└─────────────────────────────────────┘
-```
+| 组件 | 路径 | 说明 |
+|------|------|------|
+| AdminLayout | layouts/AdminLayout.vue | 管理后台布局 |
+| MiniProgramLayout | layouts/MiniProgramLayout.vue | 小程序布局 |
 
 ---
 
-## 7. API调用关系
+## 6. API调用关系
 
 ```
 首页 ──→ GET /api/v1/articles
  │
-登录页 ──→ POST /api/v1/auth/sms-code
-       ──→ POST /api/v1/auth/login
+登录页 ──→ POST /api/v1/auth/login
  │
-分析上传 ──→ POST /api/v1/analysis/upload-url
+舌诊分析 ──→ POST /api/v1/analysis/upload-image
          ──→ POST /api/v1/analysis/submit
+         ──→ GET /api/v1/analysis/status/{taskNo}
+         ──→ GET /api/v1/analysis/report/{taskNo}
  │
-分析中 ──→ GET /api/v1/analysis/status/{taskNo} (轮询)
- │
-分析结果 ──→ GET /api/v1/analysis/report/{taskNo}
-         ──→ POST /api/v1/payment/create
+面诊分析 ──→ POST /api/v1/analysis/upload-image
+         ──→ POST /api/v1/analysis/submit
+         ──→ GET /api/v1/analysis/report/{taskNo}
  │
 体质测试 ──→ GET /api/v1/constitution/questions
          ──→ POST /api/v1/constitution/submit
          ──→ GET /api/v1/constitution/report/{taskNo}
  │
 健康问答 ──→ POST /api/v1/qa/sessions
-         ──→ GET /api/v1/qa/sessions
          ──→ POST /api/v1/qa/sessions/{sessionNo}/messages
          ──→ GET /api/v1/qa/sessions/{sessionNo}/messages
+ │
+客服聊天 ──→ GET /api/v1/customer-service/session
+         ──→ POST /api/v1/customer-service/sessions/{sessionNo}/messages
+         ──→ POST /api/v1/customer-service/sessions/{sessionNo}/rate
  │
 次数包 ──→ GET /api/v1/packages
         ──→ POST /api/v1/packages/buy
  │
-健康档案 ──→ GET /api/v1/health/history
-         ──→ GET /api/v1/health/trend
-         ──→ GET /api/v1/health/constitution
+充值 ──→ GET /api/v1/xianyu/products
+      ──→ POST /api/v1/payment/create
  │
 推广中心 ──→ GET /api/v1/promoter/info
-         ──→ POST /api/v1/promoter/activate (开通推广员)
          ──→ POST /api/v1/promoter/withdraw
-         ──→ GET /api/v1/promoter/commissions (佣金明细)
-         ──→ GET /api/v1/promoter/poster (推广海报)
+         ──→ GET /api/v1/promoter/commissions
+ │
+反馈申诉 ──→ POST /api/v1/feedback
+         ──→ POST /api/v1/appeals
+         ──→ POST /api/v1/refunds
 ```
 
 ---
 
-## 8. 响应式设计
+## 7. 移动端适配
 
-### 8.1 尺寸适配
+### 7.1 适配方案
 
-| 设备 | 宽度 | 适配方案 |
-|------|------|---------|
-| 小屏手机 | 320px-375px | 基础布局 |
-| 标准手机 | 375px-414px | 主要适配 |
-| 大屏手机 | 414px-768px | 宽松布局 |
-
-### 8.2 rem适配
+使用 `postcss-px-to-viewport-8-plugin` 实现移动端适配：
 
 ```typescript
 // vite.config.ts
-import postcssPxToViewport from 'postcss-px-to-viewport'
+import postcssPxToViewport from 'postcss-px-to-viewport-8-plugin'
 
 export default {
     css: {
@@ -358,9 +285,75 @@ export default {
 }
 ```
 
+### 7.2 尺寸适配
+
+| 设备 | 宽度 | 适配方案 |
+|------|------|---------|
+| 小屏手机 | 320px-375px | 基础布局 |
+| 标准手机 | 375px-414px | 主要适配 |
+| 大屏手机 | 414px-768px | 宽松布局 |
+| 平板/PC | 768px+ | 管理后台布局 |
+
+---
+
+## 8. 核心页面设计
+
+### 8.1 首页
+
+```
+┌─────────────────────────────────────┐
+│  [Logo]   AI中医健康管理            │
+├─────────────────────────────────────┤
+│                                     │
+│         ┌─────────────────┐         │
+│         │   舌诊分析       │         │
+│         └─────────────────┘         │
+│         ┌─────────────────┐         │
+│         │   面诊分析       │         │
+│         └─────────────────┘         │
+│         ┌─────────────────┐         │
+│         │   体质测试       │         │
+│         └─────────────────┘         │
+│         ┌─────────────────┐         │
+│         │   健康问答       │         │
+│         └─────────────────┘         │
+│                                     │
+│  ────── 热门文章 ──────            │
+│  ┌─────┐ ┌─────┐ ┌─────┐          │
+│  │文章1│ │文章2│ │文章3│          │
+│  └─────┘ └─────┘ └─────┘          │
+│                                     │
+├─────────────────────────────────────┤
+│  首页    分析    推广    我的        │
+└─────────────────────────────────────┘
+```
+
+### 8.2 会员中心页
+
+```
+┌─────────────────────────────────────┐
+│              会员中心                │
+├─────────────────────────────────────┤
+│  ┌───────────────────────────────┐  │
+│  │  昵称：张三                   │  │
+│  │  剩余次数：5次                │  │
+│  │  账户余额：¥100.00            │  │
+│  └───────────────────────────────┘  │
+│                                     │
+│  ────── 我的服务 ──────            │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐   │
+│  │ 订单 │ │ 推广 │ │ 消息 │ │ 客服 │   │
+│  └─────┘ └─────┘ └─────┘ └─────┘   │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐   │
+│  │ 问答 │ │ 档案 │ │ 充值 │ │ 反馈 │   │
+│  └─────┘ └─────┘ └─────┘ └─────┘   │
+│                                     │
+└─────────────────────────────────────┘
+```
+
 ---
 
 > **相关文档**：
 > - [API 设计](05-api.md)
-> - [前端设计 - 管理端PC](07-frontend-admin.md)
+> - [前端设计 - 管理端](07-frontend-admin.md)
 > - [后端设计](08-backend.md)

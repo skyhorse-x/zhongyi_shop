@@ -1,8 +1,9 @@
 # API 设计
 
-> **版本**：v1.0  
-> **日期**：2026-07-28  
-> **对应 ai.md 阶段**：第四阶段（API 设计）
+> **版本**：v2.0  
+> **日期**：2026-08-04  
+> **认证方式**：Laravel Sanctum PersonalAccessToken (Bearer Token)  
+> **基础URL**：/api/v1  
 
 ---
 
@@ -13,80 +14,41 @@
 | 项目 | 规范 |
 |------|------|
 | 协议 | HTTPS |
-| 域名 | api.tcm-health.com |
-| 前缀 | /api/v1 |
 | 格式 | JSON |
 | 编码 | UTF-8 |
 | 时区 | Asia/Shanghai |
+| 认证 | Authorization: Bearer {token} |
 
-### 1.2 请求头
-
-| Header | 必填 | 说明 |
-|--------|------|------|
-| Authorization | 是 | Bearer {token} |
-| Content-Type | 是 | application/json |
-| X-Request-ID | 否 | 请求追踪ID |
-
-### 1.3 统一响应格式
+### 1.2 统一响应格式
 
 ```json
 {
     "code": 0,
     "message": "success",
-    "data": {},
-    "timestamp": 1721234567890,
-    "request_id": "req_abc123"
+    "data": {}
 }
 ```
 
-### 1.4 错误码定义
+### 1.3 错误码定义
 
 | 错误码 | 说明 | HTTP状态码 |
 |--------|------|-----------|
 | 0 | 成功 | 200 |
-| 1001 | 参数错误 | 400 |
-| 1002 | 未登录 | 401 |
-| 1003 | 无权限 | 403 |
-| 1004 | 资源不存在 | 404 |
-| 1005 | 请求过于频繁 | 429 |
-| 2001 | 手机号已注册 | 400 |
-| 2002 | 验证码错误 | 400 |
-| 2003 | 账号或密码错误 | 400 |
-| 3001 | 订单不存在 | 404 |
-| 3002 | 订单已支付 | 400 |
-| 4001 | AI分析失败 | 500 |
-| 9999 | 系统错误 | 500 |
+| 400 | 请求参数错误 | 400 |
+| 401 | 未登录或Token无效 | 401 |
+| 403 | 无权限 | 403 |
+| 404 | 资源不存在 | 404 |
+| 422 | 验证错误 | 422 |
+| 429 | 请求过于频繁 | 429 |
+| 500 | 系统错误 | 500 |
+| 501 | 功能未实现 | 501 |
+| 503 | 服务不可用（如AI未配置） | 503 |
 
 ---
 
 ## 2. 用户认证接口
 
-### 2.1 发送验证码
-
-```
-POST /api/v1/auth/sms-code
-```
-
-**Request:**
-```json
-{
-    "mobile": "1*********0",
-    "type": "register"
-}
-```
-
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "验证码已发送",
-    "data": {
-        "expire_in": 300
-    }
-}
-```
-
-### 2.2 注册
+### 2.1 注册（账号密码）
 
 ```
 POST /api/v1/auth/register
@@ -95,9 +57,10 @@ POST /api/v1/auth/register
 **Request:**
 ```json
 {
-    "mobile": "1*********0",
-    "code": "123456",
+    "type": "account",
+    "username": "zhangsan",
     "password": "abc123456",
+    "password_confirmation": "abc123456",
     "invite_code": "ABC123"
 }
 ```
@@ -108,11 +71,33 @@ POST /api/v1/auth/register
     "code": 0,
     "message": "注册成功",
     "data": {
-        "user_id": 10001,
-        "token": "eyJhbGciOiJIUzI1NiIs...",
-        "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
-        "expire_in": 7200
+        "token": "1|laravel_sanctum_token...",
+        "user": {
+            "id": 10001,
+            "username": "zhangsan",
+            "nickname": "zhangsan"
+        },
+        "is_promoter": true,
+        "invite_code": "ABC123",
+        "invite_url": "https://tcm-health.com?code=ABC123"
     }
+}
+```
+
+### 2.2 注册（手机号密码）
+
+```
+POST /api/v1/auth/register
+```
+
+**Request:**
+```json
+{
+    "type": "mobile",
+    "mobile": "1*********0",
+    "password": "abc123456",
+    "password_confirmation": "abc123456",
+    "invite_code": "ABC123"
 }
 ```
 
@@ -125,10 +110,12 @@ POST /api/v1/auth/login
 **Request:**
 ```json
 {
-    "mobile": "1*********0",
+    "account": "zhangsan",
     "password": "abc123456"
 }
 ```
+
+> 支持用户名或手机号登录
 
 **Response:**
 ```json
@@ -136,10 +123,12 @@ POST /api/v1/auth/login
     "code": 0,
     "message": "登录成功",
     "data": {
-        "user_id": 10001,
-        "token": "eyJhbGciOiJIUzI1NiIs...",
-        "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
-        "expire_in": 7200
+        "token": "1|laravel_sanctum_token...",
+        "user": {
+            "id": 10001,
+            "username": "zhangsan",
+            "nickname": "zhangsan"
+        }
     }
 }
 ```
@@ -153,23 +142,31 @@ POST /api/v1/auth/refresh
 **Request:**
 ```json
 {
-    "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
+    "refresh_token": "1|laravel_sanctum_token..."
 }
 ```
 
-### 2.5 微信授权登录
+### 2.5 发送短信验证码
 
 ```
-POST /api/v1/auth/wechat
+POST /api/v1/auth/sms-code
 ```
 
 **Request:**
 ```json
 {
-    "code": "wx_auth_code",
-    "invite_code": "ABC123"
+    "mobile": "1*********0",
+    "type": "register"
 }
 ```
+
+### 2.6 微信授权登录
+
+```
+POST /api/v1/auth/wechat
+```
+
+> ⚠️ **未实现** - 返回501错误
 
 ---
 
@@ -188,14 +185,16 @@ Authorization: Bearer {token}
     "code": 0,
     "message": "success",
     "data": {
-        "user_id": 10001,
+        "id": 10001,
+        "username": "zhangsan",
+        "nickname": "zhangsan",
         "mobile": "138****5678",
-        "nickname": "张三",
         "avatar": "https://xxx.com/avatar.jpg",
-        "is_vip": false,
-        "analysis_count": 5,
+        "gender": 1,
+        "birthday": "1990-01-01",
         "is_promoter": true,
-        "invite_code": "ABC123"
+        "analysis_times": 5,
+        "balance": 100.00
     }
 }
 ```
@@ -217,39 +216,73 @@ Authorization: Bearer {token}
 }
 ```
 
+### 3.3 退出登录
+
+```
+POST /api/v1/user/logout
+Authorization: Bearer {token}
+```
+
+### 3.4 我的订单
+
+```
+GET /api/v1/user/orders?page=1&limit=10
+GET /api/v1/user/orders/{orderNo}
+POST /api/v1/user/orders/{orderNo}/cancel
+Authorization: Bearer {token}
+```
+
+### 3.5 余额明细
+
+```
+GET /api/v1/user/balance-logs?page=1&limit=10
+Authorization: Bearer {token}
+```
+
 ---
 
 ## 4. AI分析接口
 
-### 4.1 获取上传预签名URL
+### 4.1 获取分析配置
 
 ```
-POST /api/v1/analysis/upload-url
+GET /api/v1/analysis/config
 Authorization: Bearer {token}
 ```
 
+### 4.2 上传图片文件
+
+```
+POST /api/v1/analysis/upload-image
+Authorization: Bearer {token}
+Content-Type: multipart/form-data
+```
+
 **Request:**
-```json
-{
-    "filename": "photo.jpg",
-    "content_type": "image/jpeg"
-}
+```
+image: File (jpg, jpeg, png, max: 10MB)
 ```
 
 **Response:**
 ```json
 {
     "code": 0,
-    "message": "success",
+    "message": "上传成功",
     "data": {
-        "upload_url": "https://cos.xxx.com/upload?sign=xxx",
-        "file_url": "https://cos.xxx.com/images/xxx.jpg",
-        "expire_in": 300
+        "image_url": "https://xxx.com/storage/analysis/20260804/xxx.jpg",
+        "path": "analysis/20260804/xxx.jpg"
     }
 }
 ```
 
-### 4.2 提交分析任务
+### 4.3 获取上传URL（兼容旧版）
+
+```
+POST /api/v1/analysis/upload-url
+Authorization: Bearer {token}
+```
+
+### 4.4 提交分析任务
 
 ```
 POST /api/v1/analysis/submit
@@ -260,9 +293,14 @@ Authorization: Bearer {token}
 ```json
 {
     "type": "tongue",
-    "image_url": "https://cos.xxx.com/images/xxx.jpg"
+    "gender": 1,
+    "age": 30,
+    "image_urls": ["https://xxx.com/image1.jpg"],
+    "text": "最近感觉疲劳..."
 }
 ```
+
+> 至少需要图片或文字描述
 
 **Response:**
 ```json
@@ -270,247 +308,46 @@ Authorization: Bearer {token}
     "code": 0,
     "message": "任务已提交",
     "data": {
-        "task_no": "TK202607280001",
-        "status": 0,
+        "task_no": "TK20260804abc1234",
+        "status": 2,
         "estimated_time": 30
     }
 }
 ```
 
-### 4.3 查询分析状态
+### 4.5 查询分析状态
 
 ```
-GET /api/v1/analysis/status/{task_no}
+GET /api/v1/analysis/status/{taskNo}
 Authorization: Bearer {token}
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "task_no": "TK202607280001",
-        "status": 2,
-        "summary": "您的舌象显示...",
-        "is_paid": false
-    }
-}
-```
-
-### 4.4 获取完整报告
+### 4.6 获取完整报告
 
 ```
-GET /api/v1/analysis/report/{task_no}
+GET /api/v1/analysis/report/{taskNo}
 Authorization: Bearer {token}
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "task_no": "TK202607280001",
-        "health_score": 85,
-        "tongue_analysis": "舌质淡红，苔薄白...",
-        "constitution_analysis": "平和质倾向...",
-        "life_advice": "保持规律作息...",
-        "diet_advice": "多吃清淡食物...",
-        "exercise_advice": "适度运动...",
-        "precautions": "避免熬夜..."
-    }
-}
-```
-
-### 4.5 获取分析历史
+### 4.7 获取分析历史
 
 ```
-GET /api/v1/analysis/history?page=1&limit=10
+GET /api/v1/analysis/history?page=1&limit=10&type=tongue
 Authorization: Bearer {token}
 ```
 
 ---
 
-## 5. 支付接口
+## 5. 体质测试接口
 
-### 5.1 创建支付订单
-
-```
-POST /api/v1/payment/create
-Authorization: Bearer {token}
-```
-
-**Request:**
-```json
-{
-    "type": "analysis",
-    "relation_id": "TK202607280001",
-    "pay_type": "wechat",
-    "amount": 9.90
-}
-```
-
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "订单创建成功",
-    "data": {
-        "order_no": "ORD202607280001",
-        "pay_amount": 9.90,
-        "pay_params": {
-            "prepay_id": "wx202607280001"
-        }
-    }
-}
-```
-
-### 5.2 支付回调（微信）
-
-```
-POST /api/v1/payment/notify/wechat
-```
-
-### 5.3 查询订单状态
-
-```
-GET /api/v1/payment/order/{order_no}
-Authorization: Bearer {token}
-```
-
----
-
-## 6. 推广中心接口
-
-### 6.1 开通推广员
-
-```
-POST /api/v1/promoter/activate
-Authorization: Bearer {token}
-```
-
-**说明**：注册用户直接开通推广员，无需审核，立即生效。
-
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "开通成功",
-    "data": {
-        "invite_code": "ABC123",
-        "invite_url": "https://tcm-health.com?code=ABC123",
-        "level": 1,
-        "commission_rate": 15.00,
-        "activated_at": "2026-07-28 10:00:00"
-    }
-}
-```
-
-### 6.2 获取推广信息
-
-```
-GET /api/v1/promoter/info
-Authorization: Bearer {token}
-```
-
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "invite_code": "ABC123",
-        "invite_url": "https://tcm-health.com?code=ABC123",
-        "level": 1,
-        "commission_rate": 15.00,
-        "total_invite": 50,
-        "total_consume": 20,
-        "total_commission": 298.00,
-        "available_commission": 200.00
-    }
-}
-```
-
-### 6.3 获取佣金记录
-
-```
-GET /api/v1/promoter/commissions?page=1&limit=10
-Authorization: Bearer {token}
-```
-
-### 6.4 申请提现
-
-```
-POST /api/v1/promoter/withdraw
-Authorization: Bearer {token}
-```
-
-**Request:**
-```json
-{
-    "amount": 100.00,
-    "pay_type": "wechat",
-    "pay_account": "openid_xxx"
-}
-```
-
-### 6.5 获取推广海报
-
-```
-GET /api/v1/promoter/poster
-Authorization: Bearer {token}
-```
-
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "poster_url": "https://cos.xxx.com/poster/abc123.jpg",
-        "share_link": "https://tcm-health.com?code=ABC123"
-    }
-}
-```
-
----
-
-## 7. 体质测试接口
-
-### 7.1 获取体质测试题目
+### 5.1 获取体质测试题目
 
 ```
 GET /api/v1/constitution/questions
 Authorization: Bearer {token}
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "total": 30,
-        "questions": [
-            {
-                "id": 1,
-                "category": "躯体",
-                "question": "您是否经常感到疲乏无力？",
-                "type": "single",
-                "options": [
-                    {"key": "A", "text": "没有", "scores": {"pinghe": 2, "qixu": 0}},
-                    {"key": "B", "text": "很少", "scores": {"pinghe": 1, "qixu": 1}},
-                    {"key": "C", "text": "有时", "scores": {"pinghe": 0, "qixu": 2}},
-                    {"key": "D", "text": "总是", "scores": {"pinghe": 0, "qixu": 3}}
-                ]
-            }
-        ]
-    }
-}
-```
-
-### 7.2 提交体质测试答案
+### 5.2 提交体质测试答案
 
 ```
 POST /api/v1/constitution/submit
@@ -522,117 +359,40 @@ Authorization: Bearer {token}
 {
     "answers": [
         {"question_id": 1, "answer": "A"},
-        {"question_id": 2, "answer": "B"},
-        {"question_id": 3, "answer": "C"}
+        {"question_id": 2, "answer": "B"}
     ]
 }
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "提交成功",
-    "data": {
-        "task_no": "CS202607280001",
-        "constitution_type": "气虚质",
-        "scores": {
-            "pinghe": 12,
-            "qixu": 25,
-            "yangxu": 8,
-            "yinxu": 5,
-            "tanshi": 3,
-            "shire": 2,
-            "xueyu": 4,
-            "qiyu": 6,
-            "tebing": 1
-        },
-        "summary": "您的体质类型为气虚质...",
-        "is_paid": false
-    }
-}
-```
-
-### 7.3 获取体质测试报告
+### 5.3 获取体质测试报告
 
 ```
-GET /api/v1/constitution/report/{task_no}
+GET /api/v1/constitution/report/{taskNo}
 Authorization: Bearer {token}
-```
-
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "task_no": "CS202607280001",
-        "constitution_type": "气虚质",
-        "features": "容易疲乏，声音低弱，气短懒言...",
-        "tendency": "易患感冒、内脏下垂等病...",
-        "diet_advice": "宜食益气健脾食物，如黄豆、白扁豆...",
-        "exercise_advice": "不宜剧烈运动，宜散步、慢跑...",
-        "life_advice": "起居宜规律，避免熬夜...",
-        "emotion_advice": "保持乐观心态..."
-    }
-}
 ```
 
 ---
 
-## 8. 健康问答接口
+## 6. 健康问答接口
 
-### 8.1 创建问答会话
+### 6.1 创建问答会话
 
 ```
 POST /api/v1/qa/sessions
 Authorization: Bearer {token}
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "创建成功",
-    "data": {
-        "session_no": "QA202607280001",
-        "title": "失眠调理方法",
-        "created_at": "2026-07-28 10:00:00"
-    }
-}
-```
-
-### 8.2 获取会话列表
+### 6.2 获取会话列表
 
 ```
 GET /api/v1/qa/sessions?page=1&limit=10
 Authorization: Bearer {token}
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "total": 5,
-        "list": [
-            {
-                "session_no": "QA202607280001",
-                "title": "失眠调理方法",
-                "message_count": 8,
-                "last_question_at": "2026-07-28 10:05:00",
-                "status": 1
-            }
-        ]
-    }
-}
-```
-
-### 8.3 发送消息
+### 6.3 发送消息
 
 ```
-POST /api/v1/qa/sessions/{session_no}/messages
+POST /api/v1/qa/sessions/{sessionNo}/messages
 Authorization: Bearer {token}
 ```
 
@@ -643,106 +403,148 @@ Authorization: Bearer {token}
 }
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "发送成功",
-    "data": {
-        "message_id": 10001,
-        "role": "assistant",
-        "content": "失眠在中医中称为不寐，多由情志、饮食内伤...",
-        "tokens": 156,
-        "created_at": "2026-07-28 10:00:05"
-    }
-}
-```
-
-### 8.4 获取消息列表
+### 6.4 获取消息列表
 
 ```
-GET /api/v1/qa/sessions/{session_no}/messages?page=1&limit=20
+GET /api/v1/qa/sessions/{sessionNo}/messages?page=1&limit=20
 Authorization: Bearer {token}
 ```
 
-**Response:**
+---
+
+## 7. 客服系统接口
+
+### 7.1 获取或创建会话
+
+```
+GET /api/v1/customer-service/session
+Authorization: Bearer {token}
+```
+
+### 7.2 获取会话列表
+
+```
+GET /api/v1/customer-service/sessions
+Authorization: Bearer {token}
+```
+
+### 7.3 发送消息
+
+```
+POST /api/v1/customer-service/sessions/{sessionNo}/messages
+Authorization: Bearer {token}
+```
+
+### 7.4 上传图片
+
+```
+POST /api/v1/customer-service/sessions/{sessionNo}/upload-image
+Authorization: Bearer {token}
+```
+
+### 7.5 关闭会话
+
+```
+POST /api/v1/customer-service/sessions/{sessionNo}/close
+Authorization: Bearer {token}
+```
+
+### 7.6 评价客服
+
+```
+POST /api/v1/customer-service/sessions/{sessionNo}/rate
+Authorization: Bearer {token}
+```
+
+**Request:**
 ```json
 {
-    "code": 0,
-    "message": "success",
-    "data": {
-        "total": 8,
-        "list": [
-            {
-                "id": 1,
-                "role": "user",
-                "content": "我最近经常失眠...",
-                "created_at": "2026-07-28 10:00:00"
-            },
-            {
-                "id": 2,
-                "role": "assistant",
-                "content": "失眠在中医中称为不寐...",
-                "tokens": 156,
-                "created_at": "2026-07-28 10:00:05"
-            }
-        ]
-    }
+    "score": 5,
+    "attitude": "good",
+    "solved": "yes",
+    "comment": "服务很好"
 }
 ```
 
 ---
 
-## 9. 次数包接口
+## 8. 消息中心接口
 
-### 9.1 获取次数包列表
+### 8.1 获取系统消息列表
+
+```
+GET /api/v1/system-messages
+Authorization: Bearer {token}
+```
+
+### 8.2 获取未读消息数
+
+```
+GET /api/v1/system-messages/unread-count
+Authorization: Bearer {token}
+```
+
+### 8.3 标记消息已读
+
+```
+POST /api/v1/system-messages/{id}/read
+Authorization: Bearer {token}
+```
+
+---
+
+## 9. 反馈申诉接口
+
+### 9.1 用户反馈
+
+```
+GET /api/v1/feedback
+POST /api/v1/feedback
+GET /api/v1/feedback/{id}
+Authorization: Bearer {token}
+```
+
+**POST Request:**
+```json
+{
+    "type": "bug",
+    "title": "发现问题",
+    "content": "详细描述...",
+    "images": ["url1", "url2"],
+    "contact": "1*********0"
+}
+```
+
+### 9.2 AI申诉
+
+```
+GET /api/v1/appeals
+POST /api/v1/appeals
+GET /api/v1/appeals/{id}
+Authorization: Bearer {token}
+```
+
+### 9.3 退款申请
+
+```
+GET /api/v1/refunds
+POST /api/v1/refunds
+GET /api/v1/refunds/{id}
+Authorization: Bearer {token}
+```
+
+---
+
+## 10. 次数包接口
+
+### 10.1 获取次数包列表
 
 ```
 GET /api/v1/packages
 Authorization: Bearer {token}
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": [
-        {
-            "id": 1,
-            "name": "舌诊10次包",
-            "type": "tongue",
-            "times": 10,
-            "days": 30,
-            "price": 69.00,
-            "original_price": 99.00,
-            "is_recommend": true
-        },
-        {
-            "id": 2,
-            "name": "面诊10次包",
-            "type": "face",
-            "times": 10,
-            "days": 30,
-            "price": 69.00,
-            "original_price": 99.00,
-            "is_recommend": false
-        },
-        {
-            "id": 3,
-            "name": "月度会员",
-            "type": "all",
-            "times": 999,
-            "days": 30,
-            "price": 39.00,
-            "original_price": 99.00,
-            "is_recommend": true
-        }
-    ]
-}
-```
-
-### 9.2 购买次数包
+### 10.2 购买次数包
 
 ```
 POST /api/v1/packages/buy
@@ -757,119 +559,175 @@ Authorization: Bearer {token}
 }
 ```
 
-**Response:**
+---
+
+## 11. 支付接口
+
+### 11.1 创建支付订单
+
+```
+POST /api/v1/payment/create
+Authorization: Bearer {token}
+```
+
+**Request:**
 ```json
 {
-    "code": 0,
-    "message": "订单创建成功",
-    "data": {
-        "order_no": "PKG202607280001",
-        "pay_amount": 69.00,
-        "pay_params": {
-            "prepay_id": "wx202607280001"
-        }
-    }
+    "type": "analysis",
+    "relation_id": "TK20260804abc1234",
+    "pay_type": "wechat"
 }
+```
+
+### 11.2 获取支付方式
+
+```
+GET /api/v1/payment/methods
+Authorization: Bearer {token}
+```
+
+### 11.3 查询订单状态
+
+```
+GET /api/v1/payment/order/{orderNo}
+Authorization: Bearer {token}
+```
+
+### 11.4 支付回调（无需登录）
+
+```
+POST /api/v1/payment/notify/wechat
+POST /api/v1/payment/notify/alipay
 ```
 
 ---
 
-## 10. 健康档案接口
+## 12. 推广中心接口
 
-### 10.1 获取分析历史
+### 12.1 开通推广员
+
+```
+POST /api/v1/promoter/activate
+Authorization: Bearer {token}
+```
+
+> 注册时自动激活，此接口用于查询状态
+
+### 12.2 获取推广信息
+
+```
+GET /api/v1/promoter/info
+Authorization: Bearer {token}
+```
+
+### 12.3 获取佣金记录
+
+```
+GET /api/v1/promoter/commissions?page=1&limit=10
+Authorization: Bearer {token}
+```
+
+### 12.4 申请提现
+
+```
+POST /api/v1/promoter/withdraw
+Authorization: Bearer {token}
+Middleware: risk:withdraw
+```
+
+**Request:**
+```json
+{
+    "amount": 100.00,
+    "pay_type": "wechat",
+    "pay_account": "openid_xxx"
+}
+```
+
+### 12.5 提现历史
+
+```
+GET /api/v1/promoter/withdraw-history
+Authorization: Bearer {token}
+```
+
+### 12.6 获取推广海报
+
+```
+GET /api/v1/promoter/poster
+GET /api/v1/promoter/poster-image
+Authorization: Bearer {token}
+```
+
+### 12.7 邀请追踪
+
+```
+POST /api/v1/promoter/track-click
+GET /api/v1/promoter/invite-records
+GET /api/v1/promoter/invite-clicks
+Authorization: Bearer {token}
+```
+
+---
+
+## 13. 健康档案接口
+
+### 13.1 获取分析历史
 
 ```
 GET /api/v1/health/history?page=1&limit=10&type=
 Authorization: Bearer {token}
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "total": 15,
-        "list": [
-            {
-                "task_no": "TK202607280001",
-                "type": "tongue",
-                "type_text": "舌诊",
-                "health_score": 85,
-                "summary": "舌质淡红，苔薄白...",
-                "is_paid": true,
-                "created_at": "2026-07-28 10:00:00"
-            },
-            {
-                "task_no": "FC202607270001",
-                "type": "face",
-                "type_text": "面诊",
-                "health_score": 82,
-                "summary": "面色红润，唇色正常...",
-                "is_paid": true,
-                "created_at": "2026-07-27 14:00:00"
-            }
-        ]
-    }
-}
-```
-
-### 10.2 获取健康趋势
+### 13.2 获取健康趋势
 
 ```
 GET /api/v1/health/trend?days=30
 Authorization: Bearer {token}
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "dates": ["2026-06-28", "2026-07-05", "2026-07-12", "2026-07-28"],
-        "scores": [78, 80, 82, 85],
-        "constitution_changes": [
-            {"date": "2026-06-28", "type": "气虚质"},
-            {"date": "2026-07-28", "type": "平和质"}
-        ]
-    }
-}
-```
-
-### 10.3 获取体质档案
+### 13.3 获取体质档案
 
 ```
 GET /api/v1/health/constitution
 Authorization: Bearer {token}
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "constitution_type": "平和质",
-        "test_count": 3,
-        "last_test_at": "2026-07-28 10:00:00",
-        "history": [
-            {
-                "task_no": "CS202607280001",
-                "constitution_type": "平和质",
-                "scores": {"pinghe": 25, "qixu": 3},
-                "created_at": "2026-07-28 10:00:00"
-            }
-        ]
-    }
-}
+---
+
+## 14. 文章接口
+
+### 14.1 文章列表
+
+```
+GET /api/v1/articles?page=1&limit=10&category=
+Authorization: Bearer {token}
+```
+
+### 14.2 文章详情
+
+```
+GET /api/v1/articles/{id}
+Authorization: Bearer {token}
 ```
 
 ---
 
-## 11. 管理端接口
+## 15. 闲鱼商品接口
 
-### 11.1 管理员登录
+### 15.1 获取闲鱼商品列表
+
+```
+GET /api/v1/xianyu/products
+```
+
+> 公开接口，无需登录
+
+---
+
+## 16. 管理后台接口
+
+### 16.1 管理员登录
 
 ```
 POST /api/v1/admin/auth/login
@@ -883,63 +741,84 @@ POST /api/v1/admin/auth/login
 }
 ```
 
-### 11.2 数据概览
+### 16.2 管理员信息
+
+```
+GET /api/v1/admin/auth/info
+Authorization: Bearer {admin_token}
+```
+
+### 16.3 修改密码
+
+```
+POST /api/v1/admin/auth/change-password
+Authorization: Bearer {admin_token}
+```
+
+### 16.4 数据概览
 
 ```
 GET /api/v1/admin/dashboard
 Authorization: Bearer {admin_token}
 ```
 
-**Response:**
-```json
-{
-    "code": 0,
-    "message": "success",
-    "data": {
-        "today_visit": 1250,
-        "today_register": 86,
-        "today_paid": 23,
-        "today_income": 227.70,
-        "today_ai_calls": 156,
-        "today_ai_cost": 78.50,
-        "today_profit": 115.05,
-        "total_users": 5680
-    }
-}
-```
-
-### 11.3 用户列表
+### 16.5 用户管理
 
 ```
-GET /api/v1/admin/users?page=1&limit=20&keyword=&status=
+GET /api/v1/admin/users
+POST /api/v1/admin/users
+GET /api/v1/admin/users/{id}
+PUT /api/v1/admin/users/{id}
+PUT /api/v1/admin/users/{id}/status
+POST /api/v1/admin/users/{id}/reset-password
+POST /api/v1/admin/users/{id}/balance
+GET /api/v1/admin/users/{id}/balance-logs
 Authorization: Bearer {admin_token}
 ```
 
-### 11.4 AI模型配置
+### 16.6 管理员管理（需超级管理员权限）
 
 ```
-GET /api/v1/admin/ai-models
-POST /api/v1/admin/ai-models
-PUT /api/v1/admin/ai-models/{id}
-DELETE /api/v1/admin/ai-models/{id}
+GET /api/v1/admin/admins
+POST /api/v1/admin/admins
+PUT /api/v1/admin/admins/{id}
+POST /api/v1/admin/admins/{id}/reset-password
+DELETE /api/v1/admin/admins/{id}
+Authorization: Bearer {admin_token}
+Middleware: super_admin
+```
+
+### 16.7 订单管理
+
+```
+GET /api/v1/admin/orders
+GET /api/v1/admin/orders/{orderNo}
 Authorization: Bearer {admin_token}
 ```
 
-### 11.5 AI调用日志
+### 16.8 AI管理
 
 ```
-GET /api/v1/admin/ai-logs?page=1&limit=20&type=&model_id=
+GET /api/v1/admin/ai/models
+POST /api/v1/admin/ai/models
+PUT /api/v1/admin/ai/models/{id}
+GET /api/v1/admin/ai/logs
 Authorization: Bearer {admin_token}
 ```
 
-### 11.6 推广员列表
+### 16.9 推广管理
 
 ```
-GET /api/v1/admin/promoters?page=1&limit=20
+GET /api/v1/admin/promoters
+GET /api/v1/admin/promoters/{id}
+POST /api/v1/admin/promoters/{id}/toggle
+GET /api/v1/admin/promoters/invite-records
+POST /api/v1/admin/promoters/{id}/ban
+POST /api/v1/admin/promoters/{id}/unban
 Authorization: Bearer {admin_token}
 ```
 
-### 11.7 提现审核
+### 16.10 提现审核
 
 ```
 GET /api/v1/admin/withdraws?status=0
@@ -947,27 +826,7 @@ POST /api/v1/admin/withdraws/{id}/audit
 Authorization: Bearer {admin_token}
 ```
 
-### 11.8 体质题目管理
-
-```
-GET /api/v1/admin/constitution/questions
-POST /api/v1/admin/constitution/questions
-PUT /api/v1/admin/constitution/questions/{id}
-DELETE /api/v1/admin/constitution/questions/{id}
-Authorization: Bearer {admin_token}
-```
-
-### 11.9 次数包管理
-
-```
-GET /api/v1/admin/packages
-POST /api/v1/admin/packages
-PUT /api/v1/admin/packages/{id}
-DELETE /api/v1/admin/packages/{id}
-Authorization: Bearer {admin_token}
-```
-
-### 11.10 文章管理
+### 16.11 文章管理
 
 ```
 GET /api/v1/admin/articles
@@ -977,47 +836,194 @@ DELETE /api/v1/admin/articles/{id}
 Authorization: Bearer {admin_token}
 ```
 
-### 11.11 系统配置
+### 16.12 系统配置
 
 ```
-GET /api/v1/admin/system-configs
-POST /api/v1/admin/system-configs
-PUT /api/v1/admin/system-configs/{key}
+GET /api/v1/admin/configs
+POST /api/v1/admin/configs
+POST /api/v1/admin/test-llm
 Authorization: Bearer {admin_token}
 ```
 
-### 11.12 订单列表
+### 16.13 次数包管理
 
 ```
-GET /api/v1/admin/orders?page=1&limit=20&status=&type=
+GET /api/v1/admin/packages
+POST /api/v1/admin/packages
+PUT /api/v1/admin/packages/{id}
+DELETE /api/v1/admin/packages/{id}
+POST /api/v1/admin/packages/{id}/toggle
 Authorization: Bearer {admin_token}
 ```
 
-### 11.13 订单退款
+### 16.14 闲鱼商品管理
 
 ```
-POST /api/v1/admin/orders/{order_no}/refund
+GET /api/v1/admin/xianyu-products
+POST /api/v1/admin/xianyu-products
+PUT /api/v1/admin/xianyu-products/{id}
+DELETE /api/v1/admin/xianyu-products/{id}
+Authorization: Bearer {admin_token}
+```
+
+### 16.15 体质题目管理
+
+```
+GET /api/v1/admin/constitution/questions
+POST /api/v1/admin/constitution/questions
+PUT /api/v1/admin/constitution/questions/{id}
+DELETE /api/v1/admin/constitution/questions/{id}
+Authorization: Bearer {admin_token}
+```
+
+### 16.16 客服管理
+
+```
+GET /api/v1/admin/customer-service/statistics
+GET /api/v1/admin/customer-service/sessions
+GET /api/v1/admin/customer-service/sessions/{sessionNo}/messages
+POST /api/v1/admin/customer-service/sessions/{sessionNo}/messages
+POST /api/v1/admin/customer-service/sessions/{sessionNo}/close
+Authorization: Bearer {admin_token}
+```
+
+### 16.17 客服话术管理
+
+```
+GET /api/v1/admin/customer-service/phrases
+POST /api/v1/admin/customer-service/phrases
+PUT /api/v1/admin/customer-service/phrases/{id}
+DELETE /api/v1/admin/customer-service/phrases/{id}
+Authorization: Bearer {admin_token}
+```
+
+### 16.18 系统消息管理
+
+```
+GET /api/v1/admin/customer-service/system-messages
+POST /api/v1/admin/customer-service/system-messages
+DELETE /api/v1/admin/customer-service/system-messages/{id}
+Authorization: Bearer {admin_token}
+```
+
+### 16.19 数据分析BI
+
+```
+GET /api/v1/admin/analytics/overview
+GET /api/v1/admin/analytics/funnel
+GET /api/v1/admin/analytics/retention
+GET /api/v1/admin/analytics/revenue
+GET /api/v1/admin/analytics/user-growth
+GET /api/v1/admin/analytics/top-promoters
+GET /api/v1/admin/analytics/analysis-distribution
+GET /api/v1/admin/analytics/refund-rate
+GET /api/v1/admin/analytics/package-sales
+GET /api/v1/admin/analytics/promotion-conversion
+GET /api/v1/admin/analytics/satisfaction
+Authorization: Bearer {admin_token}
+```
+
+### 16.20 退款管理
+
+```
+GET /api/v1/admin/refunds
+GET /api/v1/admin/refunds/{id}
+POST /api/v1/admin/refunds/{id}/approve
+POST /api/v1/admin/refunds/{id}/reject
+Authorization: Bearer {admin_token}
+```
+
+### 16.21 客服评价管理
+
+```
+GET /api/v1/admin/customer-service/ratings
+GET /api/v1/admin/customer-service/ratings-stats
+Authorization: Bearer {admin_token}
+```
+
+### 16.22 风控管理
+
+```
+GET /api/v1/admin/risk/rules
+POST /api/v1/admin/risk/rules
+PUT /api/v1/admin/risk/rules/{id}
+DELETE /api/v1/admin/risk/rules/{id}
+GET /api/v1/admin/risk/events
+GET /api/v1/admin/risk/blacklists
+POST /api/v1/admin/risk/blacklists
+DELETE /api/v1/admin/risk/blacklists/{type}/{value}
+GET /api/v1/admin/risk/statistics
+Authorization: Bearer {admin_token}
+```
+
+### 16.23 用户反馈管理
+
+```
+GET /api/v1/admin/feedback
+GET /api/v1/admin/feedback/{id}
+POST /api/v1/admin/feedback/{id}/reply
+POST /api/v1/admin/feedback/{id}/close
+Authorization: Bearer {admin_token}
+```
+
+### 16.24 AI申诉管理
+
+```
+GET /api/v1/admin/appeals
+GET /api/v1/admin/appeals/{id}
+POST /api/v1/admin/appeals/{id}/audit
 Authorization: Bearer {admin_token}
 ```
 
 ---
 
-## 12. 接口权限矩阵
+## 17. 支付配置管理
 
-| 接口 | 游客 | 用户 | 推广员 | 管理员 |
-|------|------|------|--------|--------|
-| 注册/登录 | ✅ | - | - | - |
-| AI分析提交 | - | ✅ | ✅ | - |
-| 支付订单 | - | ✅ | ✅ | - |
-| 推广中心 | - | - | ✅ | - |
-| 用户管理 | - | - | - | ✅ |
-| 订单管理 | - | - | - | ✅ |
-| AI模型配置 | - | - | - | ✅ |
+### 17.1 获取支付配置
+
+```
+GET /api/v1/admin/config/payment
+Authorization: Bearer {admin_token}
+```
+
+### 17.2 切换支付方式
+
+```
+POST /api/v1/admin/config/payment-toggle
+Authorization: Bearer {admin_token}
+```
+
+---
+
+## 18. 接口权限矩阵
+
+| 模块 | 接口 | 游客 | 用户 | 管理员 | 超级管理员 |
+|------|------|------|------|--------|-----------|
+| 认证 | 注册/登录 | ✅ | - | - | - |
+| 认证 | 微信登录 | ✅(501) | - | - | - |
+| 用户 | 用户信息 | - | ✅ | - | - |
+| AI分析 | 提交分析 | - | ✅ | - | - |
+| 体质测试 | 获取题目/提交 | - | ✅ | - | - |
+| 健康问答 | 所有接口 | - | ✅ | - | - |
+| 客服 | 所有接口 | - | ✅ | ✅ | - |
+| 消息 | 系统消息 | - | ✅ | - | - |
+| 反馈 | 提交反馈 | - | ✅ | - | - |
+| 申诉 | 提交申诉 | - | ✅ | - | - |
+| 退款 | 申请退款 | - | ✅ | - | - |
+| 次数包 | 购买 | - | ✅ | - | - |
+| 支付 | 创建订单 | - | ✅ | - | - |
+| 推广 | 提现 | - | ✅(风控) | - | - |
+| 管理 | 仪表盘 | - | - | ✅ | - |
+| 管理 | 用户管理 | - | - | ✅ | - |
+| 管理 | 管理员管理 | - | - | - | ✅ |
+| 管理 | 风控管理 | - | - | ✅ | - |
+| 管理 | 数据分析 | - | - | ✅ | - |
 
 ---
 
 > **相关文档**：
 > - [数据库设计](04-database.md)
-> - [前端设计 - 用户端H5](06-frontend-web.md)
+> - [前端设计 - 用户端](06-frontend-web.md)
+> - [前端设计 - 管理端](07-frontend-admin.md)
 > - [后端设计](08-backend.md)
 > - [安全设计](10-security.md)

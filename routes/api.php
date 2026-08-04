@@ -273,6 +273,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
                 Route::post('phrases', [V1\Admin\CustomerServiceManageController::class, 'phraseStore']);
                 Route::put('phrases/{id}', [V1\Admin\CustomerServiceManageController::class, 'phraseUpdate']);
                 Route::delete('phrases/{id}', [V1\Admin\CustomerServiceManageController::class, 'phraseDestroy']);
+                Route::post('phrases/{id}/toggle-auto-reply', [V1\Admin\CustomerServiceManageController::class, 'toggleAutoReply']);
                 
                 // 系统消息管理
                 Route::get('system-messages', [V1\Admin\CustomerServiceManageController::class, 'systemMessages']);

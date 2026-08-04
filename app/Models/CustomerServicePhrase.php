@@ -17,11 +17,13 @@ class CustomerServicePhrase extends Model
         'sort_order',
         'is_public',
         'is_enabled',
+        'is_auto_reply',
     ];
 
     protected $casts = [
         'is_public' => 'boolean',
         'is_enabled' => 'boolean',
+        'is_auto_reply' => 'boolean',
         'sort_order' => 'integer',
     ];
 }

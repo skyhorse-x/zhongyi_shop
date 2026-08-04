@@ -15,6 +15,8 @@ class CustomerServiceMessage extends Model
         'sender_type',
         'content',
         'message_type',
+        'msg_type',
+        'is_auto_reply',
         'file_url',
         'file_name',
         'file_path',
@@ -30,6 +32,7 @@ class CustomerServiceMessage extends Model
     protected $casts = [
         'file_size' => 'integer',
         'read_at'   => 'datetime',
+        'is_auto_reply' => 'boolean',
     ];
 
     /**
@@ -41,6 +44,14 @@ class CustomerServiceMessage extends Model
     public function getMsgTypeAttribute(): string
     {
         return $this->message_type ?? 'text';
+    }
+
+    /**
+     * msg_type 设置器：将前端的 msg_type 映射到数据库的 message_type 列
+     */
+    public function setMsgTypeAttribute($value): void
+    {
+        $this->attributes['message_type'] = $value;
     }
 
     /**

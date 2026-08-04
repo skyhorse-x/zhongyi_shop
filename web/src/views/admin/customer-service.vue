@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, computed } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, defineComponent, h } from 'vue'
 import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
-import { Picture, ArrowLeft } from '@element-plus/icons-vue'
+import { Picture, ArrowLeft, ChatDotRound, User, Document, Money, Setting, Plus, Search, Refresh, MagicStick } from '@element-plus/icons-vue'
+import type { Component } from 'vue'
+import { getAdminToken } from '@/utils/auth'
 
 interface Session {
   id: number
@@ -57,9 +59,8 @@ const stats = ref({
 const statusFilter = ref('')
 const searchKeyword = ref('')
 const lastMessageCount = ref(0)
-const audioRef = ref<HTMLAudioElement | null>(null)
-const showChat = ref(false) // 手机端显示聊天界面
-const activeTab = ref('chat') // chat | phrases | messages | balance | settings
+const showChat = ref(false)
+const activeTab = ref('chat')
 
 // 常用话术
 interface Phrase {
@@ -69,6 +70,7 @@ interface Phrase {
   category: string
   sort_order: number
   is_public: boolean
+  is_auto_reply?: boolean  // 是否为自动回复话术
 }
 const phrases = ref<Phrase[]>([])
 const phraseDialogVisible = ref(false)
@@ -78,6 +80,7 @@ const phraseForm = ref({
   content: '',
   category: 'common',
   is_public: false,
+  is_auto_reply: false,
 })
 
 // 系统消息
@@ -119,43 +122,45 @@ const balanceLogs = ref<BalanceLog[]>([])
 const csConfig = ref({
   welcome_message: '',
   auto_welcome: true,
+  auto_reply_phrase_id: null as number | null,  // 自动回复话术ID
 })
-const configDialogVisible = ref(false)
 
 // 标签页
 const tabs = [
-  { key: 'chat', label: '客服聊天' },
-  { key: 'phrases', label: '常用话术' },
-  { key: 'messages', label: '系统消息' },
-  { key: 'balance', label: '余额记录' },
-  { key: 'settings', label: '客服设置' },
+  { key: 'chat', label: '客服聊天', icon: ChatDotRound },
+  { key: 'phrases', label: '常用话术', icon: Document },
+  { key: 'messages', label: '系统消息', icon: User },
+  { key: 'balance', label: '余额记录', icon: Money },
+  { key: 'settings', label: '客服设置', icon: Setting },
 ]
 
-// 获取认证token
-import { getAdminToken } from '@/utils/auth'
+// 图标组件包装器
+const IconWrapper = defineComponent({
+  props: {
+    icon: { type: Object as () => Component, required: true },
+  },
+  render() {
+    return h(this.icon)
+  },
+})
 
 const getToken = (): string => getAdminToken() || ''
 
 // 播放提示音
 const playNotificationSound = () => {
-  // 创建简单的提示音
   const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
   const oscillator = audioContext.createOscillator()
   const gainNode = audioContext.createGain()
-  
   oscillator.connect(gainNode)
   gainNode.connect(audioContext.destination)
-  
   oscillator.frequency.value = 800
   oscillator.type = 'sine'
   gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
   gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
-  
   oscillator.start(audioContext.currentTime)
   oscillator.stop(audioContext.currentTime + 0.5)
 }
 
-// 获取统计数据
 const loadStatistics = async () => {
   try {
     const res = await safeFetch('/api/v1/admin/customer-service/statistics', {
@@ -168,13 +173,11 @@ const loadStatistics = async () => {
     if (data.code === 0) {
       stats.value = data.data
     }
-  } catch (e) {
-    // 忽略错误
-  }
+  } catch (e) { /* 忽略 */ }
 }
 
-// 获取会话列表
 const loadSessions = async () => {
+  loading.value = true
   try {
     let url = '/api/v1/admin/customer-service/sessions?'
     if (statusFilter.value !== '') {
@@ -183,30 +186,25 @@ const loadSessions = async () => {
     if (searchKeyword.value) {
       url += `keyword=${encodeURIComponent(searchKeyword.value)}&`
     }
-    const token = getToken()
-    console.log('Loading sessions, token:', token ? 'exists' : 'missing')
     const res = await safeFetch(url, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
       },
     })
     const data = await res.json()
-    console.log('Sessions response:', data)
     if (data.code === 0) {
       sessions.value = data.data.data || []
-      console.log('Sessions loaded:', sessions.value.length)
     } else {
-      console.error('Failed to load sessions:', data.message)
       ElMessage.error(data.message || '加载失败')
     }
   } catch (e) {
-    console.error('Error loading sessions:', e)
     ElMessage.error('网络错误')
+  } finally {
+    loading.value = false
   }
 }
 
-// 获取消息列表
 const loadMessages = async (sessionNo: string, silent = false) => {
   try {
     const res = await safeFetch(`/api/v1/admin/customer-service/sessions/${sessionNo}/messages`, {
@@ -216,46 +214,74 @@ const loadMessages = async (sessionNo: string, silent = false) => {
       },
     })
     const data = await res.json()
-    console.log('Messages response for', sessionNo, ':', data)
     if (data.code === 0) {
       const newMessages = data.data.data || []
-      // 检查是否有新消息（来自用户）
       if (!silent && newMessages.length > lastMessageCount.value) {
         const lastMsg = newMessages[newMessages.length - 1]
         if (lastMsg.sender_type === 'user' && lastMsg.id !== messages.value[messages.value.length - 1]?.id) {
           playNotificationSound()
+          // 检查是否需要自动回复
+          checkAutoReply(lastMsg.content)
         }
       }
       lastMessageCount.value = newMessages.length
       messages.value = newMessages
-      console.log('Messages loaded:', messages.value.length)
       await scrollToBottom()
-    } else {
-      console.error('Failed to load messages:', data.message)
     }
-  } catch (e) {
-    console.error('Error loading messages:', e)
+  } catch (e) { /* 忽略 */ }
+}
+
+// 检查并执行自动回复
+const checkAutoReply = (userMessage: string) => {
+  if (!csConfig.value.auto_reply_phrase_id) return
+  
+  const autoReplyPhrase = phrases.value.find(p => p.id === csConfig.value.auto_reply_phrase_id)
+  if (autoReplyPhrase && currentSession.value) {
+    // 延迟1秒发送自动回复，模拟人工回复
+    setTimeout(() => {
+      sendAutoReply(autoReplyPhrase.content)
+    }, 1000)
   }
 }
 
-// 选择会话
+// 发送自动回复
+const sendAutoReply = async (content: string) => {
+  if (!currentSession.value) return
+  try {
+    const res = await safeFetch(`/api/v1/admin/customer-service/sessions/${currentSession.value.session_no}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content, is_auto_reply: true }),
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      messages.value.push(data.data)
+      await scrollToBottom()
+      loadSessions()
+    }
+  } catch (e) {
+    console.error('自动回复失败:', e)
+  }
+}
+
 const selectSession = async (session: Session) => {
   currentSession.value = session
   showChat.value = true
   await loadMessages(session.session_no)
 }
 
-// 返回会话列表（手机端）
 const backToList = () => {
   showChat.value = false
   currentSession.value = null
 }
 
-// 发送消息
 const sendMessage = async () => {
   const text = inputText.value.trim()
   if (!text || !currentSession.value) return
-
   try {
     const res = await safeFetch(`/api/v1/admin/customer-service/sessions/${currentSession.value.session_no}/messages`, {
       method: 'POST',
@@ -271,7 +297,6 @@ const sendMessage = async () => {
       messages.value.push(data.data)
       inputText.value = ''
       await scrollToBottom()
-      // 更新会话列表
       loadSessions()
     } else {
       ElMessage.error(data.message || '发送失败')
@@ -281,37 +306,36 @@ const sendMessage = async () => {
   }
 }
 
-// 触发文件选择
+// 快速发送话术
+const quickSendPhrase = async (content: string) => {
+  if (!currentSession.value) {
+    ElMessage.warning('请先选择一个会话')
+    return
+  }
+  inputText.value = content
+  await sendMessage()
+}
+
 const triggerFileInput = () => {
   fileInputRef.value?.click()
 }
 
-// 上传图片
 const handleFileChange = async (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file || !currentSession.value) return
-
-  console.log('Uploading file:', file.name, 'size:', file.size, 'type:', file.type)
-
   const formData = new FormData()
   formData.append('image', file)
-
   try {
-    const token = getToken()
-    console.log('Upload token:', token ? 'exists' : 'missing')
-    
     const res = await safeFetch(`/api/v1/admin/customer-service/sessions/${currentSession.value.session_no}/upload-image`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
       },
       body: formData,
     })
-    console.log('Upload response status:', res.status)
     const data = await res.json()
-    console.log('Upload response:', data)
     if (data.code === 0) {
       messages.value.push(data.data)
       await scrollToBottom()
@@ -321,14 +345,12 @@ const handleFileChange = async (event: Event) => {
       ElMessage.error(data.message || '上传失败')
     }
   } catch (e: any) {
-    console.error('Upload error:', e)
     ElMessage.error('上传失败: ' + (e.message || '未知错误'))
   } finally {
     target.value = ''
   }
 }
 
-// 关闭会话
 const closeSession = async (session: Session) => {
   try {
     const res = await safeFetch(`/api/v1/admin/customer-service/sessions/${session.session_no}/close`, {
@@ -355,7 +377,6 @@ const closeSession = async (session: Session) => {
   }
 }
 
-// 滚动到底部
 const scrollToBottom = async () => {
   await nextTick()
   if (messageListRef.value) {
@@ -363,73 +384,53 @@ const scrollToBottom = async () => {
   }
 }
 
-// 格式化时间
 const formatTime = (timestamp: string): string => {
   if (!timestamp) return ''
   const date = new Date(timestamp)
   return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 
-// 获取状态文本
 const getStatusText = (status: number): string => {
-  const statusMap: Record<number, string> = {
-    0: '待接入',
-    1: '服务中',
-    2: '已关闭',
-  }
+  const statusMap: Record<number, string> = { 0: '待接入', 1: '服务中', 2: '已关闭' }
   return statusMap[status] || '未知'
 }
 
-// 获取状态颜色
 const getStatusColor = (status: number): string => {
-  const colorMap: Record<number, string> = {
-    0: '#ff976a',
-    1: '#07c160',
-    2: '#969799',
-  }
+  const colorMap: Record<number, string> = { 0: '#ff976a', 1: '#07c160', 2: '#969799' }
   return colorMap[status] || '#969799'
 }
 
-// 预览图片
 const previewImage = (url: string) => {
   window.open(url, '_blank')
 }
 
-// 定时器引用
 let sessionsInterval: number | null = null
 let messagesInterval: number | null = null
 let statsInterval: number | null = null
 
-// ===== 常用话术 =====
 const loadPhrases = async () => {
   try {
     const res = await safeFetch('/api/v1/admin/customer-service/phrases', {
-      headers: {
-        'Authorization': `Bearer ${getToken()}`,
-        'Accept': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${getToken()}`, 'Accept': 'application/json' },
     })
     const data = await res.json()
-    if (data.code === 0) {
-      phrases.value = data.data
-    }
-  } catch (e) {
-    // 忽略
-  }
+    if (data.code === 0) phrases.value = data.data
+  } catch (e) { /* 忽略 */ }
 }
 
 const openPhraseDialog = (phrase: Phrase | null = null) => {
   if (phrase) {
     editingPhrase.value = phrase
-    phraseForm.value = {
-      title: phrase.title,
-      content: phrase.content,
-      category: phrase.category,
+    phraseForm.value = { 
+      title: phrase.title, 
+      content: phrase.content, 
+      category: phrase.category, 
       is_public: phrase.is_public,
+      is_auto_reply: phrase.is_auto_reply || false,
     }
   } else {
     editingPhrase.value = null
-    phraseForm.value = { title: '', content: '', category: 'common', is_public: false }
+    phraseForm.value = { title: '', content: '', category: 'common', is_public: false, is_auto_reply: false }
   }
   phraseDialogVisible.value = true
 }
@@ -440,17 +441,11 @@ const savePhrase = async () => {
     return
   }
   try {
-    const url = editingPhrase.value
-      ? `/api/v1/admin/customer-service/phrases/${editingPhrase.value.id}`
-      : '/api/v1/admin/customer-service/phrases'
+    const url = editingPhrase.value ? `/api/v1/admin/customer-service/phrases/${editingPhrase.value.id}` : '/api/v1/admin/customer-service/phrases'
     const method = editingPhrase.value ? 'PUT' : 'POST'
     const res = await safeFetch(url, {
       method,
-      headers: {
-        'Authorization': `Bearer ${getToken()}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(phraseForm.value),
     })
     const data = await res.json()
@@ -470,10 +465,7 @@ const deletePhrase = async (id: number) => {
   try {
     const res = await safeFetch(`/api/v1/admin/customer-service/phrases/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${getToken()}`,
-        'Accept': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${getToken()}`, 'Accept': 'application/json' },
     })
     const data = await res.json()
     if (data.code === 0) {
@@ -487,28 +479,44 @@ const deletePhrase = async (id: number) => {
   }
 }
 
-// 插入话术到输入框
+// 设置/取消自动回复话术
+const toggleAutoReply = async (phrase: Phrase) => {
+  try {
+    const res = await safeFetch(`/api/v1/admin/customer-service/phrases/${phrase.id}/toggle-auto-reply`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${getToken()}`, 'Accept': 'application/json' },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      ElMessage.success(phrase.is_auto_reply ? '已取消自动回复' : '已设置为自动回复')
+      loadPhrases()
+      // 更新本地配置
+      if (phrase.is_auto_reply) {
+        csConfig.value.auto_reply_phrase_id = null
+      } else {
+        csConfig.value.auto_reply_phrase_id = phrase.id
+      }
+    } else {
+      ElMessage.error(data.message || '操作失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e.message || '操作失败')
+  }
+}
+
 const insertPhrase = (content: string) => {
   inputText.value = content
   activeTab.value = 'chat'
 }
 
-// ===== 系统消息 =====
 const loadSystemMessages = async () => {
   try {
     const res = await safeFetch('/api/v1/admin/customer-service/system-messages?per_page=20', {
-      headers: {
-        'Authorization': `Bearer ${getToken()}`,
-        'Accept': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${getToken()}`, 'Accept': 'application/json' },
     })
     const data = await res.json()
-    if (data.code === 0) {
-      systemMessages.value = data.data.data || []
-    }
-  } catch (e) {
-    // 忽略
-  }
+    if (data.code === 0) systemMessages.value = data.data.data || []
+  } catch (e) { /* 忽略 */ }
 }
 
 const sendSystemMessage = async () => {
@@ -519,11 +527,7 @@ const sendSystemMessage = async () => {
   try {
     const res = await safeFetch('/api/v1/admin/customer-service/system-messages', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${getToken()}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(systemMessageForm.value),
     })
     const data = await res.json()
@@ -540,57 +544,36 @@ const sendSystemMessage = async () => {
   }
 }
 
-// ===== 余额不足记录 =====
 const loadBalanceLogs = async () => {
   try {
     const res = await safeFetch('/api/v1/admin/customer-service/balance-insufficient-logs?per_page=20', {
-      headers: {
-        'Authorization': `Bearer ${getToken()}`,
-        'Accept': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${getToken()}`, 'Accept': 'application/json' },
     })
     const data = await res.json()
-    if (data.code === 0) {
-      balanceLogs.value = data.data.data || []
-    }
-  } catch (e) {
-    // 忽略
-  }
+    if (data.code === 0) balanceLogs.value = data.data.data || []
+  } catch (e) { /* 忽略 */ }
 }
 
-// ===== 客服配置 =====
 const loadCsConfig = async () => {
   try {
     const res = await safeFetch('/api/v1/admin/customer-service/configs', {
-      headers: {
-        'Authorization': `Bearer ${getToken()}`,
-        'Accept': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${getToken()}`, 'Accept': 'application/json' },
     })
     const data = await res.json()
-    if (data.code === 0) {
-      csConfig.value = data.data
-    }
-  } catch (e) {
-    // 忽略
-  }
+    if (data.code === 0) csConfig.value = data.data
+  } catch (e) { /* 忽略 */ }
 }
 
 const saveCsConfig = async () => {
   try {
     const res = await safeFetch('/api/v1/admin/customer-service/configs', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${getToken()}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(csConfig.value),
     })
     const data = await res.json()
     if (data.code === 0) {
       ElMessage.success('保存成功')
-      configDialogVisible.value = false
     } else {
       ElMessage.error(data.message || '保存失败')
     }
@@ -606,27 +589,14 @@ onMounted(() => {
   loadSystemMessages()
   loadBalanceLogs()
   loadCsConfig()
-  
-  // 每15秒刷新会话列表
-  sessionsInterval = window.setInterval(() => {
-    loadSessions()
-  }, 15000)
-  
-  // 每30秒刷新统计数据
-  statsInterval = window.setInterval(() => {
-    loadStatistics()
-  }, 30000)
-  
-  // 每5秒刷新消息（当选中会话时）
+  sessionsInterval = window.setInterval(loadSessions, 15000)
+  statsInterval = window.setInterval(loadStatistics, 30000)
   messagesInterval = window.setInterval(() => {
-    if (currentSession.value) {
-      loadMessages(currentSession.value.session_no, true)
-    }
+    if (currentSession.value) loadMessages(currentSession.value.session_no, true)
   }, 5000)
 })
 
 onUnmounted(() => {
-  // 清除定时器
   if (sessionsInterval) clearInterval(sessionsInterval)
   if (messagesInterval) clearInterval(messagesInterval)
   if (statsInterval) clearInterval(statsInterval)
@@ -644,276 +614,409 @@ onUnmounted(() => {
         :class="{ active: activeTab === tab.key }"
         @click="activeTab = tab.key"
       >
-        {{ tab.label }}
+        <el-icon class="tab-icon"><IconWrapper :icon="tab.icon" /></el-icon>
+        <span>{{ tab.label }}</span>
       </button>
     </div>
 
     <!-- 客服聊天 -->
-    <div v-show="activeTab === 'chat'">
-    <!-- 统计卡片 -->
-    <div class="stats-bar">
-      <div class="stat-item">
-        <div class="stat-value" style="color: #ff976a">{{ stats.waiting }}</div>
-        <div class="stat-label">待接入</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value" style="color: #07c160">{{ stats.active }}</div>
-        <div class="stat-label">服务中</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value" style="color: #969799">{{ stats.closed }}</div>
-        <div class="stat-label">已关闭</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value" style="color: #1989fa">{{ stats.total }}</div>
-        <div class="stat-label">总计</div>
-      </div>
-    </div>
-
-    <!-- 主内容区 -->
-    <div class="main-content">
-      <!-- 左侧会话列表 -->
-      <div class="session-list" :class="{ 'mobile-hidden': showChat }">
-        <div class="list-header">
-          <div class="search-bar">
-            <input
-              v-model="searchKeyword"
-              placeholder="搜索用户/会话号"
-              @keyup.enter="loadSessions"
-            />
+    <div v-show="activeTab === 'chat'" class="chat-container">
+      <!-- 统计卡片 -->
+      <div class="stats-bar">
+        <div class="stat-card stat-waiting">
+          <div class="stat-icon">
+            <el-icon><ChatDotRound /></el-icon>
           </div>
-          <div class="filter-bar">
-            <select v-model="statusFilter" @change="loadSessions">
-              <option value="">全部</option>
-              <option value="0">待接入</option>
-              <option value="1">服务中</option>
-              <option value="2">已关闭</option>
-            </select>
+          <div class="stat-info">
+            <div class="stat-value">{{ stats.waiting }}</div>
+            <div class="stat-label">待接入</div>
           </div>
         </div>
-        <div class="list-content">
-          <div
-            v-for="session in sessions"
-            :key="session.id"
-            class="session-item"
-            :class="{ active: currentSession?.id === session.id }"
-            @click="selectSession(session)"
-          >
-            <div class="session-avatar">
-              {{ session.user?.nickname?.[0] || 'U' }}
-            </div>
-            <div class="session-info">
-              <div class="session-top">
-                <span class="session-name">{{ session.user?.nickname || '未知用户' }}</span>
-                <span class="session-time">{{ formatTime(session.last_message_at) }}</span>
-              </div>
-              <div class="session-bottom">
-                <span class="session-status" :style="{ color: getStatusColor(session.status) }">
-                  {{ getStatusText(session.status) }}
-                </span>
-                <span v-if="session.admin_unread > 0" class="unread-badge">{{ session.admin_unread }}</span>
-              </div>
-            </div>
+        <div class="stat-card stat-active">
+          <div class="stat-icon">
+            <el-icon><User /></el-icon>
           </div>
-          <div v-if="sessions.length === 0" class="empty-state">暂无会话</div>
+          <div class="stat-info">
+            <div class="stat-value">{{ stats.active }}</div>
+            <div class="stat-label">服务中</div>
+          </div>
+        </div>
+        <div class="stat-card stat-closed">
+          <div class="stat-icon">
+            <el-icon><Document /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ stats.closed }}</div>
+            <div class="stat-label">已关闭</div>
+          </div>
+        </div>
+        <div class="stat-card stat-total">
+          <div class="stat-icon">
+            <el-icon><Refresh /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ stats.total }}</div>
+            <div class="stat-label">总计</div>
+          </div>
         </div>
       </div>
 
-      <!-- 右侧聊天区域 -->
-      <div class="chat-area" :class="{ 'mobile-hidden': !showChat }">
-        <template v-if="currentSession">
-          <!-- 聊天头部 -->
-          <div class="chat-header">
-            <div class="user-info">
-              <button class="back-btn" @click="backToList">
-                <el-icon><ArrowLeft /></el-icon>
-              </button>
-              <span class="user-name">{{ currentSession.user?.nickname || '未知用户' }}</span>
-              <span class="user-mobile">{{ currentSession.user?.mobile }}</span>
-            </div>
-            <div class="header-actions">
-              <span class="session-no">{{ currentSession.session_no }}</span>
-              <button
-                v-if="currentSession.status !== 2"
-                class="close-btn"
-                @click="closeSession(currentSession)"
-              >
-                关闭会话
-              </button>
-            </div>
-          </div>
-
-          <!-- 消息列表 -->
-          <div ref="messageListRef" class="message-list">
-            <div
-              v-for="msg in messages"
-              :key="msg.id"
-              class="message-item"
-              :class="msg.sender_type"
-            >
-              <div class="avatar">
-                {{ msg.sender_type === 'user' ? currentSession.user?.nickname?.[0] || 'U' : '客服' }}
-              </div>
-              <div class="message-content">
-                <div v-if="msg.msg_type === 'text'" class="message-bubble">
-                  {{ msg.content }}
-                </div>
-                <div v-else-if="msg.msg_type === 'image'" class="message-bubble image-bubble">
-                  <img :src="msg.file_url" class="message-image" @click="previewImage(msg.file_url)" />
-                </div>
-                <div class="message-time">{{ formatTime(msg.created_at) }}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 输入区域 -->
-          <div class="input-area" v-if="currentSession.status !== 2">
-            <div class="input-wrapper">
+      <!-- 主内容区 -->
+      <div class="main-content">
+        <!-- 左侧会话列表 -->
+        <div class="session-list" :class="{ 'mobile-hidden': showChat }">
+          <div class="list-header">
+            <div class="search-box">
+              <el-icon class="search-icon"><Search /></el-icon>
               <input
-                v-model="inputText"
-                placeholder="输入回复内容..."
-                class="input-field"
-                @keyup.enter="sendMessage"
+                v-model="searchKeyword"
+                placeholder="搜索用户/会话号"
+                @keyup.enter="loadSessions"
               />
-              <button class="action-btn" @click="triggerFileInput" title="发送图片">
-                <el-icon><Picture /></el-icon>
-              </button>
-              <button class="send-btn" :disabled="!inputText.trim()" @click="sendMessage">
-                发送
-              </button>
             </div>
-            <input
-              ref="fileInputRef"
-              type="file"
-              accept="image/*"
-              class="hidden-input"
-              @change="handleFileChange"
-            />
+            <div class="filter-box">
+              <select v-model="statusFilter" @change="loadSessions">
+                <option value="">全部状态</option>
+                <option value="0">待接入</option>
+                <option value="1">服务中</option>
+                <option value="2">已关闭</option>
+              </select>
+            </div>
           </div>
-          <div v-else class="closed-tip">会话已关闭</div>
-        </template>
-        <div v-else class="no-session">
-          <div class="no-session-icon">💬</div>
-          <div class="no-session-text">选择一个会话开始回复</div>
+          <div class="list-content" v-loading="loading">
+            <div
+              v-for="session in sessions"
+              :key="session.id"
+              class="session-item"
+              :class="{ active: currentSession?.id === session.id, 'has-unread': session.admin_unread > 0 }"
+              @click="selectSession(session)"
+            >
+              <div class="session-avatar" :style="{ background: session.status === 1 ? '#07c160' : session.status === 0 ? '#ff976a' : '#c8c9cc' }">
+                {{ session.user?.nickname?.[0] || 'U' }}
+              </div>
+              <div class="session-info">
+                <div class="session-top">
+                  <span class="session-name">{{ session.user?.nickname || '未知用户' }}</span>
+                  <span class="session-time">{{ formatTime(session.last_message_at) }}</span>
+                </div>
+                <div class="session-bottom">
+                  <span class="session-status" :style="{ color: getStatusColor(session.status) }">
+                    {{ getStatusText(session.status) }}
+                  </span>
+                  <span class="session-mobile">{{ session.user?.mobile }}</span>
+                  <span v-if="session.admin_unread > 0" class="unread-badge">{{ session.admin_unread }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-if="sessions.length === 0 && !loading" class="empty-state">
+              <el-icon class="empty-icon"><ChatDotRound /></el-icon>
+              <div class="empty-text">暂无会话</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧聊天区域 -->
+        <div class="chat-area" :class="{ 'mobile-hidden': !showChat }">
+          <template v-if="currentSession">
+            <!-- 聊天头部 -->
+            <div class="chat-header">
+              <div class="header-left">
+                <button class="back-btn" @click="backToList">
+                  <el-icon><ArrowLeft /></el-icon>
+                </button>
+                <div class="user-avatar">
+                  {{ currentSession.user?.nickname?.[0] || 'U' }}
+                </div>
+                <div class="user-details">
+                  <span class="user-name">{{ currentSession.user?.nickname || '未知用户' }}</span>
+                  <span class="user-mobile">{{ currentSession.user?.mobile }}</span>
+                </div>
+              </div>
+              <div class="header-right">
+                <span class="session-tag">{{ currentSession.session_no }}</span>
+                <button
+                  v-if="currentSession.status !== 2"
+                  class="close-btn"
+                  @click="closeSession(currentSession)"
+                >
+                  关闭会话
+                </button>
+              </div>
+            </div>
+
+            <!-- 消息列表 -->
+            <div ref="messageListRef" class="message-list">
+              <!-- 用户消息在左侧 -->
+              <div
+                v-for="msg in messages"
+                :key="msg.id"
+                class="message-item"
+                :class="msg.sender_type === 'user' ? 'msg-left' : 'msg-right'"
+              >
+                <div class="message-avatar">
+                  {{ msg.sender_type === 'user' ? currentSession.user?.nickname?.[0] || 'U' : '客' }}
+                </div>
+                <div class="message-body">
+                  <div v-if="msg.msg_type === 'text'" class="message-bubble">
+                    {{ msg.content }}
+                  </div>
+                  <div v-else-if="msg.msg_type === 'image'" class="message-bubble image-bubble">
+                    <img :src="msg.file_url" class="message-image" @click="previewImage(msg.file_url)" />
+                  </div>
+                  <div class="message-time">{{ formatTime(msg.created_at) }}</div>
+                </div>
+              </div>
+              <div v-if="messages.length === 0" class="no-messages">
+                <el-icon><ChatDotRound /></el-icon>
+                <div>暂无消息，开始对话吧</div>
+              </div>
+            </div>
+
+            <!-- 快速话术区域 -->
+            <div class="quick-phrases" v-if="phrases.length > 0">
+              <div class="quick-phrases-header">
+                <el-icon><MagicStick /></el-icon>
+                <span>快速话术</span>
+              </div>
+              <div class="quick-phrases-list">
+                <button
+                  v-for="phrase in phrases.slice(0, 6)"
+                  :key="phrase.id"
+                  class="quick-phrase-btn"
+                  :title="phrase.content"
+                  @click="quickSendPhrase(phrase.content)"
+                >
+                  {{ phrase.title }}
+                </button>
+              </div>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="input-area" v-if="currentSession.status !== 2">
+              <div class="input-wrapper">
+                <button class="attach-btn" @click="triggerFileInput" title="发送图片">
+                  <el-icon><Picture /></el-icon>
+                </button>
+                <input
+                  v-model="inputText"
+                  placeholder="输入回复内容，按 Enter 发送..."
+                  class="input-field"
+                  @keyup.enter="sendMessage"
+                />
+                <button class="send-btn" :disabled="!inputText.trim()" @click="sendMessage">
+                  发送
+                </button>
+              </div>
+              <input
+                ref="fileInputRef"
+                type="file"
+                accept="image/*"
+                class="hidden-input"
+                @change="handleFileChange"
+              />
+            </div>
+            <div v-else class="closed-notice">
+              <el-icon><Document /></el-icon>
+              <span>会话已关闭</span>
+            </div>
+          </template>
+          <div v-else class="no-session">
+            <div class="no-session-content">
+              <el-icon class="no-session-icon"><ChatDotRound /></el-icon>
+              <div class="no-session-title">选择一个会话</div>
+              <div class="no-session-subtitle">从左侧列表中选择会话开始回复用户</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    </div><!-- End chat tab -->
 
     <!-- 常用话术 -->
     <div v-show="activeTab === 'phrases'" class="tab-content">
       <div class="content-header">
-        <h3>常用话术管理</h3>
-        <button class="add-btn" @click="openPhraseDialog()">+ 添加话术</button>
+        <div class="header-title">
+          <el-icon><Document /></el-icon>
+          <h3>常用话术管理</h3>
+        </div>
+        <button class="add-btn" @click="openPhraseDialog()">
+          <el-icon><Plus /></el-icon>
+          <span>添加话术</span>
+        </button>
       </div>
-      <div class="phrases-list">
-        <div v-for="phrase in phrases" :key="phrase.id" class="phrase-card">
-          <div class="phrase-header">
-            <span class="phrase-title">{{ phrase.title }}</span>
-            <span class="phrase-category">{{ phrase.category === 'greeting' ? '问候语' : phrase.category === 'promotion' ? '推广' : '常见问题' }}</span>
+      <div class="card-grid">
+        <div v-for="phrase in phrases" :key="phrase.id" class="phrase-card" :class="{ 'is-auto-reply': phrase.is_auto_reply }">
+          <div class="card-header">
+            <span class="card-title">{{ phrase.title }}</span>
+            <div class="card-badges">
+              <span v-if="phrase.is_auto_reply" class="auto-reply-badge">自动回复</span>
+              <span class="card-badge" :class="phrase.category">{{ phrase.category === 'greeting' ? '问候语' : phrase.category === 'promotion' ? '推广' : '常见问题' }}</span>
+            </div>
           </div>
-          <div class="phrase-content">{{ phrase.content }}</div>
-          <div class="phrase-actions">
-            <button class="action-btn insert" @click="insertPhrase(phrase.content)">插入聊天</button>
-            <button class="action-btn edit" @click="openPhraseDialog(phrase)">编辑</button>
-            <button class="action-btn delete" @click="deletePhrase(phrase.id)">删除</button>
+          <div class="card-content">{{ phrase.content }}</div>
+          <div class="card-actions">
+            <button class="card-btn primary" @click="insertPhrase(phrase.content)">插入聊天</button>
+            <button class="card-btn" :class="{ 'active': phrase.is_auto_reply }" @click="toggleAutoReply(phrase)">
+              <el-icon><MagicStick /></el-icon>
+              {{ phrase.is_auto_reply ? '取消自动回复' : '设为自动回复' }}
+            </button>
+            <button class="card-btn" @click="openPhraseDialog(phrase)">编辑</button>
+            <button class="card-btn danger" @click="deletePhrase(phrase.id)">删除</button>
           </div>
         </div>
-        <div v-if="phrases.length === 0" class="empty-tip">暂无话术，点击添加</div>
+        <div v-if="phrases.length === 0" class="empty-card">
+          <el-icon><Document /></el-icon>
+          <div>暂无话术，点击添加</div>
+        </div>
       </div>
     </div>
 
     <!-- 系统消息 -->
     <div v-show="activeTab === 'messages'" class="tab-content">
       <div class="content-header">
-        <h3>系统消息</h3>
-        <button class="add-btn" @click="systemMessageDialogVisible = true">+ 发送消息</button>
+        <div class="header-title">
+          <el-icon><User /></el-icon>
+          <h3>系统消息</h3>
+        </div>
+        <button class="add-btn" @click="systemMessageDialogVisible = true">
+          <el-icon><Plus /></el-icon>
+          <span>发送消息</span>
+        </button>
       </div>
-      <div class="messages-list">
+      <div class="card-grid">
         <div v-for="msg in systemMessages" :key="msg.id" class="message-card">
-          <div class="message-card-header">
-            <span class="message-title">{{ msg.title }}</span>
-            <span class="message-type">{{ msg.type === 'notice' ? '通知' : msg.type === 'activity' ? '活动' : msg.type === 'balance' ? '余额' : '系统' }}</span>
+          <div class="card-header">
+            <span class="card-title">{{ msg.title }}</span>
+            <span class="card-badge" :class="msg.type">{{ msg.type === 'notice' ? '通知' : msg.type === 'activity' ? '活动' : msg.type === 'balance' ? '余额' : '系统' }}</span>
           </div>
-          <div class="message-card-content">{{ msg.content }}</div>
-          <div class="message-card-footer">
+          <div class="card-content">{{ msg.content }}</div>
+          <div class="card-footer">
             <span>接收人: {{ msg.user_id === 0 ? '全部用户' : (msg.user?.nickname || msg.user_id) }}</span>
             <span>{{ formatTime(msg.created_at) }}</span>
           </div>
         </div>
-        <div v-if="systemMessages.length === 0" class="empty-tip">暂无系统消息</div>
+        <div v-if="systemMessages.length === 0" class="empty-card">
+          <el-icon><User /></el-icon>
+          <div>暂无系统消息</div>
+        </div>
       </div>
     </div>
 
     <!-- 余额不足记录 -->
     <div v-show="activeTab === 'balance'" class="tab-content">
       <div class="content-header">
-        <h3>余额不足记录</h3>
-      </div>
-      <div class="balance-logs">
-        <div v-for="log in balanceLogs" :key="log.id" class="log-card">
-          <div class="log-header">
-            <span class="log-user">{{ log.user?.nickname || '用户' + log.user_id }}</span>
-            <span class="log-type">{{ log.action_type === 'analysis' ? '分析' : log.action_type === 'constitution' ? '体质测试' : '问答' }}</span>
-          </div>
-          <div class="log-body">
-            <span>余额: ¥{{ log.current_balance }}</span>
-            <span>所需: ¥{{ log.required_amount }}</span>
-            <span :class="['log-status', log.is_notified ? 'notified' : 'pending']">{{ log.is_notified ? '已通知' : '未通知' }}</span>
-          </div>
-          <div class="log-time">{{ formatTime(log.created_at) }}</div>
+        <div class="header-title">
+          <el-icon><Money /></el-icon>
+          <h3>余额不足记录</h3>
         </div>
-        <div v-if="balanceLogs.length === 0" class="empty-tip">暂无余额不足记录</div>
+      </div>
+      <div class="card-grid">
+        <div v-for="log in balanceLogs" :key="log.id" class="log-card">
+          <div class="card-header">
+            <span class="card-title">{{ log.user?.nickname || '用户' + log.user_id }}</span>
+            <span class="card-badge">{{ log.action_type === 'analysis' ? '分析' : log.action_type === 'constitution' ? '体质测试' : '问答' }}</span>
+          </div>
+          <div class="log-details">
+            <span class="log-item">余额: <strong>¥{{ log.current_balance }}</strong></span>
+            <span class="log-item">所需: <strong>¥{{ log.required_amount }}</strong></span>
+            <span class="log-status" :class="log.is_notified ? 'success' : 'warning'">{{ log.is_notified ? '已通知' : '未通知' }}</span>
+          </div>
+          <div class="card-footer">
+            <span>{{ formatTime(log.created_at) }}</span>
+          </div>
+        </div>
+        <div v-if="balanceLogs.length === 0" class="empty-card">
+          <el-icon><Money /></el-icon>
+          <div>暂无余额不足记录</div>
+        </div>
       </div>
     </div>
 
     <!-- 客服设置 -->
     <div v-show="activeTab === 'settings'" class="tab-content">
       <div class="content-header">
-        <h3>客服设置</h3>
-      </div>
-      <div class="settings-form">
-        <div class="form-item">
-          <label>自动发送欢迎消息</label>
-          <input type="checkbox" v-model="csConfig.auto_welcome" />
+        <div class="header-title">
+          <el-icon><Setting /></el-icon>
+          <h3>客服设置</h3>
         </div>
-        <div class="form-item">
-          <label>欢迎消息内容</label>
+      </div>
+      <div class="settings-card">
+        <div class="setting-item">
+          <div class="setting-label">
+            <span>自动发送欢迎消息</span>
+            <span class="setting-desc">开启后，用户发起会话时将自动发送欢迎语</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" v-model="csConfig.auto_welcome" />
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+        <div class="setting-item vertical">
+          <div class="setting-label">
+            <span>欢迎消息内容</span>
+            <span class="setting-desc">用户进入聊天时自动发送的消息</span>
+          </div>
           <textarea v-model="csConfig.welcome_message" rows="4" placeholder="请输入欢迎消息内容..."></textarea>
         </div>
-        <button class="save-btn" @click="saveCsConfig">保存设置</button>
+        <div class="setting-item vertical">
+          <div class="setting-label">
+            <span>自动回复话术</span>
+            <span class="setting-desc">设置后，当用户发送消息时将自动回复该话术内容</span>
+          </div>
+          <select v-model="csConfig.auto_reply_phrase_id">
+            <option :value="null">不启用自动回复</option>
+            <option v-for="phrase in phrases" :key="phrase.id" :value="phrase.id">
+              {{ phrase.title }} - {{ phrase.content.substring(0, 30) }}...
+            </option>
+          </select>
+        </div>
+        <div class="setting-actions">
+          <button class="save-btn" @click="saveCsConfig">
+            <el-icon><Setting /></el-icon>
+            <span>保存设置</span>
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- 话术编辑弹窗 -->
     <div v-if="phraseDialogVisible" class="dialog-overlay" @click.self="phraseDialogVisible = false">
       <div class="dialog">
-        <h3>{{ editingPhrase ? '编辑话术' : '添加话术' }}</h3>
-        <div class="form-group">
-          <label>标题</label>
-          <input v-model="phraseForm.title" placeholder="话术标题" />
+        <div class="dialog-header">
+          <h3>{{ editingPhrase ? '编辑话术' : '添加话术' }}</h3>
         </div>
-        <div class="form-group">
-          <label>内容</label>
-          <textarea v-model="phraseForm.content" rows="4" placeholder="话术内容"></textarea>
+        <div class="dialog-body">
+          <div class="form-group">
+            <label>标题</label>
+            <input v-model="phraseForm.title" placeholder="话术标题" />
+          </div>
+          <div class="form-group">
+            <label>内容</label>
+            <textarea v-model="phraseForm.content" rows="4" placeholder="话术内容"></textarea>
+          </div>
+          <div class="form-group">
+            <label>分类</label>
+            <select v-model="phraseForm.category">
+              <option value="greeting">问候语</option>
+              <option value="common">常见问题</option>
+              <option value="promotion">推广</option>
+            </select>
+          </div>
+          <div class="form-group inline">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="phraseForm.is_public" />
+              <span>设为公共话术</span>
+            </label>
+          </div>
+          <div class="form-group inline">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="phraseForm.is_auto_reply" />
+              <span>设为自动回复话术</span>
+            </label>
+          </div>
         </div>
-        <div class="form-group">
-          <label>分类</label>
-          <select v-model="phraseForm.category">
-            <option value="greeting">问候语</option>
-            <option value="common">常见问题</option>
-            <option value="promotion">推广</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>
-            <input type="checkbox" v-model="phraseForm.is_public" />
-            设为公共话术
-          </label>
-        </div>
-        <div class="dialog-actions">
-          <button @click="phraseDialogVisible = false">取消</button>
-          <button class="primary" @click="savePhrase">保存</button>
+        <div class="dialog-footer">
+          <button class="btn-cancel" @click="phraseDialogVisible = false">取消</button>
+          <button class="btn-primary" @click="savePhrase">保存</button>
         </div>
       </div>
     </div>
@@ -921,35 +1024,39 @@ onUnmounted(() => {
     <!-- 系统消息发送弹窗 -->
     <div v-if="systemMessageDialogVisible" class="dialog-overlay" @click.self="systemMessageDialogVisible = false">
       <div class="dialog">
-        <h3>发送系统消息</h3>
-        <div class="form-group">
-          <label>接收用户ID (0=全部用户)</label>
-          <input type="number" v-model.number="systemMessageForm.user_id" placeholder="0" />
+        <div class="dialog-header">
+          <h3>发送系统消息</h3>
         </div>
-        <div class="form-group">
-          <label>标题</label>
-          <input v-model="systemMessageForm.title" placeholder="消息标题" />
+        <div class="dialog-body">
+          <div class="form-group">
+            <label>接收用户ID (0=全部用户)</label>
+            <input type="number" v-model.number="systemMessageForm.user_id" placeholder="0" />
+          </div>
+          <div class="form-group">
+            <label>标题</label>
+            <input v-model="systemMessageForm.title" placeholder="消息标题" />
+          </div>
+          <div class="form-group">
+            <label>内容</label>
+            <textarea v-model="systemMessageForm.content" rows="4" placeholder="消息内容"></textarea>
+          </div>
+          <div class="form-group">
+            <label>类型</label>
+            <select v-model="systemMessageForm.type">
+              <option value="notice">通知</option>
+              <option value="activity">活动</option>
+              <option value="system">系统更新</option>
+              <option value="balance">余额提醒</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>跳转链接 (可选)</label>
+            <input v-model="systemMessageForm.target_url" placeholder="https://" />
+          </div>
         </div>
-        <div class="form-group">
-          <label>内容</label>
-          <textarea v-model="systemMessageForm.content" rows="4" placeholder="消息内容"></textarea>
-        </div>
-        <div class="form-group">
-          <label>类型</label>
-          <select v-model="systemMessageForm.type">
-            <option value="notice">通知</option>
-            <option value="activity">活动</option>
-            <option value="system">系统更新</option>
-            <option value="balance">余额提醒</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>跳转链接 (可选)</label>
-          <input v-model="systemMessageForm.target_url" placeholder="https://" />
-        </div>
-        <div class="dialog-actions">
-          <button @click="systemMessageDialogVisible = false">取消</button>
-          <button class="primary" @click="sendSystemMessage">发送</button>
+        <div class="dialog-footer">
+          <button class="btn-cancel" @click="systemMessageDialogVisible = false">取消</button>
+          <button class="btn-primary" @click="sendSystemMessage">发送</button>
         </div>
       </div>
     </div>
@@ -961,139 +1068,224 @@ onUnmounted(() => {
   height: calc(100vh - 60px);
   display: flex;
   flex-direction: column;
+  background: #f5f7fa;
+}
+
+/* 标签导航 */
+.tab-navigation {
+  display: flex;
+  background: #fff;
+  border-bottom: 1px solid #e4e7ed;
+  padding: 0 24px;
+  gap: 4px;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 20px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: #606266;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s;
+}
+
+.tab-btn:hover {
+  color: #409eff;
+  background: #f5f7fa;
+}
+
+.tab-btn.active {
+  color: #409eff;
+  border-bottom-color: #409eff;
+  font-weight: 500;
+}
+
+.tab-icon {
+  font-size: 16px;
+}
+
+/* 聊天容器 */
+.chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* 统计栏 */
 .stats-bar {
   display: flex;
   gap: 16px;
-  padding: 16px 20px;
-  background: #fff;
-  border-bottom: 1px solid #ebedf0;
+  padding: 20px 24px;
 }
 
-.stat-item {
+.stat-card {
   flex: 1;
-  text-align: center;
-  padding: 12px;
-  background: #f7f8fa;
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid #ebeef5;
 }
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.stat-waiting .stat-icon { background: #fff7e6; color: #ff976a; }
+.stat-active .stat-icon { background: #f0f9eb; color: #07c160; }
+.stat-closed .stat-icon { background: #f4f4f5; color: #909399; }
+.stat-total .stat-icon { background: #ecf5ff; color: #409eff; }
+
+.stat-info { flex: 1; }
 
 .stat-value {
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
   margin-bottom: 4px;
 }
 
+.stat-waiting .stat-value { color: #ff976a; }
+.stat-active .stat-value { color: #07c160; }
+.stat-closed .stat-value { color: #909399; }
+.stat-total .stat-value { color: #409eff; }
+
 .stat-label {
-  font-size: 12px;
-  color: #969799;
+  font-size: 13px;
+  color: #909399;
 }
 
 /* 主内容区 */
 .main-content {
   flex: 1;
   display: flex;
+  margin: 0 24px 24px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   overflow: hidden;
 }
 
 /* 会话列表 */
 .session-list {
-  width: 300px;
-  border-right: 1px solid #ebedf0;
+  width: 320px;
+  border-right: 1px solid #ebeef5;
   display: flex;
   flex-direction: column;
   background: #fff;
 }
 
 .list-header {
-  padding: 12px;
-  border-bottom: 1px solid #ebedf0;
+  padding: 16px;
+  border-bottom: 1px solid #ebeef5;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.search-bar input {
+.search-box { position: relative; }
+
+.search-box .search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #909399;
+  font-size: 14px;
+}
+
+.search-box input {
   width: 100%;
-  height: 36px;
-  border: 1px solid #ebedf0;
-  border-radius: 4px;
+  height: 38px;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
+  padding: 0 12px 0 36px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.search-box input:focus { border-color: #409eff; }
+
+.filter-box select {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
   padding: 0 12px;
   font-size: 14px;
-  margin-bottom: 8px;
   outline: none;
-}
-
-.search-bar input:focus {
-  border-color: #1989fa;
-}
-
-.filter-bar select {
-  width: 100%;
-  height: 36px;
-  border: 1px solid #ebedf0;
-  border-radius: 4px;
-  padding: 0 12px;
-  font-size: 14px;
-  outline: none;
+  cursor: pointer;
 }
 
 .list-content {
   flex: 1;
   overflow-y: auto;
+  padding: 8px;
 }
 
 .session-item {
   display: flex;
-  padding: 12px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: background 0.15s;
-  border-bottom: 1px solid #f5f5f5;
+  transition: all 0.2s;
+  margin-bottom: 4px;
 }
 
-.session-item:hover {
-  background: #f7f8fa;
-}
-
-.session-item.active {
-  background: #ecf5ff;
-}
+.session-item:hover { background: #f5f7fa; }
+.session-item.active { background: #ecf5ff; }
+.session-item.has-unread { background: #fef0f0; }
+.session-item.has-unread.active { background: #ecf5ff; }
 
 .session-avatar {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: #1989fa;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  font-weight: bold;
-  margin-right: 12px;
+  font-size: 18px;
+  font-weight: 600;
   flex-shrink: 0;
 }
 
-.session-info {
-  flex: 1;
-  min-width: 0;
-}
+.session-info { flex: 1; min-width: 0; }
 
 .session-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .session-name {
   font-size: 14px;
   font-weight: 500;
-  color: #323233;
+  color: #303133;
 }
 
 .session-time {
   font-size: 12px;
-  color: #c8c9cc;
+  color: #c0c4cc;
 }
 
 .session-bottom {
@@ -1104,45 +1296,57 @@ onUnmounted(() => {
 
 .session-status {
   font-size: 12px;
+  font-weight: 500;
+}
+
+.session-mobile {
+  font-size: 12px;
+  color: #909399;
 }
 
 .unread-badge {
-  min-width: 18px;
-  height: 18px;
-  line-height: 18px;
+  min-width: 20px;
+  height: 20px;
+  line-height: 20px;
   text-align: center;
-  background: #ee0a24;
+  background: #f56c6c;
   color: #fff;
-  font-size: 10px;
-  border-radius: 9px;
-  padding: 0 5px;
+  font-size: 11px;
+  border-radius: 10px;
+  padding: 0 6px;
+  margin-left: auto;
 }
 
 .empty-state {
-  padding: 40px 20px;
-  text-align: center;
-  color: #c8c9cc;
-  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #c0c4cc;
 }
+
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-text { font-size: 14px; }
 
 /* 聊天区域 */
 .chat-area {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #f7f8fa;
+  background: #f5f7fa;
 }
 
 .chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 16px 24px;
   background: #fff;
-  border-bottom: 1px solid #ebedf0;
+  border-bottom: 1px solid #ebeef5;
 }
 
-.user-info {
+.header-left {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1150,123 +1354,152 @@ onUnmounted(() => {
 
 .back-btn {
   display: none;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: none;
-  background: transparent;
-  color: #323233;
+  background: #f5f7fa;
+  color: #606266;
+  border-radius: 8px;
   cursor: pointer;
   align-items: center;
   justify-content: center;
   font-size: 18px;
-  margin-right: 8px;
 }
 
-.user-name {
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #409eff;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 16px;
+  font-weight: 600;
+}
+
+.user-details { display: flex; flex-direction: column; }
+
+.user-name {
+  font-size: 15px;
   font-weight: 500;
-  color: #323233;
+  color: #303133;
 }
 
 .user-mobile {
   font-size: 12px;
-  color: #969799;
+  color: #909399;
 }
 
-.header-actions {
+.header-right {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.session-no {
+.session-tag {
   font-size: 12px;
-  color: #969799;
+  color: #909399;
+  background: #f5f7fa;
+  padding: 4px 10px;
+  border-radius: 4px;
 }
 
 .close-btn {
-  padding: 6px 16px;
+  padding: 8px 16px;
   background: #fff;
-  color: #ee0a24;
-  border: 1px solid #ee0a24;
-  border-radius: 4px;
-  font-size: 12px;
+  color: #f56c6c;
+  border: 1px solid #f56c6c;
+  border-radius: 6px;
+  font-size: 13px;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
-.close-btn:hover {
-  background: #fef0f0;
-}
+.close-btn:hover { background: #fef0f0; }
 
 /* 消息列表 */
 .message-list {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 24px;
 }
 
 .message-item {
   display: flex;
-  margin-bottom: 16px;
-  gap: 8px;
+  margin-bottom: 20px;
+  gap: 12px;
 }
 
-.message-item.admin {
+/* 用户消息在左侧 */
+.msg-left {
+  flex-direction: row;
+}
+
+.msg-left .message-avatar {
+  background: #07c160;
+}
+
+/* 客服消息在右侧 */
+.msg-right {
   flex-direction: row-reverse;
 }
 
-.avatar {
-  width: 36px;
-  height: 36px;
+.msg-right .message-avatar {
+  background: #409eff;
+}
+
+.message-avatar {
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: #07c160;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 500;
   flex-shrink: 0;
 }
 
-.message-item.admin .avatar {
-  background: #1989fa;
-}
-
-.message-content {
+.message-body {
   max-width: 60%;
 }
 
 .message-bubble {
-  padding: 12px 16px;
-  border-radius: 12px;
+  padding: 14px 18px;
+  border-radius: 16px;
   font-size: 14px;
   line-height: 1.6;
-  word-break: break-all;
+  word-break: break-word;
 }
 
-.admin .message-bubble {
-  background: #1989fa;
+/* 用户消息气泡 - 左侧白色 */
+.msg-left .message-bubble {
+  background: #fff;
+  color: #303133;
+  border-top-left-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* 客服消息气泡 - 右侧蓝色 */
+.msg-right .message-bubble {
+  background: #409eff;
   color: #fff;
   border-top-right-radius: 4px;
 }
 
-.user .message-bubble {
-  background: #fff;
-  color: #323233;
-  border-top-left-radius: 4px;
-}
-
 .message-time {
   font-size: 11px;
-  color: #c8c9cc;
-  margin-top: 4px;
+  color: #c0c4cc;
+  margin-top: 6px;
 }
 
-.admin .message-time {
+.msg-right .message-time {
   text-align: right;
 }
 
-/* 图片消息 */
 .image-bubble {
   padding: 4px;
   overflow: hidden;
@@ -1275,269 +1508,175 @@ onUnmounted(() => {
 .message-image {
   max-width: 200px;
   max-height: 200px;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
+}
+
+.no-messages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #c0c4cc;
+}
+
+.no-messages .el-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+/* 快速话术区域 */
+.quick-phrases {
+  padding: 12px 24px;
+  background: #fff;
+  border-top: 1px solid #ebeef5;
+}
+
+.quick-phrases-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 10px;
+}
+
+.quick-phrases-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-phrase-btn {
+  padding: 6px 14px;
+  background: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 16px;
+  font-size: 13px;
+  color: #606266;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-phrase-btn:hover {
+  background: #ecf5ff;
+  border-color: #409eff;
+  color: #409eff;
 }
 
 /* 输入区域 */
 .input-area {
-  padding: 16px 20px;
+  padding: 16px 24px;
   background: #fff;
-  border-top: 1px solid #ebedf0;
+  border-top: 1px solid #ebeef5;
 }
 
 .input-wrapper {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
 }
 
-.input-field {
-  flex: 1;
-  height: 44px;
-  border: 1px solid #ebedf0;
-  border-radius: 4px;
-  padding: 0 16px;
-  font-size: 14px;
-  outline: none;
-}
-
-.input-field:focus {
-  border-color: #1989fa;
-}
-
-.action-btn {
-  width: 44px;
-  height: 44px;
-  border: 1px solid #ebedf0;
-  border-radius: 4px;
+.attach-btn {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #dcdfe6;
+  border-radius: 10px;
   background: #fff;
-  color: #666;
+  color: #606266;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
+  transition: all 0.2s;
 }
 
-.action-btn:hover {
-  background: #f5f5f5;
+.attach-btn:hover {
+  border-color: #409eff;
+  color: #409eff;
 }
+
+.input-field {
+  flex: 1;
+  height: 42px;
+  border: 1px solid #dcdfe6;
+  border-radius: 10px;
+  padding: 0 16px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input-field:focus { border-color: #409eff; }
 
 .send-btn {
-  height: 44px;
+  height: 42px;
   padding: 0 24px;
-  background: #1989fa;
+  background: #409eff;
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
-.send-btn:hover {
-  background: #0765c0;
-}
-
+.send-btn:hover { background: #66b1ff; }
 .send-btn:disabled {
-  background: #c8c9cc;
+  background: #c0c4cc;
   cursor: not-allowed;
 }
 
-.hidden-input {
-  display: none;
-}
+.hidden-input { display: none; }
 
-/* 空状态 */
 .no-session {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+.no-session-content {
+  text-align: center;
+  color: #909399;
 }
 
 .no-session-icon {
   font-size: 64px;
   margin-bottom: 16px;
+  color: #c0c4cc;
 }
 
-.no-session-text {
-  font-size: 14px;
-  color: #969799;
-}
-
-.closed-tip {
-  padding: 16px;
-  text-align: center;
-  color: #ee0a24;
-  font-size: 14px;
-  background: #fff;
-  border-top: 1px solid #ebedf0;
-}
-
-/* 手机端适配 */
-@media (max-width: 768px) {
-  .stats-bar {
-    padding: 10px 12px;
-    gap: 8px;
-  }
-
-  .stat-item {
-    padding: 8px 4px;
-  }
-
-  .stat-value {
-    font-size: 18px;
-  }
-
-  .stat-label {
-    font-size: 11px;
-  }
-
-  .main-content {
-    position: relative;
-  }
-
-  .session-list {
-    width: 100%;
-    border-right: none;
-  }
-
-  .chat-area {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 10;
-    background: #f7f8fa;
-  }
-
-  .mobile-hidden {
-    display: none !important;
-  }
-
-  .back-btn {
-    display: flex;
-  }
-
-  .chat-header {
-    padding: 12px 16px;
-  }
-
-  .user-name {
-    font-size: 14px;
-  }
-
-  .user-mobile {
-    display: none;
-  }
-
-  .session-no {
-    display: none;
-  }
-
-  .close-btn {
-    padding: 4px 12px;
-    font-size: 11px;
-  }
-
-  .message-list {
-    padding: 12px 16px;
-  }
-
-  .message-content {
-    max-width: 75%;
-  }
-
-  .message-bubble {
-    padding: 10px 12px;
-    font-size: 13px;
-  }
-
-  .input-area {
-    padding: 10px 12px;
-  }
-
-  .input-field {
-    height: 40px;
-    font-size: 13px;
-  }
-
-  .action-btn {
-    width: 40px;
-    height: 40px;
-  }
-
-  .send-btn {
-    height: 40px;
-    padding: 0 16px;
-    font-size: 13px;
-  }
-
-  .list-header {
-    padding: 10px 12px;
-  }
-
-  .search-bar input,
-  .filter-bar select {
-    height: 34px;
-    font-size: 13px;
-  }
-
-  .session-item {
-    padding: 10px 12px;
-  }
-
-  .session-avatar {
-    width: 36px;
-    height: 36px;
-    font-size: 14px;
-  }
-
-  .session-name {
-    font-size: 13px;
-  }
-
-  .session-time {
-    font-size: 11px;
-  }
-}
-
-/* 标签导航 */
-.tab-navigation {
-  display: flex;
-  background: #fff;
-  border-bottom: 1px solid #ebedf0;
-  padding: 0 16px;
-}
-
-.tab-btn {
-  padding: 12px 20px;
-  border: none;
-  background: transparent;
-  font-size: 14px;
-  color: #646566;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.3s;
-}
-
-.tab-btn:hover {
-  color: #1989fa;
-}
-
-.tab-btn.active {
-  color: #1989fa;
-  border-bottom-color: #1989fa;
+.no-session-title {
+  font-size: 18px;
   font-weight: 500;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.no-session-subtitle {
+  font-size: 14px;
+  color: #909399;
+}
+
+.closed-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: #f56c6c;
+  font-size: 14px;
+  background: #fef0f0;
 }
 
 /* 标签内容 */
 .tab-content {
   flex: 1;
-  padding: 20px;
+  padding: 24px;
   overflow-y: auto;
 }
 
@@ -1545,183 +1684,328 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
-.content-header h3 {
-  font-size: 16px;
-  font-weight: 500;
-  color: #323233;
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-title .el-icon {
+  font-size: 20px;
+  color: #409eff;
+}
+
+.header-title h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
   margin: 0;
 }
 
 .add-btn {
-  padding: 8px 16px;
-  background: #1989fa;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: #409eff;
   color: #fff;
   border: none;
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
-.add-btn:hover {
-  background: #0776e8;
-}
+.add-btn:hover { background: #66b1ff; }
 
-/* 话术卡片 */
-.phrases-list,
-.messages-list,
-.balance-logs {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* 卡片网格 */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
 }
 
 .phrase-card,
 .message-card,
 .log-card {
   background: #fff;
-  border-radius: 8px;
-  padding: 16px;
-  border: 1px solid #ebedf0;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #ebeef5;
+  transition: all 0.2s;
 }
 
-.phrase-header,
-.message-card-header,
-.log-header {
+.phrase-card:hover,
+.message-card:hover,
+.log-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.phrase-card.is-auto-reply {
+  border-color: #409eff;
+  background: #f5faff;
+}
+
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-}
-
-.phrase-title,
-.message-title,
-.log-user {
-  font-weight: 500;
-  color: #323233;
-}
-
-.phrase-category,
-.message-type,
-.log-type {
-  font-size: 12px;
-  padding: 2px 8px;
-  background: #e8f4ff;
-  color: #1989fa;
-  border-radius: 4px;
-}
-
-.phrase-content,
-.message-card-content {
-  font-size: 14px;
-  color: #646566;
-  white-space: pre-wrap;
   margin-bottom: 12px;
 }
 
-.phrase-actions {
+.card-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.auto-reply-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #409eff;
+  color: #fff;
+  border-radius: 10px;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.card-badge {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.card-badge.greeting,
+.card-badge.notice { background: #ecf5ff; color: #409eff; }
+.card-badge.common,
+.card-badge.activity { background: #f0f9eb; color: #67c23a; }
+.card-badge.promotion,
+.card-badge.balance { background: #fdf6ec; color: #e6a23c; }
+.card-badge.system { background: #f4f4f5; color: #909399; }
+
+.card-content {
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  white-space: pre-wrap;
+}
+
+.card-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-.action-btn {
-  padding: 6px 12px;
-  border: 1px solid #ebedf0;
+.card-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border: 1px solid #dcdfe6;
   background: #fff;
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: 6px;
+  font-size: 13px;
   cursor: pointer;
-  color: #646566;
+  color: #606266;
+  transition: all 0.2s;
 }
 
-.action-btn:hover {
-  border-color: #1989fa;
-  color: #1989fa;
+.card-btn:hover {
+  border-color: #409eff;
+  color: #409eff;
 }
 
-.action-btn.delete:hover {
-  border-color: #ee0a24;
-  color: #ee0a24;
+.card-btn.primary {
+  background: #409eff;
+  color: #fff;
+  border-color: #409eff;
 }
 
-.message-card-footer,
-.log-body,
-.log-time {
+.card-btn.primary:hover { background: #66b1ff; }
+
+.card-btn.active {
+  background: #ecf5ff;
+  border-color: #409eff;
+  color: #409eff;
+}
+
+.card-btn.danger:hover {
+  border-color: #f56c6c;
+  color: #f56c6c;
+}
+
+.card-footer {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: #969799;
-  margin-top: 8px;
+  color: #909399;
+  padding-top: 12px;
+  border-top: 1px solid #f5f7fa;
 }
 
-.log-body {
+.log-details {
+  display: flex;
+  align-items: center;
   gap: 16px;
+  margin-bottom: 12px;
 }
 
-.log-status.notified {
-  color: #07c160;
+.log-item {
+  font-size: 13px;
+  color: #606266;
 }
 
-.log-status.pending {
-  color: #ff976a;
-}
+.log-item strong { color: #303133; }
 
-.empty-tip {
-  text-align: center;
-  padding: 40px;
-  color: #c8c9cc;
-  font-size: 14px;
-}
-
-/* 设置表单 */
-.settings-form {
-  max-width: 600px;
-}
-
-.form-group,
-.form-item {
-  margin-bottom: 16px;
-}
-
-.form-group label,
-.form-item label {
-  display: block;
-  font-size: 14px;
-  color: #646566;
-  margin-bottom: 8px;
-}
-
-.form-group input,
-.form-group textarea,
-.form-group select,
-.form-item textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ebedf0;
+.log-status {
+  padding: 2px 8px;
   border-radius: 4px;
+  font-size: 12px;
+  margin-left: auto;
+}
+
+.log-status.success { background: #f0f9eb; color: #67c23a; }
+.log-status.warning { background: #fdf6ec; color: #e6a23c; }
+
+.empty-card {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px dashed #dcdfe6;
+  color: #909399;
+}
+
+.empty-card .el-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  color: #c0c4cc;
+}
+
+/* 设置卡片 */
+.settings-card {
+  max-width: 600px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #ebeef5;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 1px solid #f5f7fa;
+}
+
+.setting-item:last-child { border-bottom: none; }
+
+.setting-item.vertical {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.setting-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-label span:first-child {
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.setting-desc {
+  font-size: 13px;
+  color: #909399;
+}
+
+.setting-item select,
+.setting-item textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
   font-size: 14px;
-}
-
-.form-group textarea {
   resize: vertical;
+  outline: none;
 }
 
-.save-btn,
-.dialog-actions .primary {
-  padding: 10px 24px;
-  background: #1989fa;
+.setting-item select:focus,
+.setting-item textarea:focus { border-color: #409eff; }
+
+.setting-actions { margin-top: 24px; }
+
+.save-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 24px;
+  background: #409eff;
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
 }
 
-.save-btn:hover {
-  background: #0776e8;
+.save-btn:hover { background: #66b1ff; }
+
+/* 开关 */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
 }
+
+.switch input { opacity: 0; width: 0; height: 0; }
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #dcdfe6;
+  transition: 0.3s;
+  border-radius: 26px;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.switch input:checked + .switch-slider { background-color: #409eff; }
+.switch input:checked + .switch-slider:before { transform: translateX(22px); }
 
 /* 弹窗 */
 .dialog-overlay {
@@ -1734,61 +2018,148 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2000;
 }
 
 .dialog {
   background: #fff;
-  border-radius: 8px;
-  padding: 24px;
+  border-radius: 16px;
   width: 90%;
   max-width: 500px;
-  max-height: 80vh;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.dialog-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #303133;
+}
+
+.dialog-body {
+  padding: 24px;
   overflow-y: auto;
 }
 
-.dialog h3 {
-  margin: 0 0 20px;
-  font-size: 18px;
-  color: #323233;
-}
-
-.dialog-actions {
+.dialog-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #ebeef5;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 20px;
 }
 
-.dialog-actions button {
+.btn-cancel {
   padding: 10px 20px;
-  border: 1px solid #ebedf0;
+  border: 1px solid #dcdfe6;
   background: #fff;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 14px;
   cursor: pointer;
-  color: #646566;
+  color: #606266;
 }
 
-.dialog-actions button.primary {
-  background: #1989fa;
+.btn-cancel:hover {
+  border-color: #409eff;
+  color: #409eff;
+}
+
+.btn-primary {
+  padding: 10px 20px;
+  background: #409eff;
   color: #fff;
-  border-color: #1989fa;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
 }
 
+.btn-primary:hover { background: #66b1ff; }
+
+.form-group { margin-bottom: 16px; }
+.form-group.inline { margin-bottom: 0; }
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus { border-color: #409eff; }
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] { width: auto; }
+
+/* 手机端适配 */
 @media (max-width: 768px) {
   .tab-navigation {
     overflow-x: auto;
+    padding: 0 12px;
   }
   
   .tab-btn {
-    padding: 10px 12px;
+    padding: 12px 16px;
     font-size: 13px;
     white-space: nowrap;
   }
   
-  .tab-content {
+  .stats-bar {
+    flex-wrap: wrap;
     padding: 12px;
+    gap: 8px;
   }
+  
+  .stat-card {
+    min-width: calc(50% - 4px);
+    padding: 14px;
+  }
+  
+  .stat-value { font-size: 22px; }
+  
+  .main-content {
+    margin: 0 12px 12px;
+    flex-direction: column;
+  }
+  
+  .session-list {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #ebeef5;
+    max-height: 300px;
+  }
+  
+  .chat-area { min-height: 400px; }
+  .mobile-hidden { display: none !important; }
+  .back-btn { display: flex; }
+  .session-no { display: none; }
+  .card-grid { grid-template-columns: 1fr; }
+  .tab-content { padding: 16px; }
 }
 </style>

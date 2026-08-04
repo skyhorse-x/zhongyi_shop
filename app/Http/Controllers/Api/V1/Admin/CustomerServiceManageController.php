@@ -118,6 +118,33 @@ class CustomerServiceManageController extends Controller
     }
 
     /**
+     * 切换话术自动回复状态
+     */
+    public function toggleAutoReply(Request $request, $id)
+    {
+        $phrase = CustomerServicePhrase::findOrFail($id);
+
+        // 检查权限
+        if (!$phrase->is_public && $phrase->admin_id !== $request->user()->id) {
+            return response()->json(['code' => 403, 'message' => '无权操作'], 403);
+        }
+
+        // 如果设置为自动回复，先取消其他话术的自动回复状态
+        if (!$phrase->is_auto_reply) {
+            CustomerServicePhrase::where('is_auto_reply', true)
+                ->where('admin_id', $request->user()->id)
+                ->update(['is_auto_reply' => false]);
+            $phrase->is_auto_reply = true;
+        } else {
+            $phrase->is_auto_reply = false;
+        }
+
+        $phrase->save();
+
+        return response()->json(['code' => 0, 'message' => '操作成功', 'data' => $phrase]);
+    }
+
+    /**
      * ===== 系统消息管理 =====
      */
 
@@ -245,12 +272,14 @@ class CustomerServiceManageController extends Controller
     {
         $welcomeMessage = CustomerServiceConfig::getValue('welcome_message', CustomerServiceSession::WELCOME_MESSAGE);
         $autoWelcome = CustomerServiceConfig::getValue('auto_welcome', 'true');
+        $autoReplyPhraseId = CustomerServiceConfig::getValue('auto_reply_phrase_id', null);
 
         return response()->json([
             'code' => 0,
             'data' => [
                 'welcome_message' => $welcomeMessage,
                 'auto_welcome' => $autoWelcome === 'true',
+                'auto_reply_phrase_id' => $autoReplyPhraseId ? (int) $autoReplyPhraseId : null,
             ],
         ]);
     }
@@ -263,6 +292,7 @@ class CustomerServiceManageController extends Controller
         $data = $request->validate([
             'welcome_message' => 'nullable|string|max:1000',
             'auto_welcome' => 'nullable|boolean',
+            'auto_reply_phrase_id' => 'nullable|integer',
         ]);
 
         if (isset($data['welcome_message'])) {
@@ -271,6 +301,19 @@ class CustomerServiceManageController extends Controller
 
         if (isset($data['auto_welcome'])) {
             CustomerServiceConfig::setValue('auto_welcome', $data['auto_welcome'] ? 'true' : 'false', '自动欢迎', '是否自动发送欢迎消息');
+        }
+
+        if (isset($data['auto_reply_phrase_id'])) {
+            if ($data['auto_reply_phrase_id']) {
+                // 验证话术是否存在
+                $phrase = CustomerServicePhrase::where('id', $data['auto_reply_phrase_id'])
+                    ->where('is_enabled', true)
+                    ->first();
+                if (!$phrase) {
+                    return response()->json(['code' => 400, 'message' => '话术不存在或已禁用'], 400);
+                }
+            }
+            CustomerServiceConfig::setValue('auto_reply_phrase_id', $data['auto_reply_phrase_id'] ?? '', '自动回复话术ID', '设置后用户发送消息时将自动回复该话术内容');
         }
 
         return response()->json(['code' => 0, 'message' => '保存成功']);
