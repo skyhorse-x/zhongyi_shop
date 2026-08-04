@@ -43,7 +43,7 @@ final class Site
     }
 
     /**
-     * 推广员邀请链接：/?code=xxx
+     * 用户邀请链接：/?code=xxx
      */
     public static function inviteLink(string $inviteCode): string
     {

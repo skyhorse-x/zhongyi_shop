@@ -9,6 +9,7 @@ use App\Models\InviteClick;
 use App\Models\InviteRegistration;
 use App\Models\Promoter;
 use App\Models\SystemConfig;
+use App\Models\User;
 use App\Models\Withdraw;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -547,16 +548,19 @@ class PromoterController extends Controller
             return response()->json(['code' => 400, 'message' => '邀请码不能为空'], 400);
         }
 
+        // 先查找推广员，如果没有则查找普通用户
         $promoter = Promoter::where('invite_code', $code)->first();
-        if (!$promoter) {
+        $user = $promoter ? $promoter->user : User::where('invite_code', $code)->first();
+        
+        if (!$user) {
             return response()->json(['code' => 404, 'message' => '邀请码不存在'], 404);
         }
 
-        if ($promoter->is_banned) {
+        if ($promoter && $promoter->is_banned) {
             return response()->json(['code' => 403, 'message' => '推广员已被封禁'], 403);
         }
 
-        [$click, $isDup] = \App\Support\InviteTracker::recordClick($promoter, $request);
+        [$click, $isDup] = \App\Support\InviteTracker::recordClick($user, $request);
 
         return response()->json([
             'code' => 0,
@@ -569,17 +573,15 @@ class PromoterController extends Controller
     }
 
     /**
-     * 当前推广员的邀请记录（注册列表，含客户端信息）
+     * 当前用户的邀请记录（注册列表，含客户端信息）
+     * 任何注册用户都可以查看自己的邀请记录
      */
     public function inviteRecords(Request $request)
     {
-        $promoter = Promoter::where('user_id', $request->user()->id)->first();
-        if (!$promoter) {
-            return response()->json(['code' => 404, 'message' => '您还不是推广员'], 404);
-        }
+        $user = $request->user();
 
         $records = InviteRegistration::with('user')
-            ->where('promoter_id', $promoter->id)
+            ->where('inviter_user_id', $user->id)
             ->orderByDesc('created_at')
             ->paginate($request->get('limit', 20));
 
@@ -591,16 +593,13 @@ class PromoterController extends Controller
     }
 
     /**
-     * 当前推广员的邀请点击列表
+     * 当前用户的邀请点击列表
      */
     public function inviteClicks(Request $request)
     {
-        $promoter = Promoter::where('user_id', $request->user()->id)->first();
-        if (!$promoter) {
-            return response()->json(['code' => 404, 'message' => '您还不是推广员'], 404);
-        }
+        $user = $request->user();
 
-        $clicks = InviteClick::where('promoter_id', $promoter->id)
+        $clicks = InviteClick::where('inviter_user_id', $user->id)
             ->orderByDesc('clicked_at')
             ->paginate($request->get('limit', 20));
 
@@ -616,11 +615,11 @@ class PromoterController extends Controller
      */
     public function adminInviteRecords(Request $request)
     {
-        $promoterId = $request->get('promoter_id');
-        $query = InviteRegistration::with(['user', 'promoter']);
+        $query = InviteRegistration::with(['user', 'inviter']);
 
-        if ($promoterId) {
-            $query->where('promoter_id', $promoterId);
+        // 筛选特定邀请人
+        if ($request->filled('inviter_user_id')) {
+            $query->where('inviter_user_id', $request->input('inviter_user_id'));
         }
 
         // 筛选

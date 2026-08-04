@@ -24,6 +24,14 @@ class AuthController extends Controller
     {
         $type = $request->input('type', 'mobile'); // mobile 或 account
 
+        // 检查是否关闭了手机注册
+        if ($type === 'mobile' && $this->isMobileAuthDisabled()) {
+            return response()->json([
+                'code' => 403,
+                'message' => '手机注册已关闭，请使用账号密码注册',
+            ], 403);
+        }
+
         if ($type === 'account') {
             $validator = Validator::make($request->all(), [
                 'username' => 'required|string|min:3|max:50|regex:/^[a-zA-Z0-9_]+$/|unique:users',
@@ -50,7 +58,7 @@ class AuthController extends Controller
             // 处理推荐人关系
             $parentId = $this->getParentIdFromCode($request->input('invite_code'));
 
-            // 注册 + 开通推广员在一个事务内，保证数据一致性
+            // 注册 + 赠送积分 + 生成邀请码在一个事务内，保证数据一致性
             try {
                 DB::beginTransaction();
 
@@ -61,13 +69,13 @@ class AuthController extends Controller
                     'nickname' => $request->username,
                     'password' => Hash::make($request->password),
                     'parent_id' => $parentId,
+                    'invite_code' => $this->generateUniqueInviteCode(),
                 ]);
-                $this->autoActivatePromoter($user);
                 $user->grantInitialAnalysisTimes();
 
-                // 记录邀请注册
+                // 记录邀请注册（如果有推荐人）
                 if ($parentId) {
-                    $inviter = Promoter::where('user_id', $parentId)->first();
+                    $inviter = User::find($parentId);
                     if ($inviter) {
                         \App\Support\InviteTracker::recordRegistration($inviter, $user, $request);
                     }
@@ -106,7 +114,7 @@ class AuthController extends Controller
             // 处理推荐人关系
             $parentId = $this->getParentIdFromCode($request->input('invite_code'));
 
-            // 注册 + 开通推广员在一个事务内，保证数据一致性
+            // 注册 + 赠送积分 + 生成邀请码在一个事务内，保证数据一致性
             try {
                 DB::beginTransaction();
 
@@ -124,13 +132,13 @@ class AuthController extends Controller
                     'parent_id' => $parentId,
                     'parent_locked' => (bool) $parentId, // 有邀请人即锁定
                     'parent_locked_at' => $parentId ? now() : null,
+                    'invite_code' => $this->generateUniqueInviteCode(),
                 ]);
-                $this->autoActivatePromoter($user);
                 $user->grantInitialAnalysisTimes();
 
-                // 记录邀请注册（如果有推荐人 / 邀请码）
+                // 记录邀请注册（如果有推荐人）
                 if ($parentId) {
-                    $inviter = Promoter::where('user_id', $parentId)->first();
+                    $inviter = User::find($parentId);
                     if ($inviter) {
                         \App\Support\InviteTracker::recordRegistration($inviter, $user, $request);
                     }
@@ -156,24 +164,21 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // 获取推广员信息（事务内已创建）
-        $promoter = Promoter::where('user_id', $user->id)->first();
-
         return response()->json([
             'code' => 0,
             'message' => '注册成功',
             'data' => [
                 'token' => $token,
                 'user' => $user,
-                'is_promoter' => true,
-                'invite_code' => $promoter->invite_code ?? null,
-                'invite_url' => $promoter ? \App\Support\Site::inviteLink($promoter->invite_code) : null,
+                'is_promoter' => false,
+                'invite_code' => $user->invite_code,
+                'invite_url' => \App\Support\Site::inviteLink($user->invite_code),
             ],
         ]);
     }
 
     /**
-     * 自动开通推广员（注册时调用）
+     * 手动开通推广员（仅管理员调用）
      * 幂等：已存在则跳过
      */
     private function autoActivatePromoter(User $user): ?Promoter
@@ -208,13 +213,13 @@ class AuthController extends Controller
     }
 
     /**
-     * 生成唯一推广码
+     * 生成唯一邀请码
      */
     private function generateUniqueInviteCode(): string
     {
         do {
             $code = strtoupper(Str::random(6));
-        } while (Promoter::where('invite_code', $code)->exists());
+        } while (User::where('invite_code', $code)->exists());
 
         return $code;
     }
@@ -229,18 +234,18 @@ class AuthController extends Controller
             return null;
         }
 
-        $promoter = Promoter::where('invite_code', $inviteCode)->first();
+        $inviter = User::where('invite_code', $inviteCode)->first();
 
-        if (!$promoter) {
+        if (!$inviter) {
             return null;
         }
 
         // 防止自我推荐
-        if ($currentUserId && $promoter->user_id === $currentUserId) {
+        if ($currentUserId && $inviter->id === $currentUserId) {
             return null;
         }
 
-        return $promoter->user_id;
+        return $inviter->id;
     }
 
     /**
@@ -264,8 +269,17 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // 支持用户名或手机号登录
+        // 检查是否通过手机号登录且手机登录已关闭
         $account = $request->account;
+        $isMobileAccount = preg_match('/^1[3-9]\d{9}$/', $account);
+        if ($isMobileAccount && $this->isMobileAuthDisabled()) {
+            return response()->json([
+                'code' => 403,
+                'message' => '手机登录已关闭，请使用账号密码登录',
+            ], 403);
+        }
+
+        // 支持用户名或手机号登录
         $user = User::where('mobile', $account)
                     ->orWhere('username', $account)
                     ->first();
@@ -367,6 +381,14 @@ class AuthController extends Controller
                 'expire_in' => 300,
             ],
         ]);
+    }
+
+    /**
+     * 检查是否关闭了手机注册和登录
+     */
+    private function isMobileAuthDisabled(): bool
+    {
+        return (bool) SystemConfig::getValue('disable_mobile_auth', '0');
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Models\InviteClick;
 use App\Models\InviteRegistration;
 use App\Models\Promoter;
 use App\Models\SystemConfig;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 /**
@@ -104,12 +105,20 @@ final class InviteTracker
     /**
      * 记录推广链接点击（访问时调用）
      *
+     * @param User $inviter 邀请人（任意用户）
      * @return array [click 模型, 是否重复IP]
      */
-    public static function recordClick(Promoter $promoter, Request $request): array
+    public static function recordClick(User $inviter, Request $request): array
     {
         $info = self::parse($request);
-        $inviteCode = $promoter->invite_code;
+        $inviteCode = $inviter->invite_code;
+
+        if (!$inviteCode) {
+            return [null, false];
+        }
+
+        // 查找推广员记录（如果有）
+        $promoter = Promoter::where('user_id', $inviter->id)->first();
 
         // 同 IP + 同邀请码：24 小时内算重复
         $existingClick = InviteClick::where('ip', $info['ip'])
@@ -120,7 +129,8 @@ final class InviteTracker
         $isSuspicious = self::isBotUa($info['user_agent']);
 
         $click = InviteClick::create(array_merge($info, [
-            'promoter_id'     => $promoter->id,
+            'inviter_user_id' => $inviter->id,
+            'promoter_id'     => $promoter?->id,
             'invite_code'     => $inviteCode,
             'is_duplicate_ip' => $existingClick,
             'is_suspicious'   => $isSuspicious,
@@ -133,14 +143,19 @@ final class InviteTracker
     /**
      * 记录邀请注册，并做反作弊校验
      *
-     * @return InviteRegistration
+     * @param User $inviter 邀请人（任意用户）
+     * @param User $user 被邀请注册的用户
+     * @return InviteRegistration|null
      */
-    public static function recordRegistration(Promoter $promoter, User $user, Request $request): InviteRegistration
+    public static function recordRegistration(User $inviter, User $user, Request $request): ?InviteRegistration
     {
         $info = self::parse($request);
 
+        // 查找推广员记录（如果有）
+        $promoter = Promoter::where('user_id', $inviter->id)->first();
+
         // 风险评分
-        $riskScore = self::calculateRiskScore($info, $promoter);
+        $riskScore = self::calculateRiskScore($info, $inviter);
         $threshold = (int) self::getConfig('risk_score_threshold', 60);
         $isFraud = $riskScore >= $threshold;
 
@@ -149,24 +164,25 @@ final class InviteTracker
         if ($isFraud) {
             $reasons = [];
             if (self::isBotUa($info['user_agent'])) $reasons[] = '机器人 UA';
-            if ($info['ip'] === $promoter->user?->last_login_ip) $reasons[] = '推广员自身 IP 注册';
-            if (self::isDuplicateIpToday($info['ip'], $promoter->invite_code)) {
+            if ($info['ip'] === $inviter->last_login_ip) $reasons[] = '邀请人自身 IP 注册';
+            if (self::isDuplicateIpToday($info['ip'], $inviter->invite_code)) {
                 $reasons[] = '同 IP 多次注册';
             }
             $fraudReason = implode('、', $reasons) ?: '风险分过高';
         }
 
         $registration = InviteRegistration::create(array_merge($info, [
-            'promoter_id'    => $promoter->id,
-            'user_id'        => $user->id,
-            'invite_code'    => $promoter->invite_code,
-            'is_fraud'       => $isFraud,
-            'fraud_reason'   => $fraudReason,
-            'risk_score'     => $riskScore,
+            'inviter_user_id' => $inviter->id,
+            'promoter_id'     => $promoter?->id,
+            'user_id'         => $user->id,
+            'invite_code'     => $inviter->invite_code,
+            'is_fraud'        => $isFraud,
+            'fraud_reason'    => $fraudReason,
+            'risk_score'      => $riskScore,
         ]));
 
-        // 更新推广员作弊计数
-        if ($isFraud) {
+        // 更新推广员作弊计数（如果有推广员记录）
+        if ($isFraud && $promoter) {
             $promoter->increment('fraud_count');
             if ($promoter->fraud_count >= 10 && !$promoter->is_banned) {
                 $promoter->update(['is_banned' => true, 'banned_at' => now()]);
@@ -179,7 +195,7 @@ final class InviteTracker
     /**
      * 风险评分
      */
-    private static function calculateRiskScore(array $info, Promoter $promoter): int
+    private static function calculateRiskScore(array $info, User $inviter): int
     {
         $score = 0;
 
@@ -189,12 +205,12 @@ final class InviteTracker
         }
 
         // 同 IP 同邀请码之前有注册 +25
-        if (self::isDuplicateIpToday($info['ip'], $promoter->invite_code)) {
+        if (self::isDuplicateIpToday($info['ip'], $inviter->invite_code)) {
             $score += 25;
         }
 
-        // 推广员自己注册 +40
-        if ($info['ip'] === $promoter->user?->last_login_ip) {
+        // 邀请人自己注册 +40
+        if ($info['ip'] === $inviter->last_login_ip) {
             $score += 40;
         }
 
@@ -213,8 +229,9 @@ final class InviteTracker
     /**
      * 同 IP + 同邀请码今日已有注册
      */
-    private static function isDuplicateIpToday(string $ip, string $inviteCode): bool
+    private static function isDuplicateIpToday(string $ip, ?string $inviteCode): bool
     {
+        if (!$inviteCode) return false;
         return InviteRegistration::where('ip', $ip)
             ->where('invite_code', $inviteCode)
             ->whereDate('created_at', today())

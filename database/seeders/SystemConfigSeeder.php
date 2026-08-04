@@ -18,6 +18,7 @@ class SystemConfigSeeder extends Seeder
             ['key' => 'site_description', 'value' => '智能分析 · 科学养生 · 守护健康', 'name' => '站点描述', 'group_name' => 'basic', 'type' => 'textarea', 'remark' => '网站描述信息'],
             ['key' => 'admin_email', 'value' => 'admin@tcm.com', 'name' => '管理员邮箱', 'group_name' => 'basic', 'type' => 'text', 'remark' => '接收系统通知的邮箱'],
             ['key' => 'wechat_service', 'value' => '', 'name' => '微信客服', 'group_name' => 'basic', 'type' => 'text', 'remark' => '微信号或客服二维码链接'],
+            ['key' => 'disable_mobile_auth', 'value' => '0', 'name' => '关闭手机注册和登录', 'group_name' => 'basic', 'type' => 'switch', 'remark' => '开启后将禁止用户通过手机号注册和登录，仅允许账号密码登录'],
 
             // 费用设置
             ['key' => 'analysis_mode', 'value' => 'paid', 'name' => '分析模式', 'group_name' => 'fee', 'type' => 'select', 'remark' => '付费分析或免费分析'],

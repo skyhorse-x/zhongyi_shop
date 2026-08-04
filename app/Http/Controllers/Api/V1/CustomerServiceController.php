@@ -17,28 +17,35 @@ class CustomerServiceController extends Controller
     public function getOrCreateSession(Request $request)
     {
         $user = $request->user();
-        
+
         // 查找进行中的会话
         $session = CustomerServiceSession::where('user_id', $user->id)
             ->where('status', '<', 2)
             ->orderBy('created_at', 'desc')
             ->first();
-        
+
         $isNew = false;
-        
+
         if (!$session) {
             $session = CustomerServiceSession::create([
                 'session_no' => CustomerServiceSession::generateSessionNo(),
                 'user_id' => $user->id,
                 'title' => '客服咨询',
                 'status' => 0,
+                'ip_address' => $request->ip(),
+                'browser_info' => $request->userAgent(),
+                'is_online' => true,
+                'last_active_at' => now(),
             ]);
             $isNew = true;
-            
+
             // 自动发送欢迎消息
             $session->sendWelcomeMessage();
+        } else {
+            // 更新在线状态和客户端信息
+            $session->updateOnlineStatus($request->ip(), $request->userAgent());
         }
-        
+
         return response()->json([
             'code' => 0,
             'message' => 'success',
@@ -71,19 +78,25 @@ class CustomerServiceController extends Controller
     public function messages(Request $request, $sessionNo)
     {
         $user = $request->user();
-        
+
         $session = CustomerServiceSession::where('session_no', $sessionNo)
             ->where('user_id', $user->id)
             ->firstOrFail();
-        
+
         $messages = CustomerServiceMessage::where('session_id', $session->id)
             ->orderBy('created_at', 'asc')
             ->paginate(50);
-        
+
         // 清除用户未读
         $session->user_unread = 0;
         $session->save();
-        
+
+        // 标记管理员发送的消息为已读
+        CustomerServiceMessage::where('session_id', $session->id)
+            ->where('sender_type', 'admin')
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
         return response()->json([
             'code' => 0,
             'message' => 'success',
@@ -123,11 +136,13 @@ class CustomerServiceController extends Controller
                 'content' => $request->input('content', ''),
                 'message_type' => 'text',
             ]);
-            
+
             // 更新会话
             $session->message_count += 1;
             $session->admin_unread += 1;
             $session->last_message_at = now();
+            $session->is_online = true;
+            $session->last_active_at = now();
             if ($session->status == 0) {
                 $session->status = 1; // 改为服务中
             }
@@ -234,6 +249,33 @@ class CustomerServiceController extends Controller
         return response()->json([
             'code' => 0,
             'message' => '会话已关闭',
+        ]);
+    }
+
+    /**
+     * 心跳上报（用户端定期调用以维持在线状态）
+     */
+    public function heartbeat(Request $request, $sessionNo)
+    {
+        $user = $request->user();
+
+        $session = CustomerServiceSession::where('session_no', $sessionNo)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$session || $session->status == 2) {
+            return response()->json([
+                'code' => 400,
+                'message' => '会话不存在或已结束',
+            ], 400);
+        }
+
+        // 更新在线状态
+        $session->updateOnlineStatus($request->ip(), $request->userAgent());
+
+        return response()->json([
+            'code' => 0,
+            'message' => 'success',
         ]);
     }
 

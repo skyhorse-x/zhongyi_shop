@@ -10,7 +10,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'nickname', 'username', 'mobile', 'email', 'password', 'avatar', 'gender', 'birthday', 'is_promoter', 'parent_id', 'analysis_times', 'balance', 'status', 'email_verified_at'])]
+#[Fillable(['name', 'nickname', 'username', 'mobile', 'email', 'password', 'avatar', 'gender', 'birthday', 'is_promoter', 'invite_code', 'parent_id', 'analysis_times', 'balance', 'status', 'email_verified_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -59,6 +59,14 @@ class User extends Authenticatable
      * 下级用户
      */
     public function children()
+    {
+        return $this->hasMany(User::class, 'parent_id');
+    }
+
+    /**
+     * 邀请的用户（通过邀请码注册的用户）
+     */
+    public function invitedUsers()
     {
         return $this->hasMany(User::class, 'parent_id');
     }

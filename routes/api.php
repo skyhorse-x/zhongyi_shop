@@ -98,6 +98,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::post('sessions/{sessionNo}/upload-image', [V1\CustomerServiceController::class, 'uploadImage']);
             Route::post('sessions/{sessionNo}/mark-as-read', [V1\CustomerServiceController::class, 'markAsRead']);
             Route::post('sessions/{sessionNo}/close', [V1\CustomerServiceController::class, 'closeSession']);
+            Route::post('sessions/{sessionNo}/heartbeat', [V1\CustomerServiceController::class, 'heartbeat']);
         });
         
         // 系统消息（用户端）
@@ -292,9 +293,10 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::put('constitution/questions/{id}', [V1\AdminController::class, 'constitutionQuestionUpdate']);
             Route::delete('constitution/questions/{id}', [V1\AdminController::class, 'constitutionQuestionDestroy']);
 
-            // 推广员详情/禁用
+            // 推广员详情/禁用/开通
             Route::get('promoters/{id}', [V1\AdminController::class, 'promoterDetail']);
             Route::post('promoters/{id}/toggle', [V1\AdminController::class, 'promoterToggle']);
+            Route::post('promoters/activate', [V1\AdminController::class, 'promoterActivate']);
 
             // 客服管理（后台）
             Route::prefix('customer-service')->group(function () {

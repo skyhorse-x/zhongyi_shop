@@ -12,6 +12,7 @@ const form = ref({
   siteUrl: '',
   adminEmail: '',
   wechatService: '', // 微信客服
+  disableMobileAuth: '0', // 关闭手机注册和登录
   // 费用设置
   analysisMode: 'paid',
   analysisPrice: 9.99,
@@ -162,6 +163,7 @@ const loadConfigs = async () => {
             site_url: 'siteUrl',
             admin_email: 'adminEmail',
             wechat_service: 'wechatService',
+            disable_mobile_auth: 'disableMobileAuth',
             analysis_mode: 'analysisMode',
             analysis_price: 'analysisPrice',
             ai_cost_per_time: 'aiCostPerTime',
@@ -222,6 +224,7 @@ const handleSave = async () => {
       site_url: form.value.siteUrl,
       admin_email: form.value.adminEmail,
       wechat_service: form.value.wechatService,
+      disable_mobile_auth: form.value.disableMobileAuth,
       analysis_mode: form.value.analysisMode,
       analysis_price: form.value.analysisPrice,
       ai_cost_per_time: form.value.aiCostPerTime,
@@ -334,6 +337,17 @@ onMounted(() => {
           <el-form-item label="微信客服">
             <el-input v-model="form.wechatService" placeholder="请输入微信号或客服二维码链接" />
             <div class="form-tip">用户可在充值页面联系客服，微信号或二维码图片链接</div>
+          </el-form-item>
+          <el-form-item label="手机注册登录">
+            <el-switch
+              v-model="form.disableMobileAuth"
+              active-value="1"
+              inactive-value="0"
+              inline-prompt
+              active-text="已关闭"
+              inactive-text="已开启"
+            />
+            <span class="form-tip">关闭后，用户将无法通过手机号注册和登录，仅允许账号密码登录</span>
           </el-form-item>
         </el-form>
       </el-tab-pane>

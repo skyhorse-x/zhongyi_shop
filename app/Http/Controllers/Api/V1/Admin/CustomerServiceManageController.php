@@ -273,6 +273,7 @@ class CustomerServiceManageController extends Controller
         $welcomeMessage = CustomerServiceConfig::getValue('welcome_message', CustomerServiceSession::WELCOME_MESSAGE);
         $autoWelcome = CustomerServiceConfig::getValue('auto_welcome', 'true');
         $autoReplyPhraseId = CustomerServiceConfig::getValue('auto_reply_phrase_id', null);
+        $autoCloseOnLeave = CustomerServiceConfig::getValue('auto_close_on_leave', 'true');
 
         return response()->json([
             'code' => 0,
@@ -280,6 +281,7 @@ class CustomerServiceManageController extends Controller
                 'welcome_message' => $welcomeMessage,
                 'auto_welcome' => $autoWelcome === 'true',
                 'auto_reply_phrase_id' => $autoReplyPhraseId ? (int) $autoReplyPhraseId : null,
+                'auto_close_on_leave' => $autoCloseOnLeave === 'true',
             ],
         ]);
     }
@@ -293,6 +295,7 @@ class CustomerServiceManageController extends Controller
             'welcome_message' => 'nullable|string|max:1000',
             'auto_welcome' => 'nullable|boolean',
             'auto_reply_phrase_id' => 'nullable|integer',
+            'auto_close_on_leave' => 'nullable|boolean',
         ]);
 
         if (isset($data['welcome_message'])) {
@@ -314,6 +317,10 @@ class CustomerServiceManageController extends Controller
                 }
             }
             CustomerServiceConfig::setValue('auto_reply_phrase_id', $data['auto_reply_phrase_id'] ?? '', '自动回复话术ID', '设置后用户发送消息时将自动回复该话术内容');
+        }
+
+        if (isset($data['auto_close_on_leave'])) {
+            CustomerServiceConfig::setValue('auto_close_on_leave', $data['auto_close_on_leave'] ? 'true' : 'false', '离开自动关闭', '用户离开客服页面时自动关闭会话');
         }
 
         return response()->json(['code' => 0, 'message' => '保存成功']);

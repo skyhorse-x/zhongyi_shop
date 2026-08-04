@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, shallowRef, onMounted } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 import { getAdminToken, clearAdminToken } from '@/utils/auth'
-import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service, FirstAidKit, Wallet, CreditCard, RefreshLeft } from '@element-plus/icons-vue'
+import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service, FirstAidKit, Wallet, CreditCard, RefreshLeft, Close } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -12,6 +12,21 @@ const route = useRoute()
 const sidebarCollapsed = ref(false)
 const mobileSidebarOpen = ref(false)
 const waitingCount = ref(0)
+
+// 客服通知相关
+interface CustomerNotification {
+  id: number
+  sessionNo: string
+  userId: number
+  nickname: string
+  mobile: string
+  content: string
+  created_at: string
+}
+const notifications = ref<CustomerNotification[]>([])
+const notificationTimers = ref<Map<number, ReturnType<typeof setTimeout>>>(new Map())
+const lastCheckTime = ref<string>(new Date().toISOString())
+const pollingInterval = ref<ReturnType<typeof setInterval> | null>(null)
 
 // 使用 shallowRef 避免图标组件被 reactive 包裹，消除 Vue 警告
 const menuItems = shallowRef([
@@ -50,6 +65,139 @@ const loadWaitingCount = async () => {
     }
   } catch (e) {
     // 忽略错误
+  }
+}
+
+// 播放通知提示音
+const playNotificationSound = () => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    oscillator.frequency.value = 800
+    oscillator.type = 'sine'
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + 0.5)
+  } catch (e) {
+    // 忽略音频播放错误
+  }
+}
+
+// 检查新消息
+const checkNewMessages = async () => {
+  try {
+    const res = await safeFetch(`/api/v1/admin/customer-service/sessions?updated_after=${encodeURIComponent(lastCheckTime.value)}`, {
+      headers: {
+        'Authorization': `Bearer ${getAdminToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0 && data.data.data && data.data.data.length > 0) {
+      const sessions = data.data.data
+      const currentAdminId = request.user()?.id
+
+      for (const session of sessions) {
+        // 检查是否有新的用户消息（未读 > 0 且不是当前页面）
+        if (session.admin_unread > 0 && route.path !== '/admin/customer-service') {
+          // 获取最后一条消息
+          const messagesRes = await safeFetch(`/api/v1/admin/customer-service/sessions/${session.session_no}/messages?per_page=1`, {
+            headers: {
+              'Authorization': `Bearer ${getAdminToken()}`,
+              'Accept': 'application/json',
+            },
+          })
+          const messagesData = await messagesRes.json()
+          if (messagesData.code === 0 && messagesData.data.data && messagesData.data.data.length > 0) {
+            const lastMessage = messagesData.data.data[0]
+            if (lastMessage.sender_type === 'user') {
+              // 显示通知
+              showNotification({
+                id: session.id,
+                sessionNo: session.session_no,
+                userId: session.user_id,
+                nickname: session.user?.nickname || '未知用户',
+                mobile: session.user?.mobile || '',
+                content: lastMessage.content,
+                created_at: lastMessage.created_at,
+              })
+            }
+          }
+        }
+      }
+
+      // 更新时间戳
+      lastCheckTime.value = new Date().toISOString()
+    }
+  } catch (e) {
+    // 忽略错误
+  }
+}
+
+// 显示通知
+const showNotification = (notification: CustomerNotification) => {
+  // 检查是否已存在相同会话的通知
+  const existingIndex = notifications.value.findIndex(n => n.sessionNo === notification.sessionNo)
+  if (existingIndex !== -1) {
+    // 更新现有通知
+    notifications.value[existingIndex] = notification
+    // 清除旧的定时器
+    const oldTimer = notificationTimers.value.get(notification.id)
+    if (oldTimer) {
+      clearTimeout(oldTimer)
+    }
+  } else {
+    // 添加新通知
+    notifications.value.push(notification)
+    // 播放提示音
+    playNotificationSound()
+  }
+
+  // 设置自动关闭定时器（10秒后）
+  const timer = setTimeout(() => {
+    dismissNotification(notification.id)
+  }, 10000)
+  notificationTimers.value.set(notification.id, timer)
+}
+
+// 关闭通知
+const dismissNotification = (id: number) => {
+  const index = notifications.value.findIndex(n => n.id === id)
+  if (index !== -1) {
+    notifications.value.splice(index, 1)
+  }
+  const timer = notificationTimers.value.get(id)
+  if (timer) {
+    clearTimeout(timer)
+    notificationTimers.value.delete(id)
+  }
+}
+
+// 点击通知 - 跳转到客服页面
+const handleNotificationClick = (notification: CustomerNotification) => {
+  dismissNotification(notification.id)
+  router.push('/admin/customer-service')
+}
+
+// 格式化通知时间
+const formatNotificationTime = (timeStr: string) => {
+  if (!timeStr) return ''
+  const date = new Date(timeStr)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+
+  if (diff < 60000) {
+    return '刚刚'
+  } else if (diff < 3600000) {
+    return `${Math.floor(diff / 60000)}分钟前`
+  } else if (diff < 86400000) {
+    return `${Math.floor(diff / 3600000)}小时前`
+  } else {
+    return date.toLocaleDateString('zh-CN')
   }
 }
 
@@ -138,11 +286,24 @@ onMounted(() => {
   document.body.classList.add('admin-page')
   const appEl = document.getElementById('app')
   if (appEl) appEl.classList.add('admin-app')
-  
+
   // 加载客服待接入数量
   loadWaitingCount()
   // 每30秒刷新一次
   setInterval(loadWaitingCount, 30000)
+
+  // 启动客服消息轮询（每10秒检查一次）
+  pollingInterval.value = setInterval(checkNewMessages, 10000)
+})
+
+onUnmounted(() => {
+  // 清理轮询定时器
+  if (pollingInterval.value) {
+    clearInterval(pollingInterval.value)
+  }
+  // 清理通知定时器
+  notificationTimers.value.forEach(timer => clearTimeout(timer))
+  notificationTimers.value.clear()
 })
 </script>
 
@@ -218,6 +379,33 @@ onMounted(() => {
       </main>
     </div>
   </div>
+
+  <!-- 客服通知弹窗 -->
+    <div class="customer-notifications">
+      <TransitionGroup name="notification">
+        <div
+          v-for="notification in notifications"
+          :key="notification.id"
+          class="notification-card"
+          @click="handleNotificationClick(notification)"
+        >
+          <div class="notification-header">
+            <div class="notification-avatar">
+              {{ notification.nickname?.[0] || 'U' }}
+            </div>
+            <div class="notification-info">
+              <span class="notification-name">{{ notification.nickname }}</span>
+              <span class="notification-mobile">{{ notification.mobile }}</span>
+            </div>
+            <button class="notification-close" @click.stop="dismissNotification(notification.id)">
+              <el-icon><Close /></el-icon>
+            </button>
+          </div>
+          <div class="notification-content">{{ notification.content }}</div>
+          <div class="notification-time">{{ formatNotificationTime(notification.created_at) }}</div>
+        </div>
+      </TransitionGroup>
+    </div>
 
   <!-- 修改密码对话框 -->
   <el-dialog
@@ -456,6 +644,139 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
+/* 客服通知弹窗 */
+.customer-notifications {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.notification-card {
+  width: 320px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.3s ease;
+  border-left: 4px solid #1989fa;
+}
+
+.notification-card:hover {
+  transform: translateX(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.notification-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.notification-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1989fa, #409eff);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.notification-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.notification-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.notification-mobile {
+  font-size: 12px;
+  color: #999;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #999;
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+
+.notification-close:hover {
+  color: #333;
+}
+
+.notification-content {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  margin-bottom: 8px;
+}
+
+.notification-time {
+  font-size: 11px;
+  color: #999;
+}
+
+/* 通知动画 */
+.notification-enter-active {
+  animation: notification-in 0.4s ease;
+}
+
+.notification-leave-active {
+  animation: notification-out 0.3s ease;
+}
+
+@keyframes notification-in {
+  0% {
+    opacity: 0;
+    transform: translateX(100px) scale(0.8);
+  }
+  50% {
+    transform: translateX(-10px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes notification-out {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100px) scale(0.8);
+  }
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
   .sidebar {
@@ -492,6 +813,16 @@ onMounted(() => {
 
   .sidebar.collapsed {
     width: 220px;
+  }
+
+  .customer-notifications {
+    top: 60px;
+    right: 10px;
+    left: 10px;
+  }
+
+  .notification-card {
+    width: 100%;
   }
 }
 </style>

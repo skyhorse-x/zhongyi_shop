@@ -13,6 +13,12 @@ interface Session {
   admin_id: number
   title: string
   status: number
+  is_online: boolean
+  is_actually_online: boolean
+  last_active_at: string
+  ip_address: string
+  browser_info: string
+  browser_short: string
   message_count: number
   user_unread: number
   admin_unread: number
@@ -40,6 +46,7 @@ interface Message {
   file_url: string
   file_name: string
   created_at: string
+  read_at: string | null
 }
 
 const sessions = ref<Session[]>([])
@@ -54,6 +61,7 @@ const stats = ref({
   active: 0,
   closed: 0,
   total: 0,
+  online: 0,
 })
 
 const statusFilter = ref('')
@@ -123,6 +131,7 @@ const csConfig = ref({
   welcome_message: '',
   auto_welcome: true,
   auto_reply_phrase_id: null as number | null,  // 自动回复话术ID
+  auto_close_on_leave: true,  // 用户离开自动关闭会话
 })
 
 // 标签页
@@ -623,6 +632,15 @@ onUnmounted(() => {
     <div v-show="activeTab === 'chat'" class="chat-container">
       <!-- 统计卡片 -->
       <div class="stats-bar">
+        <div class="stat-card stat-online">
+          <div class="stat-icon">
+            <el-icon><User /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ stats.online }}</div>
+            <div class="stat-label">在线用户</div>
+          </div>
+        </div>
         <div class="stat-card stat-waiting">
           <div class="stat-icon">
             <el-icon><ChatDotRound /></el-icon>
@@ -691,8 +709,9 @@ onUnmounted(() => {
               :class="{ active: currentSession?.id === session.id, 'has-unread': session.admin_unread > 0 }"
               @click="selectSession(session)"
             >
-              <div class="session-avatar" :style="{ background: session.status === 1 ? '#07c160' : session.status === 0 ? '#ff976a' : '#c8c9cc' }">
+              <div class="session-avatar" :style="{ background: session.is_actually_online ? '#07c160' : session.status === 1 ? '#409eff' : session.status === 0 ? '#ff976a' : '#c8c9cc' }">
                 {{ session.user?.nickname?.[0] || 'U' }}
+                <span v-if="session.is_actually_online" class="online-dot"></span>
               </div>
               <div class="session-info">
                 <div class="session-top">
@@ -705,6 +724,12 @@ onUnmounted(() => {
                   </span>
                   <span class="session-mobile">{{ session.user?.mobile }}</span>
                   <span v-if="session.admin_unread > 0" class="unread-badge">{{ session.admin_unread }}</span>
+                </div>
+                <div class="session-meta">
+                  <span class="meta-tag" :class="session.is_actually_online ? 'online' : 'offline'">
+                    {{ session.is_actually_online ? '在线' : '离线' }}
+                  </span>
+                  <span v-if="session.browser_short" class="meta-tag browser">{{ session.browser_short }}</span>
                 </div>
               </div>
             </div>
@@ -724,8 +749,9 @@ onUnmounted(() => {
                 <button class="back-btn" @click="backToList">
                   <el-icon><ArrowLeft /></el-icon>
                 </button>
-                <div class="user-avatar">
+                <div class="user-avatar" :class="{ online: currentSession.is_actually_online }">
                   {{ currentSession.user?.nickname?.[0] || 'U' }}
+                  <span v-if="currentSession.is_actually_online" class="online-dot-header"></span>
                 </div>
                 <div class="user-details">
                   <span class="user-name">{{ currentSession.user?.nickname || '未知用户' }}</span>
@@ -733,6 +759,17 @@ onUnmounted(() => {
                 </div>
               </div>
               <div class="header-right">
+                <div class="header-meta">
+                  <span class="meta-tag" :class="currentSession.is_actually_online ? 'online' : 'offline'">
+                    {{ currentSession.is_actually_online ? '在线' : '离线' }}
+                  </span>
+                  <span v-if="currentSession.browser_short" class="meta-tag browser" :title="currentSession.browser_info">
+                    {{ currentSession.browser_short }}
+                  </span>
+                  <span v-if="currentSession.ip_address" class="meta-tag ip" :title="'IP: ' + currentSession.ip_address">
+                    {{ currentSession.ip_address }}
+                  </span>
+                </div>
                 <span class="session-tag">{{ currentSession.session_no }}</span>
                 <button
                   v-if="currentSession.status !== 2"
@@ -763,7 +800,12 @@ onUnmounted(() => {
                   <div v-else-if="msg.msg_type === 'image'" class="message-bubble image-bubble">
                     <img :src="msg.file_url" class="message-image" @click="previewImage(msg.file_url)" />
                   </div>
-                  <div class="message-time">{{ formatTime(msg.created_at) }}</div>
+                  <div class="message-time">
+                    {{ formatTime(msg.created_at) }}
+                    <span v-if="msg.sender_type === 'admin'" class="read-status" :class="msg.read_at ? 'read' : 'unread'">
+                      {{ msg.read_at ? '已读' : '未读' }}
+                    </span>
+                  </div>
                 </div>
               </div>
               <div v-if="messages.length === 0" class="no-messages">
@@ -969,6 +1011,16 @@ onUnmounted(() => {
             </option>
           </select>
         </div>
+        <div class="setting-item">
+          <div class="setting-label">
+            <span>离开自动关闭会话</span>
+            <span class="setting-desc">开启后，用户离开客服页面时会自动关闭当前会话</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" v-model="csConfig.auto_close_on_leave" />
+            <span class="switch-slider"></span>
+          </label>
+        </div>
         <div class="setting-actions">
           <button class="save-btn" @click="saveCsConfig">
             <el-icon><Setting /></el-icon>
@@ -1146,6 +1198,7 @@ onUnmounted(() => {
   font-size: 24px;
 }
 
+.stat-online .stat-icon { background: #f0f9eb; color: #67c23a; }
 .stat-waiting .stat-icon { background: #fff7e6; color: #ff976a; }
 .stat-active .stat-icon { background: #f0f9eb; color: #07c160; }
 .stat-closed .stat-icon { background: #f4f4f5; color: #909399; }
@@ -1160,6 +1213,7 @@ onUnmounted(() => {
   margin-bottom: 4px;
 }
 
+.stat-online .stat-value { color: #67c23a; }
 .stat-waiting .stat-value { color: #ff976a; }
 .stat-active .stat-value { color: #07c160; }
 .stat-closed .stat-value { color: #909399; }
@@ -1266,6 +1320,58 @@ onUnmounted(() => {
   font-size: 18px;
   font-weight: 600;
   flex-shrink: 0;
+  position: relative;
+}
+
+.online-dot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-radius: 50%;
+  border: 2px solid #07c160;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.session-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.meta-tag {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.meta-tag.online {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+
+.meta-tag.offline {
+  background: #f4f4f5;
+  color: #909399;
+}
+
+.meta-tag.browser {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.meta-tag.ip {
+  background: #fdf6ec;
+  color: #e6a23c;
 }
 
 .session-info { flex: 1; min-width: 0; }
@@ -1377,6 +1483,23 @@ onUnmounted(() => {
   justify-content: center;
   font-size: 16px;
   font-weight: 600;
+  position: relative;
+}
+
+.user-avatar.online {
+  background: #07c160;
+}
+
+.online-dot-header {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  border: 2px solid #07c160;
+  animation: pulse 2s infinite;
 }
 
 .user-details { display: flex; flex-direction: column; }
@@ -1396,6 +1519,14 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.header-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .session-tag {
@@ -1498,6 +1629,27 @@ onUnmounted(() => {
 
 .msg-right .message-time {
   text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.read-status {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.read-status.read {
+  color: #67c23a;
+  background: #f0f9eb;
+}
+
+.read-status.unread {
+  color: #909399;
+  background: #f4f4f5;
 }
 
 .image-bubble {
@@ -2123,25 +2275,29 @@ onUnmounted(() => {
     overflow-x: auto;
     padding: 0 12px;
   }
-  
+
   .tab-btn {
     padding: 12px 16px;
     font-size: 13px;
     white-space: nowrap;
   }
-  
+
   .stats-bar {
     flex-wrap: wrap;
     padding: 12px;
     gap: 8px;
   }
-  
+
   .stat-card {
     min-width: calc(50% - 4px);
     padding: 14px;
   }
-  
+
   .stat-value { font-size: 22px; }
+
+  .header-meta {
+    display: none;
+  }
   
   .main-content {
     margin: 0 12px 12px;

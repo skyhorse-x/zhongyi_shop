@@ -17,13 +17,17 @@ class CustomerServiceController extends Controller
     {
         $status = $request->input('status', '');
         $keyword = $request->input('keyword', '');
-        
+        $updatedAfter = $request->input('updated_after', '');
+
+        // 自动标记超过5分钟无活动的用户为离线
+        $this->autoMarkOffline();
+
         $query = CustomerServiceSession::with('user');
-        
+
         if ($status !== '') {
             $query->where('status', $status);
         }
-        
+
         if ($keyword) {
             $query->where(function ($q) use ($keyword) {
                 $q->where('session_no', 'like', "%{$keyword}%")
@@ -34,14 +38,36 @@ class CustomerServiceController extends Controller
                   });
             });
         }
-        
+
+        // 支持按更新时间过滤（用于轮询检测新消息）
+        if ($updatedAfter) {
+            $query->where('updated_at', '>', $updatedAfter);
+        }
+
         $sessions = $query->orderBy('updated_at', 'desc')->paginate(20);
-        
+
+        // 为每条会话添加简化的浏览器信息
+        $sessions->getCollection()->transform(function ($session) {
+            $session->browser_short = $session->browser_short;
+            $session->is_actually_online = $session->is_actually_online;
+            return $session;
+        });
+
         return response()->json([
             'code' => 0,
             'message' => 'success',
             'data' => $sessions,
         ]);
+    }
+
+    /**
+     * 自动标记超过5分钟无活动的用户为离线
+     */
+    private function autoMarkOffline(): void
+    {
+        CustomerServiceSession::where('is_online', true)
+            ->where('last_active_at', '<', now()->subMinutes(5))
+            ->update(['is_online' => false]);
     }
 
     /**
@@ -51,15 +77,21 @@ class CustomerServiceController extends Controller
     {
         $session = CustomerServiceSession::where('session_no', $sessionNo)
             ->firstOrFail();
-        
+
         $messages = CustomerServiceMessage::where('session_id', $session->id)
             ->orderBy('created_at', 'asc')
             ->paginate(50);
-        
+
         // 清除客服未读
         $session->admin_unread = 0;
         $session->save();
-        
+
+        // 标记用户发送的消息为已读
+        CustomerServiceMessage::where('session_id', $session->id)
+            ->where('sender_type', 'user')
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
         return response()->json([
             'code' => 0,
             'message' => 'success',
@@ -213,13 +245,17 @@ class CustomerServiceController extends Controller
      */
     public function statistics()
     {
+        // 自动标记超过5分钟无活动的用户为离线
+        $this->autoMarkOffline();
+
         $stats = [
             'waiting' => CustomerServiceSession::where('status', 0)->count(),
             'active' => CustomerServiceSession::where('status', 1)->count(),
             'closed' => CustomerServiceSession::where('status', 2)->count(),
             'total' => CustomerServiceSession::count(),
+            'online' => CustomerServiceSession::where('is_online', true)->where('status', '<', 2)->count(),
         ];
-        
+
         return response()->json([
             'code' => 0,
             'message' => 'success',

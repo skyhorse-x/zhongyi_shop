@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class InviteClick extends Model
 {
     protected $fillable = [
+        'inviter_user_id',
         'promoter_id',
         'invite_code',
         'ip',
@@ -27,8 +28,19 @@ class InviteClick extends Model
         'clicked_at'      => 'datetime',
     ];
 
+    /**
+     * 推广员（如果有）
+     */
     public function promoter()
     {
         return $this->belongsTo(Promoter::class);
+    }
+
+    /**
+     * 邀请人用户（任意用户）
+     */
+    public function inviter()
+    {
+        return $this->belongsTo(User::class, 'inviter_user_id');
     }
 }

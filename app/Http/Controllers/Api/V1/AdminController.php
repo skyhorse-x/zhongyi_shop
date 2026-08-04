@@ -97,67 +97,49 @@ class AdminController extends Controller
     public function inviteMarquee()
     {
         // 最近 50 条邀请注册记录（预加载关联）
-        $registrations = \App\Models\InviteRegistration::with(['user', 'promoter.user'])
+        $registrations = \App\Models\InviteRegistration::with(['user', 'inviter'])
             ->orderByDesc('created_at')
             ->limit(50)
             ->get();
 
-        // 预加载每个推广员的邀请人数（1 次查询替代 N 次 count）
-        $promoterIds = $registrations->pluck('promoter_id')->unique()->filter();
-        $inviteCounts = $promoterIds->isEmpty()
-            ? []
-            : \App\Models\InviteRegistration::whereIn('promoter_id', $promoterIds)
-                ->selectRaw('promoter_id, COUNT(*) as cnt')
-                ->groupBy('promoter_id')
-                ->pluck('cnt', 'promoter_id')
-                ->toArray();
-
-        // 预加载每个推广员的佣金汇总（1 次查询替代 N 次 sum）
-        $commissionSums = $promoterIds->isEmpty()
-            ? []
-            : \App\Models\Commission::whereIn('promoter_id', $promoterIds)
-                ->selectRaw('promoter_id, COALESCE(SUM(amount), 0) as total')
-                ->groupBy('promoter_id')
-                ->pluck('total', 'promoter_id')
-                ->toArray();
-
         $items = [];
+
         foreach ($registrations as $reg) {
-            $promoterName = $reg->promoter?->user?->nickname
-                ?? $reg->promoter?->user?->name
-                ?? '推广员';
+            $inviterName = $reg->inviter?->nickname
+                ?? $reg->inviter?->name
+                ?? '用户';
             $inviteeName = $reg->user?->nickname
                 ?? $reg->user?->name
                 ?? '用户';
 
-            $pid = $reg->promoter_id;
             $items[] = [
                 'id' => $reg->id,
-                'promoter_name' => $promoterName,
+                'inviter_name' => $inviterName,
                 'invitee_name' => $inviteeName,
-                'invite_count' => (int) ($inviteCounts[$pid] ?? 0),
-                'commission' => round((float) ($commissionSums[$pid] ?? 0), 2),
+                'invite_code' => $reg->invite_code,
                 'is_fraud' => $reg->is_fraud,
                 'created_at' => $reg->created_at->format('Y-m-d H:i'),
             ];
         }
 
-        // 补充推广员汇总（邀请人数 + 总佣金）
-        $topPromoters = \App\Models\Promoter::with('user')
-            ->orderByDesc('total_invite')
+        // 邀请排行（按邀请人数排序）
+        $topInviters = \App\Models\User::whereNotNull('invite_code')
+            ->withCount(['invitedUsers as invite_count' => function ($q) {
+                $q->whereColumn('users.parent_id', 'users.id');
+            }])
+            ->orderByDesc('invite_count')
             ->limit(20)
             ->get()
-            ->map(fn($p) => [
-                'promoter_name' => $p->user?->nickname ?? $p->user?->name ?? '推广员',
-                'invite_count' => $p->total_invite,
-                'commission' => round($p->total_commission, 2),
+            ->map(fn($u) => [
+                'inviter_name' => $u->nickname ?? $u->name ?? '用户',
+                'invite_count' => (int) $u->invite_count,
             ]);
 
         return response()->json([
             'code' => 0,
             'data' => [
                 'recent' => $items,
-                'top_list' => $topPromoters,
+                'top_list' => $topInviters,
             ],
         ]);
     }
@@ -575,6 +557,51 @@ class AdminController extends Controller
         ]);
     }
 
+    /**
+     * 手动开通推广员（管理员操作）
+     */
+    public function promoterActivate(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|integer|exists:users,id',
+        ]);
+
+        $user = User::findOrFail($request->user_id);
+
+        // 检查是否已经是推广员
+        $existing = Promoter::where('user_id', $user->id)->first();
+        if ($existing) {
+            return response()->json([
+                'code' => 400,
+                'message' => '该用户已经是推广员',
+            ], 400);
+        }
+
+        $commissionRate = (float) (\App\Models\SystemConfig::getValue('commission_rate', 15));
+
+        // 生成唯一邀请码
+        do {
+            $code = strtoupper(substr(md5(uniqid()), 0, 8));
+        } while (Promoter::where('invite_code', $code)->exists());
+
+        $promoter = Promoter::create([
+            'user_id' => $user->id,
+            'invite_code' => $code,
+            'level' => 1,
+            'commission_rate' => $commissionRate,
+            'status' => 1,
+            'activated_at' => now(),
+        ]);
+
+        $user->update(['is_promoter' => 1]);
+
+        return response()->json([
+            'code' => 0,
+            'message' => '推广员开通成功',
+            'data' => $promoter,
+        ]);
+    }
+
     // ===== 提现审核 =====
     public function withdraws(Request $request)
     {
@@ -760,6 +787,7 @@ class AdminController extends Controller
             // LLM配置
             'llm_provider', 'llm_api_url', 'llm_api_key', 'llm_model',
             'llm_temperature', 'llm_max_tokens', 'llm_timeout',
+            'disable_mobile_auth',
         ];
 
         $data = $request->only($allowedKeys);

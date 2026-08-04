@@ -60,8 +60,8 @@ const loadDashboardData = async () => {
       totalStats.value = [
         { title: '用户总数', value: dashboardData.total_users || 0, color: '#1989fa', icon: UserFilled },
         { title: '总订单数', value: dashboardData.total_orders || 0, color: '#7232dd', icon: List },
-        { title: '总佣金', value: (dashboardData.total_commission || 0) + ' 元', color: '#07c160', icon: Money },
-        { title: '总利润', value: (dashboardData.total_profit || 0) + ' 元', color: '#ee0a24', icon: TrendCharts },
+        { title: '总佣金', value: Number(dashboardData.total_commission || 0).toFixed(2) + ' 元', color: '#07c160', icon: Money },
+        { title: '总利润', value: Number(dashboardData.total_profit || 0).toFixed(2) + ' 元', color: '#ee0a24', icon: TrendCharts },
       ]
     }
   } catch (error) {

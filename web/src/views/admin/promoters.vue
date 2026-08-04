@@ -61,8 +61,8 @@ const stats = computed(() => {
     const today = new Date().toISOString().split('T')[0]
     return item.created_at?.startsWith(today)
   }).length
-  const totalCommission = tableData.value.reduce((sum, item) => sum + (item.total_commission || 0), 0)
-  const pendingWithdraw = tableData.value.reduce((sum, item) => sum + (item.frozen_commission || 0), 0)
+  const totalCommission = tableData.value.reduce((sum, item) => sum + Number(item.total_commission || 0), 0)
+  const pendingWithdraw = tableData.value.reduce((sum, item) => sum + Number(item.frozen_commission || 0), 0)
   
   return {
     totalCount,
@@ -377,10 +377,10 @@ onMounted(() => {
           <el-table-column prop="invite_count" label="邀请人数" width="90" align="center" />
           <el-table-column prop="consume_count" label="消费人数" width="90" align="center" />
           <el-table-column label="累计佣金" width="110" align="right">
-            <template #default="{ row }">¥{{ (row.total_commission || 0).toFixed(2) }}</template>
+            <template #default="{ row }">¥{{ Number(row.total_commission || 0).toFixed(2) }}</template>
           </el-table-column>
           <el-table-column label="可提现金额" width="110" align="right">
-            <template #default="{ row }">¥{{ (row.withdrawable_commission || 0).toFixed(2) }}</template>
+            <template #default="{ row }">¥{{ Number(row.withdrawable_commission || 0).toFixed(2) }}</template>
           </el-table-column>
           <el-table-column label="状态" width="80" align="center">
             <template #default="{ row }">

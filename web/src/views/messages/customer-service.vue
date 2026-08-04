@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Picture, User, Headset } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
@@ -23,6 +23,8 @@ const messageListRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const isTyping = ref(false)
 const typingTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const heartbeatInterval = ref<ReturnType<typeof setInterval> | null>(null)
+const isLeaving = ref(false) // 标记是否正在离开页面
 
 // 获取认证token
 import { getToken } from '@/utils/auth'
@@ -186,6 +188,56 @@ const markAsRead = async () => {
   }
 }
 
+// 心跳上报（保持在线状态）
+const sendHeartbeat = async () => {
+  if (!sessionNo.value || isLeaving.value) return
+  try {
+    await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/heartbeat`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+  } catch (e) {
+    // 忽略错误
+  }
+}
+
+// 关闭会话（用户离开时调用）
+const closeSessionOnLeave = async () => {
+  if (!sessionNo.value || isLeaving.value) return
+  isLeaving.value = true
+
+  // 停止心跳
+  if (heartbeatInterval.value) {
+    clearInterval(heartbeatInterval.value)
+    heartbeatInterval.value = null
+  }
+
+  // 使用 sendBeacon 确保请求在页面关闭时也能发送
+  const url = `${window.location.origin}/api/v1/customer-service/sessions/${sessionNo.value}/close`
+  const token = getToken()
+
+  if (navigator.sendBeacon) {
+    // 使用 sendBeacon API（适合页面关闭场景）
+    const blob = new Blob([JSON.stringify({})], { type: 'application/json' })
+    navigator.sendBeacon(url, blob)
+  } else {
+    // 降级使用同步 XMLHttpRequest
+    try {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', url, false) // 同步请求
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      xhr.setRequestHeader('Accept', 'application/json')
+      xhr.setRequestHeader('Content-Type', 'application/json')
+      xhr.send(JSON.stringify({}))
+    } catch (e) {
+      // 忽略错误
+    }
+  }
+}
+
 // 模拟对方正在输入（实际项目中应通过 WebSocket 接收）
 const simulateTyping = () => {
   if (typingTimer.value) {
@@ -210,6 +262,28 @@ const previewImage = (url: string) => {
 
 onMounted(() => {
   getOrCreateSession()
+
+  // 启动心跳（每30秒发送一次）
+  heartbeatInterval.value = setInterval(() => {
+    sendHeartbeat()
+  }, 30000)
+
+  // 监听页面关闭/刷新事件
+  window.addEventListener('beforeunload', closeSessionOnLeave)
+})
+
+onUnmounted(() => {
+  // 清理心跳定时器
+  if (heartbeatInterval.value) {
+    clearInterval(heartbeatInterval.value)
+    heartbeatInterval.value = null
+  }
+
+  // 如果用户离开页面（非 beforeunload 触发），关闭会话
+  closeSessionOnLeave()
+
+  // 移除事件监听
+  window.removeEventListener('beforeunload', closeSessionOnLeave)
 })
 </script>
 
