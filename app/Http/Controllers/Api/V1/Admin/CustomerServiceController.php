@@ -74,7 +74,7 @@ class CustomerServiceController extends Controller
     /**
      * 获取消息列表（客服端）
      */
-    public function messages(Request $request, $sessionNo)
+    public function messages(Request $request, string $sessionNo)
     {
         $session = CustomerServiceSession::where('session_no', $sessionNo)
             ->firstOrFail();
@@ -103,7 +103,7 @@ class CustomerServiceController extends Controller
     /**
      * 客服发送消息
      */
-    public function sendMessage(Request $request, $sessionNo)
+    public function sendMessage(Request $request, string $sessionNo)
     {
         $request->validate([
             'content' => 'required_without:image|max:5000',
@@ -162,7 +162,7 @@ class CustomerServiceController extends Controller
     /**
      * 客服上传图片
      */
-    public function uploadImage(Request $request, $sessionNo)
+    public function uploadImage(Request $request, string $sessionNo)
     {
         $request->validate([
             'image' => 'required|image|mimes:jpg,jpeg,png,gif,webp|max:5120',
@@ -183,7 +183,7 @@ class CustomerServiceController extends Controller
         try {
             $file = $request->file('image');
             $path = $file->store('customer-service', 'public');
-            $url = \Storage::url($path);
+            $url = Storage::url($path);
             
             DB::beginTransaction();
             
@@ -226,7 +226,7 @@ class CustomerServiceController extends Controller
     /**
      * 关闭会话
      */
-    public function closeSession(Request $request, $sessionNo)
+    public function closeSession(Request $request, string $sessionNo)
     {
         $session = CustomerServiceSession::where('session_no', $sessionNo)
             ->firstOrFail();
