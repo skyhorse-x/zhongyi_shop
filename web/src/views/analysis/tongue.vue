@@ -124,7 +124,7 @@ const handleSubmit = async () => {
     // 2. 提交分析任务
     const taskNo = await submitAnalysis(uploadedUrls, 'tongue', aiText.value, gender.value, age.value)
 
-    ElMessage.success('分析已提交')
+    ElMessage.success('分析任务已提交，正在处理中...')
     router.push(`/analysis/result/${taskNo}`)
   } catch (e: any) {
     const msg = e.message || '提交失败'
@@ -228,6 +228,24 @@ onMounted(() => {
           </div>
         </template>
       </el-upload>
+    </div>
+
+    <!-- 免责声明 -->
+    <div class="disclaimer-section">
+      <el-alert
+        title="免责声明"
+        type="warning"
+        :closable="false"
+        show-icon
+      >
+        <template #default>
+          <div class="disclaimer-content">
+            <p>1. 本分析结果仅供参考，不能作为医疗诊断依据。</p>
+            <p>2. 如有健康问题，请咨询专业医疗机构或医师。</p>
+            <p>3. AI分析存在局限性，不能替代专业医疗建议。</p>
+          </div>
+        </template>
+      </el-alert>
     </div>
 
     <div class="actions">
@@ -394,5 +412,20 @@ onMounted(() => {
   font-size: 12px;
   color: #67c23a;
   text-align: center;
+}
+
+/* 免责声明 */
+.disclaimer-section {
+  margin: 16px 0;
+}
+
+.disclaimer-content {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #666;
+}
+
+.disclaimer-content p {
+  margin: 2px 0;
 }
 </style>

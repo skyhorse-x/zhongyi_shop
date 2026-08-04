@@ -85,7 +85,7 @@ onMounted(() => {
 
     <!-- 今日数据 -->
     <div class="section-label">今日数据</div>
-    <div class="stats-grid" v-loading="loading">
+    <div class="stats-grid">
       <div v-for="item in stats" :key="item.title" class="stat-card" :style="{ borderTopColor: item.color }">
         <div class="stat-info">
           <div class="stat-value" :style="{ color: item.color }">{{ item.value }}</div>
@@ -99,7 +99,7 @@ onMounted(() => {
 
     <!-- 累计数据 -->
     <div class="section-label">累计数据</div>
-    <div class="stats-grid mini" v-loading="loading">
+    <div class="stats-grid mini">
       <div v-for="item in totalStats" :key="item.title" class="stat-card" :style="{ borderTopColor: item.color }">
         <div class="stat-info">
           <div class="stat-value" :style="{ color: item.color }">{{ item.value }}</div>

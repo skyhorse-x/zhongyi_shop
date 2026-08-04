@@ -237,7 +237,7 @@ onMounted(() => {
     </el-card>
 
     <el-card shadow="never" style="margin-top: 16px">
-      <el-table v-loading="loading" :data="tableData" stripe>
+      <el-table :data="tableData" stripe>
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column label="商品名称" min-width="140">
           <template #default="{ row }">

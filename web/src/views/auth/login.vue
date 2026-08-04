@@ -48,7 +48,7 @@ const goRegister = () => {
   <div class="login-page">
     <div class="login-form">
       <div class="login-title">欢迎登录</div>
-      <div class="login-subtitle">AI中医健康管理平台</div>
+      <div class="login-subtitle">ai 中医健康助手平台</div>
 
       <el-form :model="form" label-width="auto" @submit.prevent="handleLogin">
         <el-form-item

@@ -101,6 +101,24 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- 免责声明 -->
+    <div class="disclaimer-section">
+      <el-alert
+        title="免责声明"
+        type="warning"
+        :closable="false"
+        show-icon
+      >
+        <template #default>
+          <div class="disclaimer-content">
+            <p>1. 本测试结果仅供参考，不能作为医疗诊断依据。</p>
+            <p>2. 如有健康问题，请咨询专业医疗机构或医师。</p>
+            <p>3. 体质调理建议在专业医师指导下进行。</p>
+          </div>
+        </template>
+      </el-alert>
+    </div>
+
     <div class="question-list" v-loading="loading && questions.length === 0">
       <div v-if="questions.length === 0" class="empty-state">
         <el-empty description="暂无题目" />
@@ -299,5 +317,20 @@ onMounted(() => {
   color: #b5b5b5;
   box-shadow: none;
   cursor: not-allowed;
+}
+
+/* 免责声明 */
+.disclaimer-section {
+  margin: 16px 0;
+}
+
+.disclaimer-content {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #666;
+}
+
+.disclaimer-content p {
+  margin: 2px 0;
 }
 </style>

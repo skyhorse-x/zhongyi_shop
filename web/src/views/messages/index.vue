@@ -18,7 +18,7 @@ const systemMessages = ref([
   {
     id: 1,
     title: '系统通知',
-    content: '欢迎使用AI中医健康管理平台，祝您身体健康！',
+    content: '欢迎使用ai 中医健康助手平台，祝您身体健康！',
     time: '2026-08-02 09:00',
     unread: true,
     type: 'welcome',

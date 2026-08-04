@@ -236,4 +236,31 @@ class CustomerServiceController extends Controller
             'message' => '会话已关闭',
         ]);
     }
+
+    /**
+     * 标记消息为已读
+     */
+    public function markAsRead(Request $request, $sessionNo)
+    {
+        $user = $request->user();
+        
+        $session = CustomerServiceSession::where('session_no', $sessionNo)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+        
+        // 标记所有对方发送的消息为已读
+        CustomerServiceMessage::where('session_id', $session->id)
+            ->where('sender_type', 'admin')
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+        
+        // 清除未读数
+        $session->user_unread = 0;
+        $session->save();
+        
+        return response()->json([
+            'code' => 0,
+            'message' => '已标记为已读',
+        ]);
+    }
 }

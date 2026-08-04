@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, defineComponent, h } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Document, FirstAidKit, ShoppingBag, Promotion, Headset, Wallet, Money } from '@element-plus/icons-vue'
+import { ArrowRight, Document, FirstAidKit, ShoppingBag, Promotion, Headset, Wallet, Money, Present, Bell, Coin } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { safeFetch } from '@/utils/fetch'
@@ -24,8 +24,13 @@ const menuItems = ref<MenuItem[]>([
   { icon: FirstAidKit, title: '健康档案', path: '/health/history' },
   { icon: ShoppingBag, title: '购买次数包', path: '/packages' },
   { icon: Promotion, title: '推广中心', path: '/promoter' },
-  { icon: Headset, title: '联系客服', path: '' },
+  { icon: Headset, title: '联系客服', path: '/messages/customer-service' },
 ])
+
+// 充值积分
+const goRecharge = () => {
+  router.push('/recharge')
+}
 
 // 图标组件包装器（避免 reactive 警告）
 const IconWrapper = defineComponent({
@@ -131,7 +136,7 @@ onMounted(async () => {
         <div class="mobile">{{ userInfo?.mobile || '' }}</div>
         <div class="badges">
           <div v-if="userInfo?.is_new_user_gift" class="gift-badge">
-            <span class="gift-icon">🎁</span>
+            <el-icon class="gift-icon"><Present /></el-icon>
             <span>新人礼 · 已赠送 {{ userInfo?.gift_times ?? 0 }} 次</span>
           </div>
           <div class="badge-item">
@@ -143,12 +148,17 @@ onMounted(async () => {
             <span class="badge-label">次分析</span>
           </div>
         </div>
+        <!-- 充值按钮 -->
+        <button type="button" class="recharge-btn" @click="goRecharge">
+          <el-icon class="recharge-icon"><Coin /></el-icon>
+          充值积分
+        </button>
       </div>
     </div>
 
     <!-- 邀请播报滚动条 -->
     <div class="invite-marquee">
-      <div class="marquee-icon">📢</div>
+      <el-icon class="marquee-icon"><Bell /></el-icon>
       <div class="marquee-wrapper">
         <div class="marquee-content" :class="{ 'marquee-paused': marqueeLoading }">
           <span v-for="(item, idx) in marqueeList" :key="idx" class="marquee-item">
@@ -448,5 +458,34 @@ onMounted(async () => {
 
 .invite-marquee:hover .marquee-content {
   animation-play-state: paused;
+}
+
+/* 充值按钮 */
+.recharge-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 0;
+  background: linear-gradient(135deg, #ffb800 0%, #ff976a 100%);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(255, 184, 0, 0.3);
+}
+
+.recharge-btn:active {
+  transform: scale(0.96);
+  box-shadow: 0 2px 6px rgba(255, 184, 0, 0.3);
+}
+
+.recharge-icon {
+  font-size: 16px;
 }
 </style>

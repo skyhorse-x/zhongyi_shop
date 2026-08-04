@@ -9,6 +9,41 @@
   --el-color-info: #909399;
   --el-button-hover-bg-color: #06ad56;
   --el-button-active-bg-color: #059e4f;
+  --el-button-hover-border-color: #06ad56;
+  --el-button-active-border-color: #059e4f;
+}
+
+/* 全局按钮 hover 样式 - 确保所有按钮 hover 为深绿色 */
+.el-button--primary:hover,
+.el-button--primary:focus {
+  background-color: #06ad56 !important;
+  border-color: #06ad56 !important;
+}
+
+.el-button--primary:active {
+  background-color: #059e4f !important;
+  border-color: #059e4f !important;
+}
+
+/* 成功按钮 hover */
+.el-button--success:hover,
+.el-button--success:focus {
+  background-color: #06ad56 !important;
+  border-color: #06ad56 !important;
+}
+
+/* 默认按钮 hover 也改为绿色系 */
+.el-button:hover,
+.el-button:focus {
+  border-color: #07c160 !important;
+  color: #07c160 !important;
+}
+
+.el-button--primary.is-plain:hover,
+.el-button--primary.is-plain:focus {
+  background-color: #e8f7ef !important;
+  border-color: #07c160 !important;
+  color: #07c160 !important;
 }
 
 /* 全局样式 */

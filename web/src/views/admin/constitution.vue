@@ -272,7 +272,7 @@ onMounted(() => {
         </el-tab-pane>
       </el-tabs>
 
-      <div v-loading="loading">
+      <div>
         <el-empty v-if="!loading && currentList.length === 0" description="该分类暂无题目" />
         <div
           v-for="(q, idx) in currentList"

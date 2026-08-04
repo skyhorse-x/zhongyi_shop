@@ -198,6 +198,24 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- 免责声明 -->
+      <div class="disclaimer-section">
+        <el-alert
+          title="免责声明"
+          type="warning"
+          :closable="false"
+          show-icon
+        >
+          <template #default>
+            <div class="disclaimer-content">
+              <p>1. 本报告基于问卷结果自动生成，仅供参考，不能作为医疗诊断依据。</p>
+              <p>2. 如有健康问题，请咨询专业医疗机构或中医师。</p>
+              <p>3. 调理建议在专业医师指导下进行，切勿自行用药。</p>
+            </div>
+          </template>
+        </el-alert>
+      </div>
+
       <!-- 底部操作 -->
       <div class="result-actions">
         <el-button
@@ -223,7 +241,7 @@ onMounted(() => {
 <style scoped>
 .constitution-result-page {
   padding: 16px;
-  padding-bottom: 100px;
+  padding-bottom: 90px;
   min-height: 100vh;
   background: #f7f8fa;
 }
@@ -398,10 +416,26 @@ onMounted(() => {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 12px 16px;
+  padding: 16px 16px max(20px, calc(12px + env(safe-area-inset-bottom)));
   background: #fff;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
   display: flex;
   gap: 12px;
+  z-index: 100;
+}
+
+/* 免责声明 */
+.disclaimer-section {
+  margin: 16px 0;
+}
+
+.disclaimer-content {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #666;
+}
+
+.disclaimer-content p {
+  margin: 2px 0;
 }
 </style>

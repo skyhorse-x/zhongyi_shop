@@ -8,7 +8,7 @@ const commonRoutes: RouteRecordRaw[] = [
     path: '/',
     name: 'Home',
     component: () => import('@/views/home/index.vue'),
-    meta: { title: 'AI中医健康管理' },
+    meta: { title: 'ai 中医健康助手' },
   },
   {
     path: '/auth/login',

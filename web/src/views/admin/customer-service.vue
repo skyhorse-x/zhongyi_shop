@@ -683,7 +683,7 @@ onUnmounted(() => {
               </select>
             </div>
           </div>
-          <div class="list-content" v-loading="loading">
+          <div class="list-content">
             <div
               v-for="session in sessions"
               :key="session.id"

@@ -89,6 +89,22 @@ const goBuy = (item: XianyuProduct) => {
   window.open(target, '_blank', 'noopener')
 }
 
+// 复制客服微信号
+const copyWechat = async () => {
+  try {
+    await navigator.clipboard.writeText('TCM2026888')
+    ElMessage.success('微信号已复制')
+  } catch {
+    const input = document.createElement('input')
+    input.value = 'TCM2026888'
+    document.body.appendChild(input)
+    input.select()
+    document.execCommand('copy')
+    document.body.removeChild(input)
+    ElMessage.success('微信号已复制')
+  }
+}
+
 onMounted(() => {
   fetchUserInfo()
   fetchProducts()
@@ -151,6 +167,22 @@ onMounted(() => {
           <div class="system-link-desc">前往闲鱼购买并完成付款</div>
         </div>
         <el-button round type="primary" size="small">去闲鱼购买</el-button>
+      </div>
+    </div>
+
+    <!-- 微信客服 -->
+    <div class="contact-card">
+      <div class="contact-header">
+        <el-icon><ChatLineRound /></el-icon>
+        <span>微信客服</span>
+      </div>
+      <div class="contact-body">
+        <div class="contact-tip">如闲鱼购买遇到问题，或需要其他充值方式，请添加客服微信：</div>
+        <div class="wechat-id">
+          <el-icon><ChatLineRound /></el-icon>
+          <span>TCM2026888</span>
+          <el-button link type="primary" size="small" @click="copyWechat">复制</el-button>
+        </div>
       </div>
     </div>
 
@@ -381,5 +413,63 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+/* 联系客服卡片 */
+.contact-card {
+  background: linear-gradient(135deg, #fff7e6 0%, #fff2d9 100%);
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 20px;
+  border: 1px solid #ffe4a3;
+}
+
+.contact-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #c8821f;
+  margin-bottom: 10px;
+}
+
+.contact-header .el-icon {
+  color: #e6a23c;
+}
+
+.contact-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.contact-tip {
+  font-size: 13px;
+  color: #8b6914;
+  line-height: 1.5;
+}
+
+.wechat-id {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #ffe4a3;
+}
+
+.wechat-id .el-icon {
+  color: #07c160;
+  font-size: 16px;
+}
+
+.wechat-id span {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  letter-spacing: 0.5px;
 }
 </style>

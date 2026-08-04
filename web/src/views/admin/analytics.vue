@@ -45,7 +45,7 @@ const formatPct = (v: number) => `${Number(v || 0)}%`
 </script>
 
 <template>
-  <div class="analytics-page" v-loading="loading">
+  <div class="analytics-page">
     <!-- 核心指标 -->
     <el-row :gutter="16">
       <el-col :span="6"><el-card><div class="metric-label">今日收入</div><div class="metric-value">{{ formatMoney(overview.today_revenue) }}</div></el-card></el-col>

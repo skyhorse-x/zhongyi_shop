@@ -6,7 +6,7 @@ import { getToken, getAdminToken } from '@/utils/auth'
 // 路由守卫 - 权限检查
 export function setupPermissionGuard() {
   router.beforeEach((to, _from, next) => {
-    document.title = (to.meta.title as string) || 'AI中医健康管理'
+    document.title = (to.meta.title as string) || 'ai 中医健康助手'
 
     const token = getToken()
     const adminToken = getAdminToken()

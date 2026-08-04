@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Plus, List, Coin } from '@element-plus/icons-vue'
+import { Plus, List, Coin, User, FirstAidKit, CopyDocument, Microphone, VideoPause } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
 
 const route = useRoute()
@@ -114,6 +114,80 @@ const formatContent = (content: string): string => {
     .replace(/\n/g, '<br>')
 }
 
+// 复制文本
+const copyText = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    const input = document.createElement('textarea')
+    input.value = text
+    document.body.appendChild(input)
+    input.select()
+    document.execCommand('copy')
+    document.body.removeChild(input)
+    ElMessage.success('已复制到剪贴板')
+  }
+}
+
+// 语音朗读相关
+const speakingMsgId = ref<number | null>(null)
+let speechSynthesis: SpeechSynthesis | null = null
+let currentUtterance: SpeechSynthesisUtterance | null = null
+
+const initSpeech = () => {
+  if ('speechSynthesis' in window) {
+    speechSynthesis = window.speechSynthesis
+  }
+}
+
+// 朗读文本
+const speakText = (msgId: number, text: string) => {
+  if (!speechSynthesis) {
+    ElMessage.warning('您的浏览器不支持语音朗读')
+    return
+  }
+
+  // 如果正在朗读同一消息，则停止
+  if (speakingMsgId.value === msgId) {
+    speechSynthesis.cancel()
+    speakingMsgId.value = null
+    return
+  }
+
+  // 停止当前朗读
+  speechSynthesis.cancel()
+
+  // 移除 HTML 标签
+  const plainText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  
+  const utterance = new SpeechSynthesisUtterance(plainText)
+  utterance.lang = 'zh-CN'
+  utterance.rate = 1.0
+  utterance.pitch = 1.0
+  utterance.volume = 1.0
+
+  utterance.onend = () => {
+    speakingMsgId.value = null
+  }
+
+  utterance.onerror = () => {
+    speakingMsgId.value = null
+  }
+
+  currentUtterance = utterance
+  speakingMsgId.value = msgId
+  speechSynthesis.speak(utterance)
+}
+
+// 停止朗读
+const stopSpeaking = () => {
+  if (speechSynthesis) {
+    speechSynthesis.cancel()
+    speakingMsgId.value = null
+  }
+}
+
 // 发送消息
 const sendMessage = async () => {
   const text = inputText.value.trim()
@@ -218,12 +292,19 @@ const formatTime = (timestamp: number | string): string => {
 }
 
 onMounted(async () => {
+  // 初始化语音合成
+  initSpeech()
   // 加载用户信息（积分）
   await loadUserInfo()
   // 如果有 sessionNo，加载历史消息
   if (sessionNo.value) {
     await loadMessages(sessionNo.value)
   }
+})
+
+onBeforeUnmount(() => {
+  // 组件销毁时停止朗读
+  stopSpeaking()
 })
 </script>
 
@@ -248,7 +329,7 @@ onMounted(async () => {
     <div ref="messageListRef" class="message-list">
       <!-- 欢迎消息 -->
       <div v-if="messages.length === 0" class="welcome">
-        <div class="welcome-icon">🌿</div>
+        <el-icon class="welcome-icon"><FirstAidKit /></el-icon>
         <div class="welcome-title">欢迎使用健康问答</div>
         <div class="welcome-desc">我是您的AI中医健康顾问，请描述您的健康问题</div>
         <div class="quick-questions">
@@ -272,18 +353,33 @@ onMounted(async () => {
         :class="msg.role"
       >
         <div class="avatar">
-          {{ msg.role === 'user' ? '👤' : '🌿' }}
+          <el-icon v-if="msg.role === 'user'"><User /></el-icon>
+          <el-icon v-else><FirstAidKit /></el-icon>
         </div>
         <div class="message-content">
           <div class="message-bubble" v-html="msg.role === 'assistant' ? formatContent(msg.content) : msg.content">
           </div>
-          <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
+          <div class="message-meta">
+            <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
+            <div v-if="msg.role === 'assistant'" class="message-actions">
+              <el-icon
+                class="action-icon"
+                :title="'复制'"
+                @click="copyText(msg.content)"
+              ><CopyDocument /></el-icon>
+              <el-icon
+                class="action-icon"
+                :title="speakingMsgId === msg.id ? '停止朗读' : '朗读'"
+                @click="speakText(msg.id, msg.content)"
+              ><VideoPause v-if="speakingMsgId === msg.id" /><Microphone v-else /></el-icon>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- 加载状态 -->
       <div v-if="loading" class="message-item assistant">
-        <div class="avatar">🌿</div>
+        <div class="avatar"><el-icon><FirstAidKit /></el-icon></div>
         <div class="message-content">
           <div class="message-bubble typing">
             <span class="dot"></span>
@@ -538,6 +634,30 @@ onMounted(async () => {
   padding: 0;
 }
 
+/* AI 消息操作按钮 */
+.message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.message-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-icon {
+  font-size: 14px;
+  color: #969799;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.action-icon:hover {
+  color: #07c160;
+}
+
 /* 用户消息样式 */
 .user .message-bubble {
   background: linear-gradient(135deg, #07c160 0%, #04a152 100%);
@@ -592,14 +712,14 @@ onMounted(async () => {
 
 /* 输入区域 */
 .input-area {
-  padding: 8px 12px;
+  padding: 16px 20px;
   background: #fff;
   border-top: 1px solid #ebedf0;
 }
 
 .input-wrapper {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
 }
 
@@ -607,9 +727,19 @@ onMounted(async () => {
   flex: 1;
 }
 
+.input-field :deep(.el-input__wrapper) {
+  border-radius: 24px;
+  padding: 8px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
 .send-btn {
   flex-shrink: 0;
   background: linear-gradient(135deg, #07c160 0%, #04a152 100%);
   border: none;
+  border-radius: 24px;
+  padding: 12px 28px;
+  height: 44px;
+  font-weight: 500;
 }
 </style>

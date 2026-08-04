@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, h, onMounted, defineComponent } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Avatar, User, ChatLineRound, FirstAidKit, Money, Wallet } from '@element-plus/icons-vue'
+import { ArrowRight, Avatar, User, ChatLineRound, FirstAidKit, Money, Wallet, Star } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import { safeFetch } from '@/utils/fetch'
 import { getToken } from '@/utils/auth'
@@ -18,6 +18,7 @@ interface FeatureItem {
 const features = ref<FeatureItem[]>([
   { icon: FirstAidKit, title: '舌诊分析', desc: 'AI智能舌诊，了解身体状况', path: '/analysis/tongue' },
   { icon: User, title: '面诊分析', desc: '面色面诊，洞察健康密码', path: '/analysis/face' },
+  { icon: Star, title: '体质分析', desc: '中医体质辨识，个性化调理', path: '/constitution/test' },
   { icon: ChatLineRound, title: '健康问答', desc: 'AI在线问答，专业指导', path: '/qa/chat' },
 ])
 
@@ -68,7 +69,7 @@ onMounted(() => {
   <div class="home-page">
     <!-- 顶部横幅 -->
     <div class="banner">
-      <div class="banner-title">AI中医健康管理</div>
+      <div class="banner-title">ai 中医健康助手</div>
       <div class="banner-subtitle">智能分析 · 科学养生 · 守护健康</div>
     </div>
 

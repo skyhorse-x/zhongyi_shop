@@ -137,7 +137,7 @@ const statusCount = computed(() => {
 
 // 支付方式文本
 const payTypeText = (type: string) => {
-  const map: Record<string, string> = { wechat: '微信支付', alipay: '支付宝' }
+  const map: Record<string, string> = { wechat: '微信支付', alipay: '支付宝', balance: '余额支付' }
   return map[type] || type
 }
 

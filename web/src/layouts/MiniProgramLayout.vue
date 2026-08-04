@@ -56,7 +56,7 @@ const handleShare = () => {
   menuOpen.value = false
   if (navigator.share) {
     navigator.share({
-      title: 'AI中医健康管理',
+      title: 'ai 中医健康助手',
       text: '智能分析 · 科学养生 · 守护健康',
       url: window.location.origin,
     })
@@ -90,12 +90,24 @@ const switchTab = (path: string) => {
 
 // 未读消息数
 const unreadCount = ref(3)
+
+// 检测是否为微信内置浏览器
+const isWeChat = computed(() => {
+  const ua = navigator.userAgent.toLowerCase()
+  return ua.includes('micromessenger')
+})
+
+// 是否显示顶部导航栏（微信环境下隐藏）
+const showNavbar = computed(() => !isWeChat.value)
+
+// 是否显示底部Tab栏（微信环境下隐藏）
+const showTabBar = computed(() => !isWeChat.value)
 </script>
 
 <template>
   <div class="mini-program">
-    <!-- 模拟小程序顶部导航栏 -->
-    <div class="mini-navbar">
+    <!-- 模拟小程序顶部导航栏（微信环境下隐藏） -->
+    <div class="mini-navbar" v-if="showNavbar">
       <!-- 左侧返回按钮 -->
       <div class="nav-left" v-if="showBack" @click="goBack">
         <el-icon class="nav-icon"><Back /></el-icon>
@@ -144,8 +156,8 @@ const unreadCount = ref(3)
       <slot />
     </div>
 
-    <!-- 底部Tab导航栏 -->
-    <div class="tab-bar">
+    <!-- 底部Tab导航栏（微信环境下隐藏） -->
+    <div class="tab-bar" v-if="showTabBar">
       <div
         v-for="tab in tabItems"
         :key="tab.path"
@@ -161,14 +173,8 @@ const unreadCount = ref(3)
       </div>
     </div>
 
-    <!-- 底部安全区域 -->
-    <div class="safe-area-bottom"></div>
-
-    <!-- 悬浮聊天入口 -->
-    <div class="chat-float-btn" @click="navigateTo('/qa/chat')" v-if="route.path !== '/qa/chat'">
-      <el-icon class="chat-icon"><ChatLineRound /></el-icon>
-      <span class="chat-text">咨询</span>
-    </div>
+    <!-- 底部安全区域（微信环境下隐藏） -->
+    <div class="safe-area-bottom" v-if="showTabBar"></div>
   </div>
 </template>
 
@@ -401,39 +407,6 @@ const unreadCount = ref(3)
 .safe-area-bottom {
   height: env(safe-area-inset-bottom);
   background: #fff;
-}
-
-/* 悬浮聊天入口 */
-.chat-float-btn {
-  position: fixed;
-  right: 16px;
-  bottom: 80px;
-  z-index: 110;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 16px;
-  background: linear-gradient(135deg, #07c160 0%, #06ad56 100%);
-  border-radius: 24px;
-  box-shadow: 0 4px 16px rgba(7, 193, 96, 0.35);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.chat-float-btn:active {
-  transform: scale(0.95);
-  box-shadow: 0 2px 8px rgba(7, 193, 96, 0.3);
-}
-
-.chat-icon {
-  font-size: 18px;
-  color: #fff;
-}
-
-.chat-text {
-  font-size: 14px;
-  color: #fff;
-  font-weight: 500;
 }
 
 /* 过渡动画 */

@@ -209,7 +209,7 @@ onMounted(() => {
         </el-form-item>
       </el-form>
 
-      <el-table :data="tableData" border stripe style="width: 100%" v-loading="loading">
+      <el-table :data="tableData" border stripe style="width: 100%">
         <el-table-column prop="withdraw_no" label="提现单号" width="180" />
         <el-table-column prop="promoter" label="推广员" min-width="120" />
         <el-table-column prop="amount" label="提现金额" width="120" align="right">

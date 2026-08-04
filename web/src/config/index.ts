@@ -1,5 +1,5 @@
 export const appConfig = {
-  title: import.meta.env.VITE_APP_TITLE || 'AI中医健康管理平台',
+  title: import.meta.env.VITE_APP_TITLE || 'ai 中医健康助手平台',
   shortName: import.meta.env.VITE_APP_SHORT_NAME || '中医商城',
   version: '1.0.0',
 

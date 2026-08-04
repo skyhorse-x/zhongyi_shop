@@ -155,7 +155,7 @@ onUnmounted(() => {
   <div class="register-page">
     <div class="register-form">
       <div class="register-title">创建账号</div>
-      <div class="register-subtitle">加入AI中医健康管理平台</div>
+      <div class="register-subtitle">加入ai 中医健康助手平台</div>
 
       <!-- 注册方式切换 -->
       <div class="register-type-switch">

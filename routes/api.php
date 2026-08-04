@@ -94,6 +94,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::get('sessions/{sessionNo}/messages', [V1\CustomerServiceController::class, 'messages']);
             Route::post('sessions/{sessionNo}/messages', [V1\CustomerServiceController::class, 'sendMessage']);
             Route::post('sessions/{sessionNo}/upload-image', [V1\CustomerServiceController::class, 'uploadImage']);
+            Route::post('sessions/{sessionNo}/mark-as-read', [V1\CustomerServiceController::class, 'markAsRead']);
             Route::post('sessions/{sessionNo}/close', [V1\CustomerServiceController::class, 'closeSession']);
         });
         
@@ -194,6 +195,10 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::post('users/{id}/balance', [V1\AdminController::class, 'userAdjustBalance']);
             Route::get('users/{id}/balance-logs', [V1\AdminController::class, 'userBalanceLogs']);
 
+            // 用户积分：充值 / 扣减 + 流水
+            Route::post('users/{id}/credits', [V1\AdminController::class, 'userAdjustCredits']);
+            Route::get('users/{id}/credits-logs', [V1\AdminController::class, 'userCreditsLogs']);
+
             // 管理员管理（需超级管理员权限）
             Route::middleware('super_admin')->group(function () {
                 Route::get('admins', [V1\AdminController::class, 'adminList']);
@@ -201,6 +206,16 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
                 Route::put('admins/{id}', [V1\AdminController::class, 'adminUpdate']);
                 Route::post('admins/{id}/reset-password', [V1\AdminController::class, 'adminResetPassword']);
                 Route::delete('admins/{id}', [V1\AdminController::class, 'adminDestroy']);
+                
+                // 角色管理
+                Route::get('roles/all', [V1\Admin\RoleController::class, 'all']);
+                Route::get('roles/permissions', [V1\Admin\RoleController::class, 'permissions']);
+                Route::get('roles', [V1\Admin\RoleController::class, 'index']);
+                Route::post('roles', [V1\Admin\RoleController::class, 'store']);
+                Route::get('roles/{id}', [V1\Admin\RoleController::class, 'show']);
+                Route::put('roles/{id}', [V1\Admin\RoleController::class, 'update']);
+                Route::delete('roles/{id}', [V1\Admin\RoleController::class, 'destroy']);
+                Route::post('roles/{id}/toggle-status', [V1\Admin\RoleController::class, 'toggleStatus']);
             });
 
             // 订单管理

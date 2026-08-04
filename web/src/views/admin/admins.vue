@@ -338,7 +338,7 @@ onMounted(() => {
       </el-row>
     </el-form>
 
-    <el-table :data="tableData" border stripe style="width: 100%" v-loading="loading">
+    <el-table :data="tableData" border stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="60" align="center" />
       <el-table-column prop="username" label="用户名" width="140">
         <template #default="scope">

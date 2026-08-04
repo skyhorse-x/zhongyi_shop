@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 import { Edit, Refresh, Wallet, Promotion, MoreFilled, View, Close, Lock, Plus, Minus, List } from '@element-plus/icons-vue'
@@ -157,6 +157,7 @@ const loadUsers = async () => {
         birthday: user.birthday || '',
         registerTime: user.created_at || '-',
         balance: Number(user.balance ?? 0),
+        analysis_times: Number(user.analysis_times ?? 0),
       }))
       total.value = data.data.total || list.length
     } else {
@@ -414,6 +415,11 @@ const submitEdit = async () => {
 
 onMounted(() => {
   loadUsers()
+  window.addEventListener('resize', checkMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
 })
 
 // ===== 余额管理 =====
@@ -502,6 +508,92 @@ const submitAdjust = async () => {
   }
 }
 
+// ===== 积分管理 =====
+const adjustCreditsDialogVisible = ref(false)
+const adjustCreditsLoading = ref(false)
+const adjustCreditsForm = reactive({
+  user: null as any,
+  type: 'recharge' as 'recharge' | 'admin_deduct',
+  amount: 0 as number | string,
+  remark: '',
+})
+const presetCreditsAmounts = [1, 5, 10, 20, 50, 100]
+
+const openAdjustCredits = (row: any, type: 'recharge' | 'admin_deduct') => {
+  adjustCreditsForm.user = row
+  adjustCreditsForm.type = type
+  adjustCreditsForm.amount = 0
+  adjustCreditsForm.remark = type === 'recharge' ? '管理员后台充值积分' : '管理员后台扣减积分'
+  adjustCreditsDialogVisible.value = true
+}
+
+const submitAdjustCredits = async () => {
+  const amt = Number(adjustCreditsForm.amount)
+  if (!amt || amt <= 0) {
+    ElMessage.warning('请输入大于 0 的积分数量')
+    return
+  }
+  if (!Number.isInteger(amt)) {
+    ElMessage.warning('积分必须为整数')
+    return
+  }
+  if (amt > 99999) {
+    ElMessage.warning('单次积分不能超过 99,999')
+    return
+  }
+  if (
+    adjustCreditsForm.type === 'admin_deduct' &&
+    amt > Number(adjustCreditsForm.user?.analysis_times ?? 0)
+  ) {
+    ElMessage.warning('扣减积分不能超过用户当前积分')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确认要「${adjustCreditsForm.type === 'recharge' ? '充值' : '扣减'}」${amt} 积分给用户「${adjustCreditsForm.user?.username}」？`,
+      `${adjustCreditsForm.type === 'recharge' ? '充值' : '扣减'}积分确认`,
+      { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+
+  adjustCreditsLoading.value = true
+  try {
+    const res = await safeFetch(
+      `/api/v1/admin/users/${adjustCreditsForm.user.id}/credits`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: adjustCreditsForm.type,
+          amount: amt,
+          remark: adjustCreditsForm.remark,
+        }),
+      }
+    )
+    const data = await res.json()
+    if (data.code === 0) {
+      ElMessage.success(data.message || '操作成功')
+      adjustCreditsDialogVisible.value = false
+      // 刷新列表里的积分显示
+      const newCredits = data.data?.analysis_times ?? 0
+      const target = tableData.value.find((u) => u.id === adjustCreditsForm.user.id)
+      if (target) target.analysis_times = Number(newCredits)
+    } else {
+      ElMessage.error(data.message || '操作失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '操作失败')
+  } finally {
+    adjustCreditsLoading.value = false
+  }
+}
+
 // 流水弹窗
 const logsDialogVisible = ref(false)
 const logsLoading = ref(false)
@@ -511,6 +603,12 @@ const logsPage = ref(1)
 const logsPageSize = ref(15)
 const logsFilterType = ref('')
 
+// 移动端检测
+const isMobile = ref(window.innerWidth <= 768)
+const checkMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
+
 const logTypeName = (t: string) =>
   ({
     recharge: '后台充值',
@@ -519,6 +617,71 @@ const logTypeName = (t: string) =>
     reward: '系统奖励',
     admin_deduct: '后台扣减',
   }[t] || t)
+
+// ===== 积分流水弹窗 =====
+const creditsLogsDialogVisible = ref(false)
+const creditsLogsLoading = ref(false)
+const creditsLogsList = ref<any[]>([])
+const creditsLogsTotal = ref(0)
+const creditsLogsPage = ref(1)
+const creditsLogsPageSize = ref(15)
+const creditsLogsFilterType = ref('')
+const creditsLogsUser = ref<any>(null)
+
+const creditsLogTypeName = (t: string) =>
+  ({
+    recharge: '后台充值',
+    use: '分析消费',
+    refund: '退款返还',
+    reward: '系统奖励',
+    admin_deduct: '后台扣减',
+    register_grant: '注册赠送',
+    purchase: '购买',
+  }[t] || t)
+
+const openCreditsLogs = async (row: any) => {
+  creditsLogsDialogVisible.value = true
+  creditsLogsPage.value = 1
+  creditsLogsList.value = []
+  creditsLogsUser.value = row
+  await loadCreditsLogs()
+}
+
+const loadCreditsLogs = async () => {
+  if (!creditsLogsUser.value) return
+  creditsLogsLoading.value = true
+  try {
+    const params = new URLSearchParams({
+      page: creditsLogsPage.value.toString(),
+      per_page: creditsLogsPageSize.value.toString(),
+    })
+    if (creditsLogsFilterType.value) params.append('type', creditsLogsFilterType.value)
+    const res = await safeFetch(
+      `/api/v1/admin/users/${creditsLogsUser.value.id}/credits-logs?${params}`,
+      {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          Accept: 'application/json',
+        },
+      }
+    )
+    const ct = res.headers.get('content-type') || ''
+    if (!ct.includes('application/json')) {
+      throw new Error(`接口返回非 JSON（status=${res.status}）`)
+    }
+    const data = await res.json()
+    if (data.code === 0) {
+      creditsLogsList.value = data.data.logs?.data ?? []
+      creditsLogsTotal.value = data.data.logs?.total ?? creditsLogsList.value.length
+    } else {
+      ElMessage.error(data.message || '加载积分流水失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载积分流水失败')
+  } finally {
+    creditsLogsLoading.value = false
+  }
+}
 const formatMoney = (n: any) => Number(n ?? 0).toFixed(2)
 const formatTime = (s: string) => (s ? s.replace('T', ' ').slice(0, 19) : '-')
 
@@ -607,7 +770,7 @@ const loadLogs = async (row?: any) => {
     </el-form>
 
     <div class="table-scroll-wrapper">
-      <el-table :data="tableData" border stripe v-loading="loading">
+      <el-table :data="tableData" border stripe>
         <el-table-column prop="id" label="ID" width="50" align="center" />
         <el-table-column label="用户信息" min-width="140">
           <template #default="scope">
@@ -636,6 +799,13 @@ const loadLogs = async (row?: any) => {
             </span>
           </template>
         </el-table-column>
+        <el-table-column label="积分" width="80" align="center">
+          <template #default="scope">
+            <span :style="{ color: scope.row.analysis_times > 0 ? '#67c23a' : '#999', fontWeight: 600 }">
+              {{ scope.row.analysis_times || 0 }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="70" align="center">
           <template #default="scope">
             <el-tag :type="scope.row.statusValue === 1 ? 'success' : 'danger'" size="small">
@@ -644,7 +814,7 @@ const loadLogs = async (row?: any) => {
           </template>
         </el-table-column>
         <el-table-column prop="registerTime" label="注册时间" min-width="150" class-name="hidden-mobile" />
-        <el-table-column label="操作" width="120" align="center" fixed="right">
+        <el-table-column label="操作" width="120" align="center" :fixed="isMobile ? false : 'right'">
           <template #default="scope">
             <el-dropdown
               trigger="click"
@@ -655,6 +825,9 @@ const loadLogs = async (row?: any) => {
                 else if (cmd === 'resetpwd') handleResetPassword(scope.row)
                 else if (cmd === 'recharge') openAdjust(scope.row, 'recharge')
                 else if (cmd === 'admin_deduct') openAdjust(scope.row, 'admin_deduct')
+                else if (cmd === 'credits_recharge') openAdjustCredits(scope.row, 'recharge')
+                else if (cmd === 'credits_deduct') openAdjustCredits(scope.row, 'admin_deduct')
+                else if (cmd === 'credits_logs') openCreditsLogs(scope.row)
                 else if (cmd === 'logs') openLogs(scope.row)
               }"
             >
@@ -679,8 +852,17 @@ const loadLogs = async (row?: any) => {
                   <el-dropdown-item command="admin_deduct">
                     <el-icon><Minus /></el-icon> 扣减
                   </el-dropdown-item>
+                  <el-dropdown-item command="credits_recharge" divided>
+                    <el-icon><Plus /></el-icon> 充值积分
+                  </el-dropdown-item>
+                  <el-dropdown-item command="credits_deduct">
+                    <el-icon><Minus /></el-icon> 扣减积分
+                  </el-dropdown-item>
+                  <el-dropdown-item command="credits_logs">
+                    <el-icon><List /></el-icon> 查看积分流水
+                  </el-dropdown-item>
                   <el-dropdown-item command="logs" divided>
-                    <el-icon><List /></el-icon> 查看流水
+                    <el-icon><List /></el-icon> 查看余额流水
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -911,6 +1093,71 @@ const loadLogs = async (row?: any) => {
       </template>
     </el-dialog>
 
+    <!-- 积分充值/扣减 弹窗 -->
+    <el-dialog
+      v-model="adjustCreditsDialogVisible"
+      :title="adjustCreditsForm.type === 'recharge' ? '积分充值' : '积分扣减'"
+      width="480px"
+      :close-on-click-modal="false"
+    >
+      <el-alert
+        :title="`用户「${adjustCreditsForm.user?.username}」当前积分：${adjustCreditsForm.user?.analysis_times || 0}`"
+        :type="adjustCreditsForm.type === 'recharge' ? 'success' : 'warning'"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      />
+      <el-form label-width="80px">
+        <el-form-item label="操作类型">
+          <el-radio-group v-model="adjustCreditsForm.type">
+            <el-radio value="recharge">充值（增加）</el-radio>
+            <el-radio value="admin_deduct">扣减（减少）</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="积分" required>
+          <el-input-number
+            v-model="adjustCreditsForm.amount"
+            :min="1"
+            :max="99999"
+            :step="1"
+            style="width: 100%"
+            placeholder="请输入积分数量"
+          />
+        </el-form-item>
+        <el-form-item label="快捷">
+          <el-button
+            v-for="p in presetCreditsAmounts"
+            :key="p"
+            size="small"
+            @click="adjustCreditsForm.amount = p"
+            style="margin-right: 6px; margin-bottom: 4px"
+          >
+            {{ p }} 积分
+          </el-button>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input
+            v-model="adjustCreditsForm.remark"
+            type="textarea"
+            :rows="2"
+            maxlength="200"
+            show-word-limit
+            placeholder="如：活动赠送、补偿等"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="adjustCreditsDialogVisible = false">取消</el-button>
+        <el-button
+          :type="adjustCreditsForm.type === 'recharge' ? 'primary' : 'danger'"
+          :loading="adjustCreditsLoading"
+          @click="submitAdjustCredits"
+        >
+          确认{{ adjustCreditsForm.type === 'recharge' ? '充值' : '扣减' }}
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- 新增用户弹窗 -->
     <el-dialog
       v-model="createDialogVisible"
@@ -1044,7 +1291,7 @@ const loadLogs = async (row?: any) => {
         </el-select>
       </div>
 
-      <el-table :data="logsList" border stripe v-loading="logsLoading" max-height="420">
+      <el-table :data="logsList" border stripe max-height="420">
         <el-table-column prop="id" label="ID" width="60" align="center" />
         <el-table-column label="类型" width="100" align="center">
           <template #default="scope">
@@ -1093,6 +1340,88 @@ const loadLogs = async (row?: any) => {
 
       <template #footer>
         <el-button @click="logsDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 积分流水弹窗 -->
+    <el-dialog
+      v-model="creditsLogsDialogVisible"
+      :title="`用户「${creditsLogsUser?.username}」积分流水`"
+      width="780px"
+      :close-on-click-modal="false"
+    >
+      <div class="logs-header">
+        <div class="logs-stat">
+          <span class="logs-stat-label">当前积分：</span>
+          <span class="logs-stat-value" style="color: #67c23a;">{{ creditsLogsUser?.analysis_times || 0 }}</span>
+        </div>
+        <el-select
+          v-model="creditsLogsFilterType"
+          placeholder="全部类型"
+          clearable
+          size="small"
+          style="width: 160px"
+          @change="() => { creditsLogsPage = 1; loadCreditsLogs() }"
+        >
+          <el-option label="后台充值" value="recharge" />
+          <el-option label="分析消费" value="use" />
+          <el-option label="退款返还" value="refund" />
+          <el-option label="系统奖励" value="reward" />
+          <el-option label="后台扣减" value="admin_deduct" />
+          <el-option label="注册赠送" value="register_grant" />
+          <el-option label="购买" value="purchase" />
+        </el-select>
+      </div>
+
+      <el-table :data="creditsLogsList" border stripe max-height="420">
+        <el-table-column prop="id" label="ID" width="60" align="center" />
+        <el-table-column label="类型" width="100" align="center">
+          <template #default="scope">
+            <el-tag
+              :type="['recharge','refund','reward','register_grant','purchase'].includes(scope.row.type) ? 'success' : 'danger'"
+              size="small"
+            >
+              {{ creditsLogTypeName(scope.row.type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动积分" width="110" align="right">
+          <template #default="scope">
+            <span
+              :style="{
+                color: Number(scope.row.change) > 0 ? '#67c23a' : '#f56c6c',
+                fontWeight: 600
+              }"
+            >
+              {{ Number(scope.row.change) > 0 ? '+' : '' }}{{ scope.row.change }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动前" width="80" align="right">
+          <template #default="scope">{{ scope.row.before }}</template>
+        </el-table-column>
+        <el-table-column label="变动后" width="80" align="right">
+          <template #default="scope">{{ scope.row.after }}</template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
+        <el-table-column label="时间" width="150" align="center">
+          <template #default="scope">{{ formatTime(scope.row.created_at) }}</template>
+        </el-table-column>
+      </el-table>
+
+      <el-pagination
+        v-if="creditsLogsTotal > creditsLogsPageSize"
+        v-model:current-page="creditsLogsPage"
+        :page-size="creditsLogsPageSize"
+        :total="creditsLogsTotal"
+        layout="prev, pager, next, total"
+        background
+        @current-change="() => loadCreditsLogs()"
+        style="margin-top: 12px; justify-content: flex-end"
+      />
+
+      <template #footer>
+        <el-button @click="creditsLogsDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>

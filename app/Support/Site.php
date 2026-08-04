@@ -43,11 +43,11 @@ final class Site
     }
 
     /**
-     * 推广员邀请链接：?code=xxx
+     * 推广员邀请链接：/?code=xxx
      */
     public static function inviteLink(string $inviteCode): string
     {
-        return self::url() . '?code=' . rawurlencode($inviteCode);
+        return self::url() . '/?code=' . rawurlencode($inviteCode);
     }
 
     /**

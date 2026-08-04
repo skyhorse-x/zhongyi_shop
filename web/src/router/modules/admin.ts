@@ -21,6 +21,7 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'risk',            name: 'AdminRisk',            component: () => import('@/views/admin/risk.vue'),            meta: { title: '风控管理' } },
       { path: 'users',           name: 'AdminUsers',           component: () => import('@/views/admin/users.vue'),           meta: { title: '用户管理' } },
       { path: 'admins',          name: 'AdminAdmins',          component: () => import('@/views/admin/admins.vue'),          meta: { title: '管理员管理' } },
+      { path: 'roles',           name: 'AdminRoles',           component: () => import('@/views/admin/roles.vue'),           meta: { title: '角色管理' } },
       { path: 'orders',          name: 'AdminOrders',          component: () => import('@/views/admin/orders.vue'),          meta: { title: '订单管理' } },
       { path: 'packages',        name: 'AdminPackages',        component: () => import('@/views/admin/packages.vue'),        meta: { title: '次数包管理' } },
       { path: 'xianyu-products', name: 'AdminXianyuProducts',  component: () => import('@/views/admin/xianyu-products.vue'), meta: { title: '闲鱼商品管理' } },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 
@@ -287,6 +287,39 @@ const handleSizeChange = (size: number) => {
   loadCallRecords()
 }
 
+// 提供商名称映射
+const providerLabels: Record<string, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic Claude',
+  deepseek: 'DeepSeek',
+  doubao: '豆包 (字节跳动)',
+  qwen: '通义千问',
+  longcat: '美团 LongCat',
+  custom: '自定义服务商',
+}
+
+const getProviderLabel = (provider: string) => providerLabels[provider] || provider
+
+// 提供商默认API地址
+const providerDefaultUrls: Record<string, string> = {
+  openai: 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com',
+  deepseek: 'https://api.deepseek.com/v1',
+  doubao: 'https://ark.cn-beijing.volces.com/api/v3',
+  qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  longcat: 'https://api.longcat.chat/openai/v1',
+  custom: '',
+}
+
+// 监听服务商变化，自动填充API地址
+watch(() => editForm.value.provider, (newProvider) => {
+  const currentUrl = editForm.value.api_url
+  const isDefaultUrl = Object.values(providerDefaultUrls).includes(currentUrl) || !currentUrl
+  if (isDefaultUrl && providerDefaultUrls[newProvider]) {
+    editForm.value.api_url = providerDefaultUrls[newProvider]
+  }
+})
+
 onMounted(() => {
   loadModels()
   loadCallRecords()
@@ -318,7 +351,7 @@ onMounted(() => {
               </el-tag>
             </div>
             <el-descriptions :column="2" border size="small" class="model-desc">
-              <el-descriptions-item label="提供商">{{ model.provider }}</el-descriptions-item>
+              <el-descriptions-item label="提供商">{{ getProviderLabel(model.provider) }}</el-descriptions-item>
               <el-descriptions-item label="模型">{{ model.model || '-' }}</el-descriptions-item>
               <el-descriptions-item label="类型">{{ model.type === 'vision' ? '视觉' : '文本' }}</el-descriptions-item>
               <el-descriptions-item label="分析类型">{{ model.analysis_type || '-' }}</el-descriptions-item>
@@ -360,7 +393,7 @@ onMounted(() => {
 
           <div class="record-section">
             <h4 class="record-title">调用记录</h4>
-            <el-table :data="callRecords" border stripe size="small" style="width: 100%" v-loading="recordsLoading">
+            <el-table :data="callRecords" border stripe size="small" style="width: 100%">
               <el-table-column prop="created_at" label="时间" width="160" />
               <el-table-column prop="model_name" label="模型" min-width="110" />
               <el-table-column prop="type" label="类型" width="90" />
@@ -403,9 +436,12 @@ onMounted(() => {
         <el-form-item label="提供商" required>
           <el-select v-model="editForm.provider" placeholder="请选择提供商" style="width: 100%">
             <el-option label="DeepSeek" value="deepseek" />
-            <el-option label="豆包" value="doubao" />
+            <el-option label="豆包 (字节跳动)" value="doubao" />
             <el-option label="OpenAI" value="openai" />
-            <el-option label="Anthropic" value="anthropic" />
+            <el-option label="Anthropic Claude" value="anthropic" />
+            <el-option label="通义千问" value="qwen" />
+            <el-option label="美团 LongCat" value="longcat" />
+            <el-option label="自定义服务商" value="custom" />
           </el-select>
         </el-form-item>
         <el-form-item label="模型标识" required>

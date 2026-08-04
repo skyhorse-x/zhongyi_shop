@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
-import { Search, Refresh, View, Delete, Tickets, Money, Document, Check, Close } from '@element-plus/icons-vue'
+import { Search, Refresh, View, Delete, Tickets, Money, Document, Check, Close, ChatLineSquare, CreditCard } from '@element-plus/icons-vue'
 
 const form = ref({
   orderNo: '',
@@ -249,7 +249,6 @@ onMounted(() => {
         <el-table
           :data="tableData"
           stripe
-          v-loading="loading"
           :header-cell-style="{ background: '#fafafa', color: '#606266' }"
         >
         <el-table-column prop="orderNo" label="订单号" min-width="180">
@@ -271,10 +270,10 @@ onMounted(() => {
         <el-table-column prop="payMethod" label="支付方式" width="110" align="center">
           <template #default="scope">
             <span v-if="scope.row.payMethod === '微信'" class="pay-tag pay-tag--wechat">
-              <span class="pay-icon">💚</span>微信
+              <el-icon class="pay-icon"><ChatLineSquare /></el-icon>微信
             </span>
             <span v-else-if="scope.row.payMethod === '支付宝'" class="pay-tag pay-tag--alipay">
-              <span class="pay-icon">💙</span>支付宝
+              <el-icon class="pay-icon"><CreditCard /></el-icon>支付宝
             </span>
             <span v-else class="pay-tag pay-tag--default">-</span>
           </template>

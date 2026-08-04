@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 import { Connection, Setting, Money, Promotion, Cpu, ChatDotRound, Message, Wallet, Switch } from '@element-plus/icons-vue'
@@ -258,6 +258,27 @@ const handleSave = async () => {
   }
 }
 
+// 提供商默认API地址
+const providerDefaultUrls: Record<string, string> = {
+  openai: 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com',
+  deepseek: 'https://api.deepseek.com/v1',
+  doubao: 'https://ark.cn-beijing.volces.com/api/v3',
+  qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  longcat: 'https://api.longcat.chat/openai/v1',
+  custom: '',
+}
+
+// 监听服务商变化，自动填充API地址
+watch(() => form.value.llmProvider, (newProvider) => {
+  // 只有当API地址为空或者是默认值时才自动填充
+  const currentUrl = form.value.llmApiUrl
+  const isDefaultUrl = Object.values(providerDefaultUrls).includes(currentUrl) || !currentUrl
+  if (isDefaultUrl && providerDefaultUrls[newProvider]) {
+    form.value.llmApiUrl = providerDefaultUrls[newProvider]
+  }
+})
+
 onMounted(() => {
   loadConfigs()
   loadPaymentConfig()
@@ -280,7 +301,7 @@ onMounted(() => {
             <span class="tab-text">基本设置</span>
           </span>
         </template>
-        <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
+        <el-form :model="form" label-width="140px" class="settings-form">
           <el-form-item label="站点名称">
             <el-input v-model="form.siteName" placeholder="请输入站点名称" />
           </el-form-item>
@@ -305,7 +326,7 @@ onMounted(() => {
             <span class="tab-text">费用设置</span>
           </span>
         </template>
-        <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
+        <el-form :model="form" label-width="140px" class="settings-form">
           <el-form-item label="分析模式">
             <el-radio-group v-model="form.analysisMode">
               <el-radio value="paid">付费分析</el-radio>
@@ -334,7 +355,7 @@ onMounted(() => {
             <span class="tab-text">支付方式</span>
           </span>
         </template>
-        <el-form :model="paymentConfig" label-width="160px" class="settings-form" v-loading="paymentLoading">
+        <el-form :model="paymentConfig" label-width="160px" class="settings-form">
           <el-alert
             type="info"
             show-icon
@@ -386,7 +407,7 @@ onMounted(() => {
             <span class="tab-text">推广返利</span>
           </span>
         </template>
-        <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
+        <el-form :model="form" label-width="140px" class="settings-form">
           <el-form-item label="推广佣金比例">
             <el-input-number v-model="form.commissionRate" :min="0" :max="100" :precision="1" style="width: 200px" />
             <span class="form-unit">%</span>
@@ -418,14 +439,16 @@ onMounted(() => {
             <span class="tab-text">大模型配置</span>
           </span>
         </template>
-        <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
+        <el-form :model="form" label-width="140px" class="settings-form">
           <el-form-item label="大模型服务商">
             <el-select v-model="form.llmProvider" placeholder="请选择服务商" style="width: 200px">
               <el-option label="OpenAI" value="openai" />
               <el-option label="Anthropic (Claude)" value="anthropic" />
               <el-option label="DeepSeek" value="deepseek" />
+              <el-option label="豆包 (字节跳动)" value="doubao" />
               <el-option label="通义千问" value="qwen" />
               <el-option label="美团 LongCat" value="longcat" />
+              <el-option label="自定义服务商" value="custom" />
             </el-select>
           </el-form-item>
           <el-form-item label="API地址">
@@ -467,7 +490,7 @@ onMounted(() => {
             <span class="tab-text">微信配置</span>
           </span>
         </template>
-        <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
+        <el-form :model="form" label-width="140px" class="settings-form">
           <el-form-item label="小程序AppID">
             <el-input v-model="form.wechatAppid" placeholder="请输入小程序AppID" />
           </el-form-item>
@@ -491,7 +514,7 @@ onMounted(() => {
             <span class="tab-text">支付宝配置</span>
           </span>
         </template>
-        <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
+        <el-form :model="form" label-width="140px" class="settings-form">
           <el-form-item label="AppID">
             <el-input v-model="form.alipayAppId" placeholder="请输入支付宝AppID" />
           </el-form-item>
@@ -514,7 +537,7 @@ onMounted(() => {
             <span class="tab-text">短信配置</span>
           </span>
         </template>
-        <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
+        <el-form :model="form" label-width="140px" class="settings-form">
           <el-form-item label="短信服务商">
             <el-select v-model="form.smsProvider" style="width: 200px">
               <el-option label="短信宝" value="smsbao" />

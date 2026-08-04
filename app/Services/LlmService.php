@@ -74,7 +74,7 @@ class LlmService
             $provider = $config['provider'];
 
             return match ($provider) {
-                'openai', 'deepseek', 'qwen', 'longcat' => $this->callOpenAiCompatible($config, $systemPrompt, $userMessage, $history),
+                'openai', 'deepseek', 'qwen', 'longcat', 'doubao', 'custom' => $this->callOpenAiCompatible($config, $systemPrompt, $userMessage, $history),
                 'anthropic' => $this->callAnthropic($config, $systemPrompt, $userMessage, $history),
                 default => [
                     'success' => false,
@@ -247,8 +247,10 @@ class LlmService
             ['value' => 'openai',    'label' => 'OpenAI',           'baseUrl' => 'https://api.openai.com/v1'],
             ['value' => 'anthropic', 'label' => 'Anthropic Claude', 'baseUrl' => 'https://api.anthropic.com'],
             ['value' => 'deepseek',  'label' => 'DeepSeek',         'baseUrl' => 'https://api.deepseek.com/v1'],
+            ['value' => 'doubao',    'label' => '豆包 (字节跳动)',   'baseUrl' => 'https://ark.cn-beijing.volces.com/api/v3'],
             ['value' => 'qwen',      'label' => '通义千问',         'baseUrl' => 'https://dashscope.aliyuncs.com/compatible-mode/v1'],
             ['value' => 'longcat',   'label' => '美团 LongCat',     'baseUrl' => 'https://api.longcat.chat/openai/v1'],
+            ['value' => 'custom',    'label' => '自定义服务商',      'baseUrl' => ''],
         ];
     }
 }

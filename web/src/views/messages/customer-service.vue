@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, Picture } from '@element-plus/icons-vue'
+import { Plus, Picture, User, Headset } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
 
 interface ChatMessage {
@@ -12,6 +12,7 @@ interface ChatMessage {
   file_url: string
   file_name: string
   created_at: string
+  read_at: string | null
 }
 
 const sessionNo = ref('')
@@ -20,6 +21,8 @@ const inputText = ref('')
 const loading = ref(false)
 const messageListRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const isTyping = ref(false)
+const typingTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
 // 获取认证token
 import { getToken } from '@/utils/auth'
@@ -62,6 +65,8 @@ const loadMessages = async () => {
     if (data.code === 0) {
       messages.value = data.data.data || []
       await scrollToBottom()
+      // 加载消息后标记为已读
+      markAsRead()
     }
   } catch (e) {
     // 忽略错误
@@ -165,6 +170,33 @@ const scrollToBottom = async () => {
   }
 }
 
+// 标记消息为已读
+const markAsRead = async () => {
+  if (!sessionNo.value) return
+  try {
+    await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/mark-as-read`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+  } catch (e) {
+    // 忽略错误
+  }
+}
+
+// 模拟对方正在输入（实际项目中应通过 WebSocket 接收）
+const simulateTyping = () => {
+  if (typingTimer.value) {
+    clearTimeout(typingTimer.value)
+  }
+  isTyping.value = true
+  typingTimer.value = setTimeout(() => {
+    isTyping.value = false
+  }, 3000)
+}
+
 // 格式化时间
 const formatTime = (timestamp: string): string => {
   const date = new Date(timestamp)
@@ -183,6 +215,16 @@ onMounted(() => {
 
 <template>
   <div class="customer-service-page">
+    <!-- 对方正在输入提示 -->
+    <div class="typing-indicator" v-if="isTyping">
+      <div class="typing-dots">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <span class="typing-text">客服正在输入...</span>
+    </div>
+
     <!-- 消息列表 -->
     <div ref="messageListRef" class="message-list">
       <!-- 服务提示 -->
@@ -192,7 +234,7 @@ onMounted(() => {
 
       <!-- 欢迎消息 -->
       <div v-if="messages.length === 0" class="welcome">
-        <div class="welcome-icon">🎧</div>
+        <el-icon class="welcome-icon"><Headset /></el-icon>
         <div class="welcome-title">在线客服</div>
         <div class="welcome-desc">有什么问题可以告诉我们，我们会尽快为您解答</div>
       </div>
@@ -205,7 +247,8 @@ onMounted(() => {
         :class="msg.sender_type"
       >
         <div class="avatar">
-          {{ msg.sender_type === 'user' ? '👤' : '🎧' }}
+          <el-icon v-if="msg.sender_type === 'user'"><User /></el-icon>
+          <el-icon v-else><Headset /></el-icon>
         </div>
         <div class="message-content">
           <!-- 文本消息 -->
@@ -216,7 +259,13 @@ onMounted(() => {
           <div v-else-if="msg.msg_type === 'image'" class="message-bubble image-bubble">
             <img :src="msg.file_url" class="message-image" @click="previewImage(msg.file_url)" />
           </div>
-          <div class="message-time">{{ formatTime(msg.created_at) }}</div>
+          <div class="message-time">
+            {{ formatTime(msg.created_at) }}
+            <!-- 已读/未读状态（仅自己发送的消息显示） -->
+            <span v-if="msg.sender_type === 'user'" class="read-status">
+              {{ msg.read_at ? '已读' : '未读' }}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -259,6 +308,53 @@ onMounted(() => {
   flex-direction: column;
   height: calc(100vh - 100px);
   background-color: #f7f8fa;
+}
+
+/* 对方正在输入提示 */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(7, 193, 96, 0.08);
+  border-bottom: 1px solid rgba(7, 193, 96, 0.15);
+}
+
+.typing-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #07c160;
+  animation: typing-bounce 1.4s infinite;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.typing-text {
+  font-size: 12px;
+  color: #07c160;
 }
 
 /* 服务提示 */
@@ -361,6 +457,16 @@ onMounted(() => {
 
 .user .message-time {
   text-align: right;
+}
+
+.read-status {
+  margin-left: 6px;
+  font-size: 10px;
+  color: #07c160;
+}
+
+.read-status.unread {
+  color: #c8c9cc;
 }
 
 /* 图片消息 */

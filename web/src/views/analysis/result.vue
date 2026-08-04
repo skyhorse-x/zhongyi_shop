@@ -6,7 +6,7 @@ import html2canvas from 'html2canvas'
 import { safeFetch } from '@/utils/fetch'
 import {
   Loading, Refresh, Check, Calendar, Document, Histogram,
-  Promotion, Sunny, ChatLineRound, Star, Trophy, Share, Download, Picture
+  Promotion, Sunny, ChatLineRound, Star, Trophy, Share, Download, Picture, InfoFilled
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -16,6 +16,7 @@ const taskNo = ref('')
 const loading = ref(true)
 const taskStatus = ref(0)
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const pollCount = ref(0)
 const analysisMode = ref<'image' | 'text'>('image')
 
 interface SectionItem {
@@ -52,6 +53,7 @@ import { getToken } from '@/utils/auth'
 
 const fetchStatus = async () => {
   try {
+    pollCount.value++
     const res = await safeFetch(`/api/v1/analysis/status/${taskNo.value}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
@@ -68,6 +70,11 @@ const fetchStatus = async () => {
         clearInterval(pollTimer.value!)
         loading.value = false
         ElMessage.error('分析失败，请重试')
+      } else if (pollCount.value > 40) {
+        // 超过 2 分钟（40次 * 3秒）仍在处理，提示用户稍后查看
+        clearInterval(pollTimer.value!)
+        loading.value = false
+        ElMessage.warning('分析时间较长，请稍后在"我的历史"中查看结果')
       }
     }
   } catch (e: any) {
@@ -517,7 +524,7 @@ onUnmounted(() => {
 
       <!-- 温馨提示 -->
       <div class="warm-tip">
-        <div class="tip-icon">💡</div>
+        <el-icon class="tip-icon"><InfoFilled /></el-icon>
         <div class="tip-content">
           <div class="tip-title">温馨提示</div>
           <div class="tip-text">本报告由 AI 智能分析生成，仅供参考，不能替代专业医生的诊断和治疗。如有严重症状，请及时就医。</div>

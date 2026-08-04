@@ -21,6 +21,7 @@ class UserAnalysisLog extends Model
         'after',
         'type',
         'remark',
+        'operator_id',
     ];
 
     protected function casts(): array
@@ -35,5 +36,10 @@ class UserAnalysisLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function operator(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Admin::class, 'operator_id');
     }
 }

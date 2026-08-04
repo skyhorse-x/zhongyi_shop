@@ -70,7 +70,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="risk-page" v-loading="loading">
+  <div class="risk-page">
     <!-- 顶部统计卡 -->
     <el-row :gutter="16" class="stats-row">
       <el-col :span="4">

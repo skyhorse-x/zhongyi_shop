@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Money } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
 import { getToken } from '@/utils/auth'
 
@@ -76,7 +77,7 @@ onMounted(() => {
   <div class="withdraw-history-page">
     <!-- 空状态 -->
     <div v-if="!loading && withdrawList.length === 0" class="empty-wrapper">
-      <div class="empty-icon">💸</div>
+      <el-icon class="empty-icon"><Money /></el-icon>
       <div class="empty-text">暂无提现记录</div>
       <el-button type="primary" round @click="router.push('/promoter/withdraw')">
         申请提现

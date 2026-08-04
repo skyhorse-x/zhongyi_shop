@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, shallowRef, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 import { getAdminToken, clearAdminToken } from '@/utils/auth'
-import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service } from '@element-plus/icons-vue'
+import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service, FirstAidKit } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -25,6 +26,8 @@ const menuItems = shallowRef([
   { title: '提现审核', icon: Money, path: '/admin/withdraws' },
   { title: '文章管理', icon: Document, path: '/admin/articles' },
   { title: '体质题目', icon: EditPen, path: '/admin/constitution' },
+  { title: '管理员管理', icon: UserFilled, path: '/admin/admins' },
+  { title: '角色管理', icon: Operation, path: '/admin/roles' },
   { title: '系统设置', icon: Setting, path: '/admin/settings' },
 ])
 
@@ -64,6 +67,68 @@ const handleLogout = () => {
   router.push('/admin/login')
 }
 
+// 修改密码
+const showChangePasswordDialog = ref(false)
+const passwordForm = ref({
+  old_password: '',
+  new_password: '',
+  new_password_confirmation: ''
+})
+const passwordLoading = ref(false)
+
+const handleCommand = (command: string) => {
+  if (command === 'changePassword') {
+    showChangePasswordDialog.value = true
+  } else if (command === 'logout') {
+    handleLogout()
+  }
+}
+
+const handleChangePassword = async () => {
+  if (!passwordForm.value.old_password || !passwordForm.value.new_password) {
+    ElMessage.warning('请填写完整密码信息')
+    return
+  }
+  if (passwordForm.value.new_password !== passwordForm.value.new_password_confirmation) {
+    ElMessage.warning('两次输入的新密码不一致')
+    return
+  }
+  if (passwordForm.value.new_password.length < 6) {
+    ElMessage.warning('新密码长度不能少于6位')
+    return
+  }
+  
+  passwordLoading.value = true
+  try {
+    const res = await safeFetch('/api/v1/admin/auth/change-password', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAdminToken()}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        old_password: passwordForm.value.old_password,
+        new_password: passwordForm.value.new_password,
+        new_password_confirmation: passwordForm.value.new_password_confirmation,
+      }),
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      ElMessage.success('密码修改成功，请重新登录')
+      showChangePasswordDialog.value = false
+      clearAdminToken()
+      router.push('/admin/login')
+    } else {
+      ElMessage.error(data.message || '密码修改失败')
+    }
+  } catch (e) {
+    ElMessage.error('密码修改失败，请稍后重试')
+  } finally {
+    passwordLoading.value = false
+  }
+}
+
 // 页面加载时给 body 添加 admin 类
 onMounted(() => {
   document.body.classList.add('admin-page')
@@ -85,7 +150,7 @@ onMounted(() => {
     <!-- 侧边栏 -->
     <aside class="sidebar" :class="{ collapsed: sidebarCollapsed, mobile: mobileSidebarOpen }">
       <div class="sidebar-header">
-        <div class="sidebar-logo">⚕</div>
+        <el-icon class="sidebar-logo"><FirstAidKit /></el-icon>
         <div v-if="!sidebarCollapsed" class="sidebar-title">管理后台</div>
       </div>
 
@@ -128,7 +193,18 @@ onMounted(() => {
           <span class="topbar-title">{{ route.meta.title }}</span>
         </div>
         <div class="topbar-right">
-          <span class="admin-username">管理员</span>
+          <el-dropdown @command="handleCommand">
+            <span class="admin-username">
+              管理员
+              <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="changePassword">修改密码</el-dropdown-item>
+                <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </header>
 
@@ -138,6 +214,47 @@ onMounted(() => {
       </main>
     </div>
   </div>
+
+  <!-- 修改密码对话框 -->
+  <el-dialog
+    v-model="showChangePasswordDialog"
+    title="修改密码"
+    width="400px"
+    :close-on-click-modal="false"
+  >
+    <el-form :model="passwordForm" label-width="100px">
+      <el-form-item label="原密码" required>
+        <el-input
+          v-model="passwordForm.old_password"
+          type="password"
+          placeholder="请输入原密码"
+          show-password
+        />
+      </el-form-item>
+      <el-form-item label="新密码" required>
+        <el-input
+          v-model="passwordForm.new_password"
+          type="password"
+          placeholder="请输入新密码（至少6位）"
+          show-password
+        />
+      </el-form-item>
+      <el-form-item label="确认密码" required>
+        <el-input
+          v-model="passwordForm.new_password_confirmation"
+          type="password"
+          placeholder="请再次输入新密码"
+          show-password
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="showChangePasswordDialog = false">取消</el-button>
+      <el-button type="primary" :loading="passwordLoading" @click="handleChangePassword">
+        确认修改
+      </el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>

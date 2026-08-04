@@ -362,7 +362,7 @@ onMounted(() => {
           </el-form-item>
         </el-form>
 
-        <el-table :data="tableData" border stripe style="width: 100%" v-loading="loading">
+        <el-table :data="tableData" border stripe style="width: 100%">
           <el-table-column prop="id" label="ID" width="80" />
           <el-table-column label="昵称" min-width="120">
             <template #default="{ row }">
@@ -471,7 +471,7 @@ onMounted(() => {
           </el-form-item>
         </el-form>
 
-        <el-table :data="inviteTableData" border stripe style="width: 100%" v-loading="inviteLoading">
+        <el-table :data="inviteTableData" border stripe style="width: 100%">
           <el-table-column prop="id" label="ID" width="70" />
           <el-table-column label="推广员" min-width="120">
             <template #default="{ row }">

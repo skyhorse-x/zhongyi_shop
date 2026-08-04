@@ -14,6 +14,7 @@ import {
   Sunny,
   User,
   SwitchButton,
+  FirstAidKit,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -126,7 +127,7 @@ onMounted(() => {
     >
       <!-- Logo -->
       <div class="sidebar-header flex items-center h-14 px-4 border-b border-white/10 gap-3 flex-shrink-0">
-        <div class="text-2xl flex-shrink-0">⚕</div>
+        <el-icon class="text-2xl flex-shrink-0"><FirstAidKit /></el-icon>
         <transition name="fade">
           <span v-if="!sidebarCollapsed" class="text-base font-bold whitespace-nowrap">管理后台</span>
         </transition>
@@ -279,7 +280,7 @@ onMounted(() => {
       <footer
         class="footer flex items-center justify-center h-10 text-xs text-gray-400 dark:text-gray-500 bg-white dark:bg-[#1d1e1f] border-t border-gray-200 dark:border-gray-700 flex-shrink-0"
       >
-        AI中医健康管理平台 &copy; {{ new Date().getFullYear() }} All Rights Reserved.
+        ai 中医健康助手平台 &copy; {{ new Date().getFullYear() }} All Rights Reserved.
       </footer>
     </div>
   </div>

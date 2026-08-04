@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElDialog, ElRadioGroup, ElRadio, ElButton } from 'element-plus'
-import { List, Check, InfoFilled, ShoppingBag, Sunny, Star, Trophy, Wallet, Money, ChatLineSquare } from '@element-plus/icons-vue'
+import { List, Check, InfoFilled, ShoppingBag, Sunny, Star, Trophy, Wallet, Money, ChatLineSquare, CreditCard, Iphone, FirstAidKit } from '@element-plus/icons-vue'
 import { toMoney } from '@/utils'
 import { safeFetch } from '@/utils/fetch'
 import { getToken } from '@/utils/auth'
@@ -254,7 +254,7 @@ onMounted(() => {
     <!-- 顶部横幅 -->
     <div class="header-banner">
       <div class="banner-content">
-        <div class="banner-icon">🌿</div>
+        <el-icon class="banner-icon"><FirstAidKit /></el-icon>
         <div class="banner-text">
           <h1 class="banner-title">购买次数包</h1>
           <p class="banner-subtitle">选择适合您的分析套餐，享受智能中医健康服务</p>
@@ -348,7 +348,7 @@ onMounted(() => {
     </div>
 
     <div class="security-tips">
-      <span class="shield-icon">🛡️</span>
+      <el-icon class="shield-icon"><Check /></el-icon>
       <span>支付安全有保障 · 放心购买</span>
     </div>
 
@@ -356,8 +356,7 @@ onMounted(() => {
     <ElDialog
       v-model="showPayDialog"
       title="选择支付方式"
-      width="90%"
-      :max-width="420"
+      width="360px"
       :close-on-click-modal="false"
       @close="cancelPayType"
     >
@@ -381,7 +380,9 @@ onMounted(() => {
           >
             <ElRadio :value="m.code" :disabled="!m.is_enabled || !balanceEnough(Number(currentPkg?.price ?? 0))">
               <div class="pay-option-content">
-                <div class="pay-icon-box pay-icon-balance">💰</div>
+                <div class="pay-icon-box pay-icon-balance">
+                  <el-icon :size="22"><Wallet /></el-icon>
+                </div>
                 <div class="pay-info">
                   <div class="pay-name-row">
                     <span class="pay-name">{{ m.name }}</span>
@@ -398,7 +399,53 @@ onMounted(() => {
               </div>
             </ElRadio>
           </div>
-          <!-- 微信/支付宝选项 -->
+          <!-- 微信选项 -->
+          <div
+            v-else-if="m.code === 'wechat'"
+            class="pay-option"
+            :class="{ active: selectedPayType === m.code, disabled: !m.is_enabled }"
+            @click="m.is_enabled && (selectedPayType = m.code)"
+          >
+            <ElRadio :value="m.code" :disabled="!m.is_enabled">
+              <div class="pay-option-content">
+                <div class="pay-icon-box pay-icon-wechat">
+                  <el-icon :size="22"><ChatLineSquare /></el-icon>
+                </div>
+                <div class="pay-info">
+                  <div class="pay-name-row">
+                    <span class="pay-name">{{ m.name }}</span>
+                    <span v-if="!m.is_enabled" class="pay-tag-disabled">已关闭</span>
+                  </div>
+                  <div class="pay-desc">推荐使用微信支付</div>
+                </div>
+                <el-icon class="pay-check"><Check /></el-icon>
+              </div>
+            </ElRadio>
+          </div>
+          <!-- 支付宝选项 -->
+          <div
+            v-else-if="m.code === 'alipay'"
+            class="pay-option"
+            :class="{ active: selectedPayType === m.code, disabled: !m.is_enabled }"
+            @click="m.is_enabled && (selectedPayType = m.code)"
+          >
+            <ElRadio :value="m.code" :disabled="!m.is_enabled">
+              <div class="pay-option-content">
+                <div class="pay-icon-box pay-icon-alipay">
+                  <el-icon :size="22"><CreditCard /></el-icon>
+                </div>
+                <div class="pay-info">
+                  <div class="pay-name-row">
+                    <span class="pay-name">{{ m.name }}</span>
+                    <span v-if="!m.is_enabled" class="pay-tag-disabled">已关闭</span>
+                  </div>
+                  <div class="pay-desc">安全快捷</div>
+                </div>
+                <el-icon class="pay-check"><Check /></el-icon>
+              </div>
+            </ElRadio>
+          </div>
+          <!-- 其他支付方式 -->
           <div
             v-else
             class="pay-option"
@@ -407,18 +454,15 @@ onMounted(() => {
           >
             <ElRadio :value="m.code" :disabled="!m.is_enabled">
               <div class="pay-option-content">
-                <div class="pay-icon-box" :class="m.code === 'wechat' ? 'pay-icon-wechat' : 'pay-icon-alipay'">
-                  {{ m.icon }}
+                <div class="pay-icon-box pay-icon-other">
+                  <el-icon :size="22"><Iphone /></el-icon>
                 </div>
                 <div class="pay-info">
                   <div class="pay-name-row">
                     <span class="pay-name">{{ m.name }}</span>
                     <span v-if="!m.is_enabled" class="pay-tag-disabled">已关闭</span>
                   </div>
-                  <div class="pay-desc">
-                    <span v-if="m.code === 'wechat'">推荐使用微信支付</span>
-                    <span v-else>安全快捷</span>
-                  </div>
+                  <div class="pay-desc">安全便捷</div>
                 </div>
                 <el-icon class="pay-check"><Check /></el-icon>
               </div>
@@ -545,6 +589,10 @@ onMounted(() => {
 }
 .pay-icon-alipay {
   background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+  color: #fff;
+}
+.pay-icon-other {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
   color: #fff;
 }
 

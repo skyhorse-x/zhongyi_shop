@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, ChatDotSquare, ArrowRight } from '@element-plus/icons-vue'
+import { Plus, ChatDotSquare, ArrowRight, ChatLineRound } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
@@ -117,7 +117,7 @@ onMounted(() => {
 
       <div v-for="session in sessions" :key="session.session_no">
         <div class="session-item" @click="enterSession(session.session_no)">
-          <div class="session-icon">💬</div>
+          <el-icon class="session-icon"><ChatLineRound /></el-icon>
           <div class="session-info">
             <div class="session-header">
               <div class="session-title">{{ session.title }}</div>

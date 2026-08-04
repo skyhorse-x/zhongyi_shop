@@ -359,6 +359,86 @@ class AdminController extends Controller
         ]);
     }
 
+    // ===== 用户积分管理 =====
+
+    /**
+     * 调整用户积分（充值或扣减）
+     * POST /admin/users/{id}/credits
+     * body: { type: 'recharge'|'admin_deduct', amount: 10, remark: '...' }
+     */
+    public function userAdjustCredits(Request $request, $id)
+    {
+        $data = $request->validate([
+            'type'   => 'required|in:recharge,admin_deduct',
+            'amount' => 'required|integer|min:1|max:99999',
+            'remark' => 'nullable|string|max:200',
+        ]);
+
+        $user = User::findOrFail($id);
+        $adminId = optional($request->user())->id;
+
+        $amount = (int) $data['amount'];
+        $change = $data['type'] === 'recharge' ? $amount : -$amount;
+
+        // 扣减时校验积分是否够
+        if ($change < 0 && (int) $user->analysis_times < $amount) {
+            return response()->json([
+                'code' => 422,
+                'message' => '用户积分不足，当前积分：' . $user->analysis_times,
+            ], 422);
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($user, $change, $data, $adminId) {
+            $before = (int) $user->analysis_times;
+            $after  = $before + $change;
+
+            $user->analysis_times = $after;
+            $user->save();
+
+            \App\Models\UserAnalysisLog::create([
+                'user_id'     => $user->id,
+                'change'      => $change,
+                'before'      => $before,
+                'after'       => $after,
+                'type'        => $data['type'],
+                'remark'      => $data['remark'] ?? ($data['type'] === 'recharge' ? '管理员后台充值积分' : '管理员后台扣减积分'),
+                'operator_id' => $adminId,
+            ]);
+        });
+
+        return response()->json([
+            'code'    => 0,
+            'message' => $data['type'] === 'recharge' ? '积分充值成功' : '积分扣减成功',
+            'data'    => [
+                'analysis_times' => (int) $user->fresh()->analysis_times,
+            ],
+        ]);
+    }
+
+    /**
+     * 用户积分变动流水
+     * GET /admin/users/{id}/credits-logs?type=&page=&per_page=
+     */
+    public function userCreditsLogs(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+        $query = \App\Models\UserAnalysisLog::where('user_id', $user->id)
+            ->with('operator:id,username,name')
+            ->orderBy('created_at', 'desc');
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+        $paginator = $query->paginate($request->get('per_page', 15));
+
+        return response()->json([
+            'code' => 0,
+            'data' => [
+                'analysis_times' => (int) $user->analysis_times,
+                'logs'           => $paginator,
+            ],
+        ]);
+    }
+
     // ===== 订单管理 =====
     public function orders(Request $request)
     {
