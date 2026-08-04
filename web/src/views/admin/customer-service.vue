@@ -130,7 +130,7 @@ const balanceLogs = ref<BalanceLog[]>([])
 const csConfig = ref({
   welcome_message: '',
   auto_welcome: true,
-  auto_reply_phrase_id: null as number | null,  // 自动回复话术ID
+  auto_reply_phrase_ids: [] as number[],  // 自动回复话术ID列表（支持多个）
   auto_close_on_leave: true,  // 用户离开自动关闭会话
 })
 
@@ -240,17 +240,17 @@ const loadMessages = async (sessionNo: string, silent = false) => {
   } catch (e) { /* 忽略 */ }
 }
 
-// 检查并执行自动回复
+// 检查并执行自动回复（支持多个话术）
 const checkAutoReply = (userMessage: string) => {
-  if (!csConfig.value.auto_reply_phrase_id) return
-  
-  const autoReplyPhrase = phrases.value.find(p => p.id === csConfig.value.auto_reply_phrase_id)
-  if (autoReplyPhrase && currentSession.value) {
-    // 延迟1秒发送自动回复，模拟人工回复
+  const autoReplyPhrases = phrases.value.filter(p => p.is_auto_reply)
+  if (autoReplyPhrases.length === 0 || !currentSession.value) return
+
+  // 依次发送所有自动回复话术，每个间隔1秒
+  autoReplyPhrases.forEach((phrase, index) => {
     setTimeout(() => {
-      sendAutoReply(autoReplyPhrase.content)
-    }, 1000)
-  }
+      sendAutoReply(phrase.content)
+    }, 1000 * (index + 1))
+  })
 }
 
 // 发送自动回复
@@ -488,7 +488,7 @@ const deletePhrase = async (id: number) => {
   }
 }
 
-// 设置/取消自动回复话术
+// 设置/取消自动回复话术（支持多选）
 const toggleAutoReply = async (phrase: Phrase) => {
   try {
     const res = await safeFetch(`/api/v1/admin/customer-service/phrases/${phrase.id}/toggle-auto-reply`, {
@@ -497,20 +497,23 @@ const toggleAutoReply = async (phrase: Phrase) => {
     })
     const data = await res.json()
     if (data.code === 0) {
-      ElMessage.success(phrase.is_auto_reply ? '已取消自动回复' : '已设置为自动回复')
+      ElMessage.success(phrase.is_auto_reply ? '已取消自动回复' : '已添加到自动回复')
       loadPhrases()
       // 更新本地配置
-      if (phrase.is_auto_reply) {
-        csConfig.value.auto_reply_phrase_id = null
-      } else {
-        csConfig.value.auto_reply_phrase_id = phrase.id
-      }
+      updateAutoReplyConfig()
     } else {
       ElMessage.error(data.message || '操作失败')
     }
   } catch (e: any) {
     ElMessage.error(e.message || '操作失败')
   }
+}
+
+// 更新自动回复配置（从话术列表同步）
+const updateAutoReplyConfig = () => {
+  csConfig.value.auto_reply_phrase_ids = phrases.value
+    .filter(p => p.is_auto_reply)
+    .map(p => p.id)
 }
 
 const insertPhrase = (content: string) => {
@@ -1002,14 +1005,20 @@ onUnmounted(() => {
         <div class="setting-item vertical">
           <div class="setting-label">
             <span>自动回复话术</span>
-            <span class="setting-desc">设置后，当用户发送消息时将自动回复该话术内容</span>
+            <span class="setting-desc">设置后，当用户发送消息时将自动回复这些话术内容（可多选）</span>
           </div>
-          <select v-model="csConfig.auto_reply_phrase_id">
-            <option :value="null">不启用自动回复</option>
-            <option v-for="phrase in phrases" :key="phrase.id" :value="phrase.id">
-              {{ phrase.title }} - {{ phrase.content.substring(0, 30) }}...
-            </option>
-          </select>
+          <div class="auto-reply-phrases">
+            <div v-if="phrases.length === 0" class="no-phrases">暂无话术，请先在"常用话术"中添加</div>
+            <label v-for="phrase in phrases" :key="phrase.id" class="phrase-checkbox" :class="{ 'is-auto-reply': phrase.is_auto_reply }">
+              <input
+                type="checkbox"
+                :checked="phrase.is_auto_reply"
+                @change="toggleAutoReply(phrase)"
+              />
+              <span class="phrase-title">{{ phrase.title }}</span>
+              <span class="phrase-preview">{{ phrase.content.substring(0, 30) }}...</span>
+            </label>
+          </div>
         </div>
         <div class="setting-item">
           <div class="setting-label">
@@ -2103,6 +2112,68 @@ onUnmounted(() => {
 
 .setting-item select:focus,
 .setting-item textarea:focus { border-color: #409eff; }
+
+.auto-reply-phrases {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.no-phrases {
+  color: #909399;
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+
+.phrase-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.phrase-checkbox:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.phrase-checkbox.is-auto-reply {
+  border-color: #67c23a;
+  background: #f0f9eb;
+}
+
+.phrase-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #67c23a;
+}
+
+.phrase-title {
+  font-weight: 500;
+  color: #303133;
+  min-width: 80px;
+}
+
+.phrase-preview {
+  color: #909399;
+  font-size: 12px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .setting-actions { margin-top: 24px; }
 

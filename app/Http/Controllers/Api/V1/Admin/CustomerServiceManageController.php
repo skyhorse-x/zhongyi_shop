@@ -118,7 +118,7 @@ class CustomerServiceManageController extends Controller
     }
 
     /**
-     * 切换话术自动回复状态
+     * 切换话术自动回复状态（支持多选）
      */
     public function toggleAutoReply(Request $request, $id)
     {
@@ -129,19 +129,28 @@ class CustomerServiceManageController extends Controller
             return response()->json(['code' => 403, 'message' => '无权操作'], 403);
         }
 
-        // 如果设置为自动回复，先取消其他话术的自动回复状态
-        if (!$phrase->is_auto_reply) {
-            CustomerServicePhrase::where('is_auto_reply', true)
-                ->where('admin_id', $request->user()->id)
-                ->update(['is_auto_reply' => false]);
-            $phrase->is_auto_reply = true;
-        } else {
-            $phrase->is_auto_reply = false;
-        }
-
+        // 切换自动回复状态（支持多个）
+        $phrase->is_auto_reply = !$phrase->is_auto_reply;
         $phrase->save();
 
         return response()->json(['code' => 0, 'message' => '操作成功', 'data' => $phrase]);
+    }
+
+    /**
+     * 获取当前自动回复话术ID列表
+     */
+    public function getAutoReplyPhraseIds(Request $request)
+    {
+        $adminId = $request->user()->id;
+        $phraseIds = CustomerServicePhrase::where('is_auto_reply', true)
+            ->where(function ($q) use ($adminId) {
+                $q->where('is_public', true)
+                  ->orWhere('admin_id', $adminId);
+            })
+            ->pluck('id')
+            ->toArray();
+
+        return response()->json(['code' => 0, 'data' => $phraseIds]);
     }
 
     /**
@@ -272,15 +281,21 @@ class CustomerServiceManageController extends Controller
     {
         $welcomeMessage = CustomerServiceConfig::getValue('welcome_message', CustomerServiceSession::WELCOME_MESSAGE);
         $autoWelcome = CustomerServiceConfig::getValue('auto_welcome', 'true');
-        $autoReplyPhraseId = CustomerServiceConfig::getValue('auto_reply_phrase_id', null);
+        $autoReplyPhraseIds = CustomerServiceConfig::getValue('auto_reply_phrase_ids', '[]');
         $autoCloseOnLeave = CustomerServiceConfig::getValue('auto_close_on_leave', 'true');
+
+        // 解析JSON数组
+        $phraseIds = json_decode($autoReplyPhraseIds, true) ?? [];
+        if (!is_array($phraseIds)) {
+            $phraseIds = [];
+        }
 
         return response()->json([
             'code' => 0,
             'data' => [
                 'welcome_message' => $welcomeMessage,
                 'auto_welcome' => $autoWelcome === 'true',
-                'auto_reply_phrase_id' => $autoReplyPhraseId ? (int) $autoReplyPhraseId : null,
+                'auto_reply_phrase_ids' => $phraseIds,
                 'auto_close_on_leave' => $autoCloseOnLeave === 'true',
             ],
         ]);
@@ -294,7 +309,8 @@ class CustomerServiceManageController extends Controller
         $data = $request->validate([
             'welcome_message' => 'nullable|string|max:1000',
             'auto_welcome' => 'nullable|boolean',
-            'auto_reply_phrase_id' => 'nullable|integer',
+            'auto_reply_phrase_ids' => 'nullable|array',
+            'auto_reply_phrase_ids.*' => 'integer',
             'auto_close_on_leave' => 'nullable|boolean',
         ]);
 
@@ -306,17 +322,19 @@ class CustomerServiceManageController extends Controller
             CustomerServiceConfig::setValue('auto_welcome', $data['auto_welcome'] ? 'true' : 'false', '自动欢迎', '是否自动发送欢迎消息');
         }
 
-        if (isset($data['auto_reply_phrase_id'])) {
-            if ($data['auto_reply_phrase_id']) {
-                // 验证话术是否存在
-                $phrase = CustomerServicePhrase::where('id', $data['auto_reply_phrase_id'])
+        if (isset($data['auto_reply_phrase_ids'])) {
+            // 验证所有话术是否存在且启用
+            $phraseIds = array_filter($data['auto_reply_phrase_ids'], fn($id) => $id > 0);
+            if (!empty($phraseIds)) {
+                $existingCount = CustomerServicePhrase::whereIn('id', $phraseIds)
                     ->where('is_enabled', true)
-                    ->first();
-                if (!$phrase) {
-                    return response()->json(['code' => 400, 'message' => '话术不存在或已禁用'], 400);
+                    ->count();
+                if ($existingCount !== count($phraseIds)) {
+                    return response()->json(['code' => 400, 'message' => '部分话术不存在或已禁用'], 400);
                 }
             }
-            CustomerServiceConfig::setValue('auto_reply_phrase_id', $data['auto_reply_phrase_id'] ?? '', '自动回复话术ID', '设置后用户发送消息时将自动回复该话术内容');
+            // 存储为JSON数组
+            CustomerServiceConfig::setValue('auto_reply_phrase_ids', json_encode(array_values($phraseIds)), '自动回复话术ID列表', '设置后用户发送消息时将自动回复这些话术内容');
         }
 
         if (isset($data['auto_close_on_leave'])) {
