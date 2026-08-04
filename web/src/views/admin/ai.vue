@@ -313,7 +313,7 @@ const providerDefaultUrls: Record<string, string> = {
 
 // 监听服务商变化，自动填充API地址
 watch(() => editForm.value.provider, (newProvider) => {
-  const currentUrl = editForm.value.api_url
+  const currentUrl = editForm.value.api_url || ''
   const isDefaultUrl = Object.values(providerDefaultUrls).includes(currentUrl) || !currentUrl
   if (isDefaultUrl && providerDefaultUrls[newProvider]) {
     editForm.value.api_url = providerDefaultUrls[newProvider]
