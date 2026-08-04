@@ -140,7 +140,76 @@ const fetchReport = async () => {
   }
 }
 
-// 解析 Markdown 内容为章节
+// 新的报告解析逻辑 - 适配优化后的报告格式
+const parsedReport = computed(() => {
+  if (!result.value?.content) return null
+
+  const content = result.value.content
+  const lines = content.split('\n')
+  
+  // 解析健康评分
+  const scoreMatch = content.match(/健康评分[：:]\s*(\d+)\s*\/\s*100/)
+  const healthScore = scoreMatch ? parseInt(scoreMatch[1]) : result.value.healthScore
+  
+  // 解析评分依据
+  const scoreItems: { text: string; isPositive: boolean }[] = []
+  let inScoreSection = false
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed.includes('评分依据') || trimmed.includes('评分说明')) {
+      inScoreSection = true
+      continue
+    }
+    if (inScoreSection) {
+      if (trimmed.startsWith('+')) {
+        scoreItems.push({ text: trimmed.replace(/^\+\s*/, '').trim(), isPositive: true })
+      } else if (trimmed.startsWith('-') && !trimmed.startsWith('---')) {
+        scoreItems.push({ text: trimmed.replace(/^-\s*/, '').trim(), isPositive: false })
+      } else if (trimmed.startsWith('##') || trimmed === '---') {
+        break
+      }
+    }
+  }
+  
+  // 解析一句话总结
+  let summary = result.value.summary
+  const summaryMatch = content.match(/一句话总结[：:]?\s*\n([^\n]+)/)
+  if (summaryMatch) {
+    summary = summaryMatch[1].trim()
+  }
+  
+  // 解析AI置信度
+  const confidence: Record<string, string> = {}
+  let inConfidenceSection = false
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed.includes('置信度') || trimmed.includes('可信度')) {
+      inConfidenceSection = true
+      continue
+    }
+    if (inConfidenceSection) {
+      const confMatch = trimmed.match(/[：:]\s*(\d+)%/)
+      if (confMatch) {
+        const label = trimmed.split(/[：:]/)[0].replace(/^[-*]\s*/, '').trim()
+        const value = confMatch[1]
+        confidence[label] = value + '%'
+      }
+      if (trimmed.startsWith('##') || trimmed === '---') {
+        break
+      }
+    }
+  }
+  
+  return {
+    healthScore,
+    scoreItems,
+    summary,
+    confidence,
+    rawContent: content
+  }
+})
+
+// 解析 Markdown 内容为章节（适配新格式）
 const parsedSections = computed<ReportSection[]>(() => {
   if (!result.value?.content) return []
 
@@ -148,23 +217,48 @@ const parsedSections = computed<ReportSection[]>(() => {
   const lines = result.value.content.split('\n')
   let currentSection: ReportSection | null = null
 
+  // 新的图标映射
   const iconMap: Record<string, any> = {
     '观察': Sunny,
+    '舌象': Sunny,
     '推断': Sunny,
     '辨证': Trophy,
+    '体质倾向': Trophy,
     '建议': Star,
+    '调养': Star,
     '注意': ChatLineRound,
     '提示': ChatLineRound,
+    '温馨': ChatLineRound,
+    '风险': ChatLineRound,
+    '了解': Promotion,
+    '进一步': Promotion,
+    '分析说明': Document,
+    '评分': Histogram,
+    '总结': Check,
   }
 
   for (const line of lines) {
     const trimmed = line.trim()
     if (!trimmed) continue
 
+    // 跳过评分依据部分（已在评分区域展示）
+    if (trimmed.includes('评分依据') || trimmed.includes('评分说明')) {
+      // 跳过到下一个 ## 标题
+      if (currentSection) {
+        currentSection = null
+      }
+      continue
+    }
+
     // 匹配 ## 标题
     const h2Match = trimmed.match(/^##\s+(.+)$/)
     if (h2Match) {
       const title = h2Match[1].trim()
+      // 跳过评分相关标题
+      if (title.includes('健康评分') || title.includes('评分')) {
+        currentSection = null
+        continue
+      }
       const matchedKey = Object.keys(iconMap).find(k => title.includes(k))
       currentSection = {
         title,
@@ -191,8 +285,8 @@ const parsedSections = computed<ReportSection[]>(() => {
       continue
     }
 
-    // 匹配 - 列表项
-    const listMatch = trimmed.match(/^[-*]\s+(.+)$/)
+    // 匹配 - 列表项（包括 ○ 和 □）
+    const listMatch = trimmed.match(/^[-*○□]\s+(.+)$/)
     if (listMatch) {
       if (!currentSection) {
         currentSection = { title: '分析内容', icon: Document, level: 2, items: [] }
@@ -220,8 +314,8 @@ const parsedSections = computed<ReportSection[]>(() => {
       continue
     }
 
-    // 普通段落
-    if (currentSection && !trimmed.startsWith('#')) {
+    // 普通段落（跳过空行和分隔线）
+    if (currentSection && !trimmed.startsWith('#') && trimmed !== '---') {
       currentSection.items.push({ text: trimmed })
     }
   }
@@ -280,9 +374,9 @@ const scoreLevel = computed(() => {
   return { label: '需关注', color: '#f56c6c', desc: '存在明显健康问题，建议及时就医咨询' }
 })
 
-// 健康评分角度（用于环形进度）
+// 健康评分角度（用于环形进度）- 使用解析后的评分
 const scoreDashArray = computed(() => {
-  const score = result.value?.healthScore || 0
+  const score = parsedReport.value?.healthScore || result.value?.healthScore || 0
   const circumference = 2 * Math.PI * 54
   const offset = circumference - (score / 100) * circumference
   return { circumference, offset }
@@ -430,8 +524,8 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- 健康评分 -->
-        <div v-if="result.healthScore > 0" class="score-section">
+        <!-- 健康评分（新版 - 包含评分依据） -->
+        <div v-if="parsedReport && parsedReport.healthScore > 0" class="score-section">
           <div class="score-circle-wrap">
             <svg class="score-circle" width="140" height="140">
               <circle class="score-track" cx="70" cy="70" r="54" />
@@ -446,7 +540,7 @@ onUnmounted(() => {
               />
             </svg>
             <div class="score-center">
-              <div class="score-num" :style="{ color: scoreLevel.color }">{{ result.healthScore }}</div>
+              <div class="score-num" :style="{ color: scoreLevel.color }">{{ parsedReport.healthScore }}</div>
               <div class="score-unit">分</div>
             </div>
           </div>
@@ -455,7 +549,47 @@ onUnmounted(() => {
               {{ scoreLevel.label }}
             </div>
             <div class="score-desc-text">{{ scoreLevel.desc }}</div>
-            <div class="score-summary">{{ result.summary }}</div>
+            <div class="score-summary">{{ parsedReport.summary }}</div>
+          </div>
+        </div>
+
+        <!-- 评分依据 -->
+        <div v-if="parsedReport && parsedReport.scoreItems.length > 0" class="score-reason-section">
+          <div class="score-reason-title">
+            <el-icon><Histogram /></el-icon>
+            <span>评分依据</span>
+          </div>
+          <div class="score-reason-list">
+            <div
+              v-for="(item, idx) in parsedReport.scoreItems"
+              :key="idx"
+              class="score-reason-item"
+              :class="item.isPositive ? 'positive' : 'negative'"
+            >
+              <span class="score-reason-icon">{{ item.isPositive ? '+' : '-' }}</span>
+              <span class="score-reason-text">{{ item.text }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI置信度 -->
+        <div v-if="parsedReport && Object.keys(parsedReport.confidence).length > 0" class="confidence-section">
+          <div class="confidence-title">
+            <el-icon><Check /></el-icon>
+            <span>AI 识别置信度</span>
+          </div>
+          <div class="confidence-list">
+            <div
+              v-for="(value, label) in parsedReport.confidence"
+              :key="label"
+              class="confidence-item"
+            >
+              <span class="confidence-label">{{ label }}</span>
+              <div class="confidence-bar-wrap">
+                <div class="confidence-bar" :style="{ width: value }"></div>
+              </div>
+              <span class="confidence-value">{{ value }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1166,6 +1300,149 @@ onUnmounted(() => {
   color: #323233;
 }
 
+/* 评分依据 */
+.score-reason-section {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.score-reason-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 14px;
+}
+
+.score-reason-title .el-icon {
+  color: #07c160;
+  font-size: 18px;
+}
+
+.score-reason-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.score-reason-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.score-reason-item.positive {
+  background: #f0f9f4;
+  color: #07c160;
+}
+
+.score-reason-item.negative {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
+.score-reason-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.score-reason-item.positive .score-reason-icon {
+  background: #07c160;
+  color: #fff;
+}
+
+.score-reason-item.negative .score-reason-icon {
+  background: #f56c6c;
+  color: #fff;
+}
+
+.score-reason-text {
+  flex: 1;
+  color: #323233;
+}
+
+/* AI置信度 */
+.confidence-section {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.confidence-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 14px;
+}
+
+.confidence-title .el-icon {
+  color: #07c160;
+  font-size: 18px;
+}
+
+.confidence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.confidence-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.confidence-label {
+  width: 100px;
+  font-size: 13px;
+  color: #646566;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.confidence-bar-wrap {
+  flex: 1;
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.confidence-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #07c160 0%, #4fd180 100%);
+  border-radius: 4px;
+  transition: width 0.5s ease-out;
+}
+
+.confidence-value {
+  width: 40px;
+  font-size: 13px;
+  color: #07c160;
+  font-weight: 600;
+  text-align: right;
+}
+
 /* 响应式 */
 @media (max-width: 480px) {
   .score-section {
@@ -1181,6 +1458,10 @@ onUnmounted(() => {
   }
   .meta-list {
     grid-template-columns: 1fr;
+  }
+  .confidence-label {
+    width: 70px;
+    font-size: 12px;
   }
 }
 

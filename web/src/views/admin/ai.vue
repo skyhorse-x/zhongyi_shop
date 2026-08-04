@@ -519,7 +519,7 @@ onMounted(() => {
           <el-input v-model="editForm.api_url" placeholder="请输入API地址" />
         </el-form-item>
         <el-form-item label="API密钥">
-          <el-input v-model="editForm.api_key" type="password" placeholder="请输入API密钥" show-password />
+          <el-input v-model="editForm.api_key" type="text" placeholder="请输入API密钥" />
         </el-form-item>
         <el-form-item label="模型类型">
           <el-radio-group v-model="editForm.type">

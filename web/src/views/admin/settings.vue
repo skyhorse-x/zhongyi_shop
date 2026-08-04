@@ -455,7 +455,7 @@ onMounted(() => {
             <el-input v-model="form.llmApiUrl" placeholder="https://api.openai.com/v1" />
           </el-form-item>
           <el-form-item label="API密钥">
-            <el-input v-model="form.llmApiKey" placeholder="请输入API密钥" type="password" show-password />
+            <el-input v-model="form.llmApiKey" placeholder="请输入API密钥" type="text" />
           </el-form-item>
           <el-form-item label="模型名称">
             <el-input v-model="form.llmModel" placeholder="gpt-4o-mini" />
@@ -495,13 +495,13 @@ onMounted(() => {
             <el-input v-model="form.wechatAppid" placeholder="请输入小程序AppID" />
           </el-form-item>
           <el-form-item label="小程序Secret">
-            <el-input v-model="form.wechatSecret" placeholder="请输入小程序Secret" type="password" show-password />
+            <el-input v-model="form.wechatSecret" placeholder="请输入小程序Secret" type="text" />
           </el-form-item>
           <el-form-item label="支付商户号">
             <el-input v-model="form.wechatMchId" placeholder="请输入微信支付商户号" />
           </el-form-item>
           <el-form-item label="支付API密钥">
-            <el-input v-model="form.wechatPayKey" placeholder="请输入微信支付API密钥" type="password" show-password />
+            <el-input v-model="form.wechatPayKey" placeholder="请输入微信支付API密钥" type="text" />
           </el-form-item>
         </el-form>
       </el-tab-pane>
@@ -519,7 +519,7 @@ onMounted(() => {
             <el-input v-model="form.alipayAppId" placeholder="请输入支付宝AppID" />
           </el-form-item>
           <el-form-item label="应用私钥">
-            <el-input v-model="form.alipayPrivateKey" placeholder="请输入应用私钥" type="password" show-password />
+            <el-input v-model="form.alipayPrivateKey" placeholder="请输入应用私钥" type="text" />
             <div class="form-tip">RSA2 私钥，可从支付宝开放平台生成</div>
           </el-form-item>
           <el-form-item label="支付宝公钥">
@@ -547,7 +547,7 @@ onMounted(() => {
             <el-input v-model="form.smsBaoUser" placeholder="请输入短信宝账号" />
           </el-form-item>
           <el-form-item label="短信宝密码">
-            <el-input v-model="form.smsBaoPass" placeholder="请输入短信宝密码" type="password" show-password />
+            <el-input v-model="form.smsBaoPass" placeholder="请输入短信宝密码" type="text" />
             <div class="form-tip">系统使用MD5(密码) 调用短信宝API，密码本身不传输</div>
           </el-form-item>
         </el-form>

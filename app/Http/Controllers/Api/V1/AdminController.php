@@ -457,7 +457,18 @@ class AdminController extends Controller
     // ===== AI管理 =====
     public function aiModels()
     {
-        return response()->json(['code' => 0, 'data' => AiModel::orderBy('sort_order')->get()]);
+        $models = AiModel::orderBy('sort_order')->get();
+        // 解密 api_key 以便前端明文显示
+        $models->each(function ($model) {
+            if (!empty($model->api_key)) {
+                try {
+                    $model->api_key = \Illuminate\Support\Facades\Crypt::decryptString($model->api_key);
+                } catch (\Exception $e) {
+                    // 如果解密失败，保持原值（可能是旧数据未加密）
+                }
+            }
+        });
+        return response()->json(['code' => 0, 'data' => $models]);
     }
 
     public function aiModelStore(Request $request)
@@ -474,7 +485,13 @@ class AdminController extends Controller
             'is_enabled' => 'nullable|in:0,1',
             'sort_order' => 'nullable|integer|min:0',
         ]);
+        // 加密 api_key 后存储
+        if (!empty($data['api_key'])) {
+            $data['api_key'] = \Illuminate\Support\Facades\Crypt::encryptString($data['api_key']);
+        }
         $model = AiModel::create($data);
+        // 返回时解密 api_key
+        $model->api_key = \Illuminate\Support\Facades\Crypt::decryptString($model->api_key);
         return response()->json(['code' => 0, 'data' => $model]);
     }
 
@@ -493,7 +510,13 @@ class AdminController extends Controller
             'is_enabled' => 'nullable|in:0,1',
             'sort_order' => 'nullable|integer|min:0',
         ]);
+        // 加密 api_key 后存储
+        if (!empty($data['api_key'])) {
+            $data['api_key'] = \Illuminate\Support\Facades\Crypt::encryptString($data['api_key']);
+        }
         $model->update($data);
+        // 返回时解密 api_key
+        $model->api_key = \Illuminate\Support\Facades\Crypt::decryptString($model->api_key);
         return response()->json(['code' => 0, 'data' => $model]);
     }
 
@@ -699,6 +722,22 @@ class AdminController extends Controller
     public function configs()
     {
         $configs = SystemConfig::all()->groupBy('group_name');
+        // 需要解密的配置键
+        $encryptedKeys = ['llm_api_key', 'wechat_secret', 'wechat_pay_key', 'alipay_private_key', 'sms_bao_pass', 'cos_secret_key'];
+        
+        // 解密敏感配置
+        foreach ($configs as $group => $items) {
+            foreach ($items as $config) {
+                if (in_array($config->key, $encryptedKeys) && !empty($config->value)) {
+                    try {
+                        $config->value = \Illuminate\Support\Facades\Crypt::decryptString($config->value);
+                    } catch (\Exception $e) {
+                        // 解密失败保持原值
+                    }
+                }
+            }
+        }
+        
         return response()->json(['code' => 0, 'data' => $configs]);
     }
 
