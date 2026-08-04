@@ -631,6 +631,24 @@ onMounted(() => {
 
 .form-unit { margin-left: 8px; color: #999; }
 
+/* 提示词管理 */
+.prompt-editor { padding: 16px 0; }
+.prompt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.prompt-type-tag {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  padding: 4px 12px;
+  background: #f0f9eb;
+  border-radius: 4px;
+  color: #67c23a;
+}
+
 /* 手机端适配 */
 @media (max-width: 768px) {
   .stats-num { font-size: 16px; }

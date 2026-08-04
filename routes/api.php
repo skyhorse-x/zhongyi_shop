@@ -228,6 +228,10 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::put('ai/models/{id}', [V1\AdminController::class, 'aiModelUpdate']);
             Route::get('ai/logs', [V1\AdminController::class, 'aiLogs']);
 
+            // AI提示词管理
+            Route::get('ai/prompts', [V1\Admin\PromptController::class, 'index']);
+            Route::put('ai/prompts/{id}', [V1\Admin\PromptController::class, 'update']);
+
             // 推广管理
             Route::get('promoters', [V1\AdminController::class, 'promoters']);
 

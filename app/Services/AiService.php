@@ -312,6 +312,19 @@ class AiService
             $imageUrls = is_array($imageUrl) ? $imageUrl : [$imageUrl];
             $content = [];
             foreach ($imageUrls as $url) {
+                // 如果是本地URL，转为base64（外部AI服务无法访问内网地址）
+                if ($this->isLocalUrl($url)) {
+                    $base64Url = $this->convertImageToBase64($url);
+                    if ($base64Url) {
+                        $content[] = [
+                            'type' => 'image_url',
+                            'image_url' => [
+                                'url' => $base64Url,
+                            ],
+                        ];
+                        continue;
+                    }
+                }
                 $content[] = [
                     'type' => 'image_url',
                     'image_url' => [
@@ -684,5 +697,55 @@ PROMPT;
             return '';
         }
         return '用户基本信息：' . implode('，', $parts) . '。请在分析中结合用户的性别与年龄特点进行针对性辨证与建议。';
+    }
+
+    /**
+     * 判断URL是否为本地地址
+     */
+    protected function isLocalUrl(string $url): bool
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (!$host) {
+            return false;
+        }
+        $localHosts = ['localhost', '127.0.0.1', '::1', '0.0.0.0'];
+        return in_array($host, $localHosts) || str_starts_with($host, '192.168.') || str_starts_with($host, '10.');
+    }
+
+    /**
+     * 将本地图片转为Base64 Data URI
+     */
+    protected function convertImageToBase64(string $url): ?string
+    {
+        try {
+            // 从URL提取相对路径
+            $parsedUrl = parse_url($url);
+            $path = $parsedUrl['path'] ?? '';
+
+            // 移除 /storage/ 前缀，获取相对路径
+            $relativePath = preg_replace('#^/storage/#', '', $path);
+            if (empty($relativePath)) {
+                return null;
+            }
+
+            // 构建本地文件路径
+            $filePath = public_path('storage/' . $relativePath);
+            if (!file_exists($filePath)) {
+                Log::warning('Local image file not found', ['path' => $filePath, 'url' => $url]);
+                return null;
+            }
+
+            // 读取文件并转为base64
+            $imageData = file_get_contents($filePath);
+            if ($imageData === false) {
+                return null;
+            }
+
+            $mimeType = mime_content_type($filePath) ?: 'image/jpeg';
+            return 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
+        } catch (\Throwable $e) {
+            Log::error('Failed to convert image to base64', ['url' => $url, 'error' => $e->getMessage()]);
+            return null;
+        }
     }
 }
