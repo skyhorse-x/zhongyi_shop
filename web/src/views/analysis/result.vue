@@ -335,15 +335,27 @@ const parseSuggestions = (content: string): string[] => {
       inSuggestionSection = true
       continue
     }
+    
+    // 遇到下一个空行或新章节，结束建议解析
+    if (inSuggestionSection && trimmed === '') {
+      // 如果已经有建议了，就结束；否则继续等待内容
+      if (suggestions.length > 0) break
+      continue
+    }
+    
     if (inSuggestionSection && trimmed.startsWith('-')) {
       const text = trimmed.replace(/^[-*]\s*/, '')
       // 提取 - 后面的实际内容（去掉 **标签**：）
       const cleanText = text.replace(/^\*\*[^*]+\*\*[：:]\s*/, '')
-      if (cleanText) suggestions.push(cleanText)
+      if (cleanText && cleanText.trim()) suggestions.push(cleanText.trim())
     } else if (inSuggestionSection && trimmed.match(/^\d+\./)) {
       const text = trimmed.replace(/^\d+\.\s*/, '')
       const cleanText = text.replace(/^\*\*[^*]+\*\*[：:]\s*/, '')
-      if (cleanText) suggestions.push(cleanText)
+      if (cleanText && cleanText.trim()) suggestions.push(cleanText.trim())
+    } else if (inSuggestionSection && trimmed.match(/^[一二三四五六七八九十]+[、.]/)) {
+      const text = trimmed.replace(/^[一二三四五六七八九十]+[、.]\s*/, '')
+      const cleanText = text.replace(/^\*\*[^*]+\*\*[：:]\s*/, '')
+      if (cleanText && cleanText.trim()) suggestions.push(cleanText.trim())
     }
   }
 

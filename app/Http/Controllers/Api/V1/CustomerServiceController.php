@@ -305,4 +305,28 @@ class CustomerServiceController extends Controller
             'message' => '已标记为已读',
         ]);
     }
+
+    /**
+     * 管理员标记用户消息为已读（管理员查看会话时调用）
+     */
+    public function adminMarkRead(Request $request, $sessionNo)
+    {
+        // 查找会话（管理员可以查看任何会话）
+        $session = CustomerServiceSession::where('session_no', $sessionNo)->firstOrFail();
+        
+        // 标记所有用户发送的消息为已读（添加 read_at 时间戳）
+        CustomerServiceMessage::where('session_id', $session->id)
+            ->where('sender_type', 'user')
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+        
+        // 清除管理员未读数
+        $session->admin_unread = 0;
+        $session->save();
+        
+        return response()->json([
+            'code' => 0,
+            'message' => '已标记为已读',
+        ]);
+    }
 }

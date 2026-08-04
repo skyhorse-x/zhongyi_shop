@@ -481,14 +481,14 @@ class AiService
      * @param bool $success
      * @return void
      */
-    protected function logApiLog(?int $modelId, string $type, array $request, array $response, int $duration, bool $success): void
+    protected function logApiLog(?int $modelId, string $type, array $request, ?array $response, int $duration, bool $success): void
     {
         try {
             AiLog::create([
                 'model_id' => $modelId,
                 'type' => $type,
                 'request' => json_encode($request),
-                'response' => json_encode($response),
+                'response' => $response ? json_encode($response) : null,
                 'duration' => $duration,
                 'status' => $success ? 1 : 0,
             ]);

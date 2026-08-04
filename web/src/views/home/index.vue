@@ -28,6 +28,7 @@ const goToFeature = (path: string) => {
 
 // 当前剩余分析次数（未登录时为 null，不显示）
 const analysisTimes = ref<number | null>(null)
+const siteName = ref<string>('AI 中医健康助手') // 默认标题
 
 // 图标组件包装器（避免 reactive 警告）
 const IconWrapper = defineComponent({
@@ -56,12 +57,30 @@ const fetchAnalysisTimes = async () => {
   }
 }
 
+// 获取网站名称配置
+const fetchSiteConfig = async () => {
+  try {
+    const res = await safeFetch('/api/v1/analysis/config', {
+      headers: {
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0 && data.data?.site_name) {
+      siteName.value = data.data.site_name
+    }
+  } catch (e) {
+    // 使用默认标题
+  }
+}
+
 const goRecharge = () => {
   router.push('/recharge')
 }
 
 onMounted(() => {
   fetchAnalysisTimes()
+  fetchSiteConfig()
 })
 </script>
 
@@ -69,7 +88,7 @@ onMounted(() => {
   <div class="home-page">
     <!-- 顶部横幅 -->
     <div class="banner">
-      <div class="banner-title">ai 中医健康助手</div>
+      <div class="banner-title">{{ siteName }}</div>
       <div class="banner-subtitle">智能分析 · 科学养生 · 守护健康</div>
     </div>
 

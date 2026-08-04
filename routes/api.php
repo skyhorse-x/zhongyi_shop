@@ -97,6 +97,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::post('sessions/{sessionNo}/messages', [V1\CustomerServiceController::class, 'sendMessage']);
             Route::post('sessions/{sessionNo}/upload-image', [V1\CustomerServiceController::class, 'uploadImage']);
             Route::post('sessions/{sessionNo}/mark-as-read', [V1\CustomerServiceController::class, 'markAsRead']);
+            Route::post('sessions/{sessionNo}/admin-mark-read', [V1\CustomerServiceController::class, 'adminMarkRead']);
             Route::post('sessions/{sessionNo}/close', [V1\CustomerServiceController::class, 'closeSession']);
             Route::post('sessions/{sessionNo}/heartbeat', [V1\CustomerServiceController::class, 'heartbeat']);
         });

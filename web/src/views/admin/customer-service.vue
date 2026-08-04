@@ -281,6 +281,60 @@ const selectSession = async (session: Session) => {
   currentSession.value = session
   showChat.value = true
   await loadMessages(session.session_no)
+  // 标记用户消息为已读
+  await markAsRead(session.session_no)
+  // 查询IP地理位置
+  if (session.ip_address && !session.ip_location) {
+    await fetchIpLocation(session.session_no, session.ip_address)
+  }
+}
+
+// 查询IP地理位置
+const fetchIpLocation = async (sessionNo: string, ip: string) => {
+  try {
+    // 使用 ip-api.com 免费API（无需密钥，每分钟45次限制）
+    const res = await fetch(`http://ip-api.com/json/${ip}?lang=zh-CN&fields=status,country,regionName,city,isp`, {
+      headers: { 'Accept': 'application/json' }
+    })
+    const data = await res.json()
+    if (data.status === 'success') {
+      const location = `${data.country} ${data.regionName} ${data.city}`.trim()
+      // 更新会话的IP位置
+      const session = sessions.value.find(s => s.session_no === sessionNo)
+      if (session) {
+        session.ip_location = location
+      }
+      if (currentSession.value?.session_no === sessionNo) {
+        currentSession.value.ip_location = location
+      }
+    }
+  } catch (e) {
+    // 查询失败时显示"未知"
+    const session = sessions.value.find(s => s.session_no === sessionNo)
+    if (session) {
+      session.ip_location = '未知'
+    }
+  }
+}
+
+// 标记消息为已读（管理员查看时）
+const markAsRead = async (sessionNo: string) => {
+  try {
+    await safeFetch(`/api/v1/admin/customer-service/sessions/${sessionNo}/admin-mark-read`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    // 更新本地会话未读数
+    const session = sessions.value.find(s => s.session_no === sessionNo)
+    if (session) {
+      session.admin_unread = 0
+    }
+  } catch (e) {
+    // 忽略错误
+  }
 }
 
 const backToList = () => {
@@ -769,9 +823,9 @@ onUnmounted(() => {
                   <span v-if="currentSession.browser_short" class="meta-tag browser" :title="currentSession.browser_info">
                     {{ currentSession.browser_short }}
                   </span>
-                  <span v-if="currentSession.ip_address" class="meta-tag ip" :title="'IP: ' + currentSession.ip_address">
-                    {{ currentSession.ip_address }}
-                  </span>
+                  <span v-if="currentSession.ip_address" class="meta-tag ip" :title="'IP: ' + currentSession.ip_address + ' | ' + (currentSession.ip_location || '查询中...')">
+                  {{ currentSession.ip_address }} · {{ currentSession.ip_location || '查询中...' }}
+                </span>
                 </div>
                 <span class="session-tag">{{ currentSession.session_no }}</span>
                 <button
@@ -805,7 +859,12 @@ onUnmounted(() => {
                   </div>
                   <div class="message-time">
                     {{ formatTime(msg.created_at) }}
+                    <!-- 管理员消息：显示用户是否已读 -->
                     <span v-if="msg.sender_type === 'admin'" class="read-status" :class="msg.read_at ? 'read' : 'unread'">
+                      {{ msg.read_at ? '已读' : '未读' }}
+                    </span>
+                    <!-- 用户消息：显示管理员是否已读 -->
+                    <span v-else class="read-status" :class="msg.read_at ? 'read' : 'unread'">
                       {{ msg.read_at ? '已读' : '未读' }}
                     </span>
                   </div>
@@ -1634,6 +1693,12 @@ onUnmounted(() => {
   font-size: 11px;
   color: #c0c4cc;
   margin-top: 6px;
+}
+
+.msg-left .message-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .msg-right .message-time {

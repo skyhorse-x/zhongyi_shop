@@ -159,6 +159,32 @@ class ProcessAnalysisJob implements ShouldQueue
     }
 
     /**
+     * 任务失败处理（所有重试都失败后调用）
+     */
+    public function failed(\Throwable $exception): void
+    {
+        try {
+            $task = $this->task;
+            
+            // 更新任务状态为失败
+            $task->update([
+                'status' => 3,
+                'error_msg' => $exception->getMessage(),
+            ]);
+            
+            Log::error('Analysis task permanently failed', [
+                'task_no' => $task->task_no,
+                'error' => $exception->getMessage(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to update task status on job failure', [
+                'task_no' => $this->task->task_no ?? 'unknown',
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * 提取摘要
      */
     protected function extractSummary(string $content): string
