@@ -119,7 +119,7 @@ class ProcessAnalysisJob implements ShouldQueue
                 'mode' => $hasImages ? 'image' : 'text',
             ]);
         } catch (\Exception $e) {
-            $task->update(['status' => 3]); // 失败
+            $task->update(['status' => 3, 'error_message' => substr($e->getMessage(), 0, 500)]); // 失败
 
             // 失败/超时/异常：返还次数（避免用户资金损失）
             try {
@@ -171,7 +171,7 @@ class ProcessAnalysisJob implements ShouldQueue
             // 更新任务状态为失败
             $task->update([
                 'status' => 3,
-                'error_msg' => $exception->getMessage(),
+                'error_message' => substr($exception->getMessage(), 0, 500),
             ]);
             
             Log::error('Analysis task permanently failed', [
