@@ -97,7 +97,7 @@ onMounted(() => {
       <div class="entry-content">
         <div class="recharge-entry-title">充值积分</div>
         <div class="recharge-entry-desc">
-          <template v-if="analysisTimes !== null">当前剩余 {{ analysisTimes }} 次分析次数，点击充值</template>
+          <template v-if="analysisTimes !== null">当前剩余 {{ analysisTimes }} 积分，点击充值</template>
           <template v-else>充值分析次数，畅享 AI 健康分析</template>
         </div>
       </div>

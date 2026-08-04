@@ -318,7 +318,7 @@ onBeforeUnmount(() => {
       <div class="header-right">
         <div class="credits-badge">
           <el-icon class="credits-icon"><Coin /></el-icon>
-          <span class="credits-text">剩余 {{ analysisTimes }} 次</span>
+          <span class="credits-text">剩余 {{ analysisTimes }} 积分</span>
         </div>
         <el-icon @click="startNewChat" class="action-btn" title="新建对话"><Plus /></el-icon>
         <el-icon @click="goToSessions" class="action-btn" title="对话列表"><List /></el-icon>

@@ -249,7 +249,7 @@ const handleSubmit = async () => {
         开始分析
       </el-button>
       <div v-if="analysisTimes > 0" class="free-tip">
-        剩余 {{ analysisTimes }} 次分析次数
+        剩余 {{ analysisTimes }} 积分
       </div>
       <div v-else class="free-tip">
         分析次数不足，请先购买套餐

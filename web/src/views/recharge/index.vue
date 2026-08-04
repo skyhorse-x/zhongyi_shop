@@ -134,7 +134,7 @@ onMounted(() => {
     <!-- 顶部余额卡片 -->
     <div class="balance-card">
       <div class="balance-left">
-        <div class="balance-label">当前剩余分析次数</div>
+        <div class="balance-label">当前剩余积分</div>
         <div class="balance-num">
           {{ analysisTimes }}
           <span class="balance-unit">次</span>
