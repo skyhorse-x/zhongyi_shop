@@ -1,9 +1,9 @@
 # 后端设计
 
-> **版本**：v1.1  
-> **日期**：2026-07-28  
+> **版本**：v2.0  
+> **日期**：2026-08-04  
 > **对应 ai.md 阶段**：第六阶段（后端设计）  
-> **变更说明**：Laravel 13 + Laravel Queue（Redis驱动）替代RabbitMQ
+> **变更说明**：根据实际代码修正（移除Repository/Jobs/Events/Horizon，修正Controller/Service/Middleware列表，Sanctum认证）
 
 ---
 
@@ -15,207 +15,268 @@
 │              接收请求、参数验证、调用Service              │
 ├─────────────────────────────────────────────────────────┤
 │                       Service 层                         │
-│              业务逻辑、事务管理、事件触发                 │
-├─────────────────────────────────────────────────────────┤
-│                     Repository 层                        │
-│              数据访问、查询构建、模型操作                 │
+│              业务逻辑、事务管理                          │
 ├─────────────────────────────────────────────────────────┤
 │                       Model 层                           │
-│              数据模型、关系定义、访问器                   │
+│              数据模型、关系定义、查询构建                 │
 ├─────────────────────────────────────────────────────────┤
 │                      数据库                              │
 └─────────────────────────────────────────────────────────┘
 ```
 
+**说明**：
+- **无 Repository 层**：直接使用 Laravel Eloquent Model
+- **无 FormRequest**：验证逻辑内联在 Controller 中
+- **无 Resource 类**：直接返回数组或 Model->toArray()
+- **AI 分析为同步处理**：不使用队列 Jobs
+- **无 Events/Listeners**：业务逻辑直接在 Service 中处理
+
 ---
 
-## 2. Controller层
+## 2. Controller 层
 
 ### 2.1 用户端控制器（Api/V1/）
 
-| Controller | 路径 | 职责 |
-|------------|------|------|
-| AuthController | Api/V1/AuthController.php | 注册、登录、验证码、微信授权 |
-| UserController | Api/V1/UserController.php | 用户信息查询和更新 |
-| TongueAnalysisController | Api/V1/TongueAnalysisController.php | 舌诊分析提交、状态查询 |
-| FaceAnalysisController | Api/V1/FaceAnalysisController.php | 面诊分析提交、状态查询 |
-| ConstitutionController | Api/V1/ConstitutionController.php | 体质测试题库、提交分析 |
+| Controller | 文件路径 | 职责 |
+|------------|---------|------|
+| AuthController | Api/V1/AuthController.php | 注册、登录、验证码、微信授权、Token刷新 |
+| UserController | Api/V1/UserController.php | 用户信息、订单、余额明细 |
+| AnalysisController | Api/V1/AnalysisController.php | 舌诊/面诊分析提交、状态查询、报告获取、历史记录 |
+| ConstitutionController | Api/V1/ConstitutionController.php | 体质测试题库、提交分析、获取报告 |
 | QaController | Api/V1/QaController.php | 健康问答会话、消息 |
-| ReportController | Api/V1/ReportController.php | 分析报告获取 |
-| HealthController | Api/V1/HealthController.php | 健康档案、历史记录、趋势 |
-| PaymentController | Api/V1/PaymentController.php | 订单创建、支付回调 |
-| PromoterController | Api/V1/PromoterController.php | 推广员开通、推广信息、佣金、提现 |
+| HealthController | Api/V1/HealthController.php | 健康档案、历史记录、趋势、体质档案 |
+| PaymentController | Api/V1/PaymentController.php | 订单创建、支付回调、支付方式 |
+| PromoterController | Api/V1/PromoterController.php | 推广员开通、推广信息、佣金、提现、邀请追踪 |
 | PackageController | Api/V1/PackageController.php | 次数包列表、购买 |
 | ArticleController | Api/V1/ArticleController.php | 健康资讯文章 |
+| CustomerServiceController | Api/V1/CustomerServiceController.php | 客服会话、消息 |
+| CustomerServiceRatingController | Api/V1/CustomerServiceRatingController.php | 客服评价 |
+| SystemMessageController | Api/V1/SystemMessageController.php | 系统消息 |
+| FeedbackController | Api/V1/FeedbackController.php | 用户反馈 |
+| AppealController | Api/V1/AppealController.php | AI申诉 |
+| RefundController | Api/V1/RefundController.php | 退款 |
+| ConfigController | Api/V1/ConfigController.php | 系统配置 |
+| XianyuProductController | Api/V1/XianyuProductController.php | 闲鱼商品（用户端） |
 
-### 2.2 管理端控制器（Admin/）
+### 2.2 管理端控制器
 
-| Controller | 路径 | 职责 |
-|------------|------|------|
-| DashboardController | Admin/DashboardController.php | 数据概览 |
-| UserController | Admin/UserController.php | 用户管理 |
-| OrderController | Admin/OrderController.php | 订单管理 |
-| AiController | Admin/AiController.php | AI模型管理、Prompt管理 |
-| ConstitutionController | Admin/ConstitutionController.php | 体质测试题库管理 |
-| PromoterController | Admin/PromoterController.php | 推广员管理、提现审核 |
-| PackageController | Admin/PackageController.php | 次数包管理 |
-| ArticleController | Admin/ArticleController.php | 文章管理 |
-| SystemController | Admin/SystemController.php | 系统配置 |
+| Controller | 文件路径 | 职责 |
+|------------|---------|------|
+| AdminController | Api/V1/AdminController.php | **统一管理后台**（仪表盘、用户/订单/AI/推广/文章/系统配置等所有后台管理功能） |
+| AnalyticsController | Api/V1/Admin/AnalyticsController.php | 数据分析 BI |
+| AppealController | Api/V1/Admin/AppealController.php | 申诉审核 |
+| CustomerServiceController | Api/V1/Admin/CustomerServiceController.php | 客服会话查看、消息发送 |
+| CustomerServiceManageController | Api/V1/Admin/CustomerServiceManageController.php | 客服管理（话术、系统消息、配置） |
+| CustomerServiceRatingController | Api/V1/Admin/CustomerServiceRatingController.php | 客服评价管理 |
+| FeedbackController | Api/V1/Admin/FeedbackController.php | 用户反馈管理 |
+| RefundController | Api/V1/Admin/RefundController.php | 退款审核 |
+| RiskController | Api/V1/Admin/RiskController.php | 风控规则、事件、黑名单管理 |
+| XianyuProductController | Api/V1/Admin/XianyuProductController.php | 闲鱼商品管理 |
 
 ### 2.3 控制器示例
 
 ```php
-// app/Http/Controllers/Api/V1/TongueAnalysisController.php
+// app/Http/Controllers/Api/V1/AuthController.php
 <?php
 
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\TongueAnalysisRequest;
-use App\Http\Resources\AnalysisResource;
-use App\Services\Analysis\TongueAnalysisService;
+use App\Models\User;
+use App\Models\Promoter;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
-class TongueAnalysisController extends Controller
+class AuthController extends Controller
 {
-    public function __construct(
-        private TongueAnalysisService $analysisService
-    ) {}
-
     /**
-     * 提交舌诊分析任务
+     * 用户注册（账号+密码 或 手机号+密码）
      */
-    public function submit(TongueAnalysisRequest $request): JsonResponse
+    public function register(Request $request): JsonResponse
     {
-        $task = $this->analysisService->submit(
-            $request->user()->id,
-            $request->validated('image_url')
-        );
+        $request->validate([
+            'type' => 'required|in:account,mobile',
+            'username' => 'required_if:type,account|unique:users',
+            'mobile' => 'required_if:type,mobile|unique:users',
+            'password' => 'required|min:6|confirmed',
+            'invite_code' => 'nullable|exists:promoters,invite_code',
+        ]);
 
-        return $this->success(new AnalysisResource($task));
+        $user = User::create([
+            'username' => $request->username,
+            'mobile' => $request->mobile,
+            'password' => Hash::make($request->password),
+            'nickname' => '用户' . substr($request->mobile ?? $request->username, -4),
+            'parent_id' => $this->getInviterId($request->invite_code),
+        ]);
+
+        // 自动开通推广员
+        Promoter::create([
+            'user_id' => $user->id,
+            'invite_code' => $this->generateInviteCode(),
+            'level' => 1,
+            'commission_rate' => 15.00,
+            'status' => 1,
+        ]);
+        $user->update(['is_promoter' => 1]);
+
+        $token = $user->createToken('app')->plainTextToken;
+
+        return $this->success([
+            'token' => $token,
+            'user' => $user,
+            'is_promoter' => true,
+            'invite_code' => $promoter->invite_code ?? null,
+            'invite_url' => url('?code=' . ($promoter->invite_code ?? '')),
+        ]);
     }
 
     /**
-     * 查询分析状态
+     * 登录（账号或手机号 + 密码）
      */
-    public function status(string $taskNo): JsonResponse
+    public function login(Request $request): JsonResponse
     {
-        $task = $this->analysisService->getStatus($taskNo);
-        return $this->success(new AnalysisResource($task));
+        $request->validate([
+            'account' => 'required',
+            'password' => 'required',
+        ]);
+
+        $user = User::where('username', $request->account)
+            ->orWhere('mobile', $request->account)
+            ->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return $this->error('账号或密码错误', 401);
+        }
+
+        $token = $user->createToken('app')->plainTextToken;
+
+        return $this->success([
+            'token' => $token,
+            'user' => $user,
+        ]);
+    }
+
+    /**
+     * 微信登录（暂未实现）
+     */
+    public function wechatLogin(Request $request): JsonResponse
+    {
+        return $this->error('微信登录功能尚未实现，请使用账号+密码登录', 501);
+    }
+
+    /**
+     * 刷新Token
+     */
+    public function refreshToken(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $user->tokens()->delete();
+        $token = $user->createToken('app')->plainTextToken;
+        return $this->success(['token' => $token]);
+    }
+
+    /**
+     * 退出登录
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $request->user()->currentAccessToken()->delete();
+        return $this->success(null, '退出成功');
     }
 }
 ```
 
 ---
 
-## 3. Service层
+## 3. Service 层
 
 ### 3.1 服务清单
 
-| Service | 路径 | 职责 |
-|---------|------|------|
-| AuthService | Services/Auth/AuthService.php | 注册、登录逻辑、JWT生成 |
-| UserService | Services/User/UserService.php | 用户信息管理 |
-| TongueAnalysisService | Services/Analysis/TongueAnalysisService.php | 舌诊分析任务管理 |
-| FaceAnalysisService | Services/Analysis/FaceAnalysisService.php | 面诊分析任务管理 |
-| ConstitutionService | Services/Analysis/ConstitutionService.php | 体质测试分析 |
-| QaService | Services/Qa/QaService.php | 健康问答服务 |
-| ReportService | Services/Report/ReportService.php | 分析报告服务 |
-| HealthRecordService | Services/Health/HealthRecordService.php | 健康档案服务 |
-| PaymentService | Services/Payment/PaymentService.php | 支付订单、退款处理 |
-| PromoterService | Services/Promote/PromoterService.php | 推广员开通、推广关系、佣金计算 |
-| SmsService | Services/Notification/SmsService.php | 短信发送 |
-| WechatService | Services/Wechat/WechatService.php | 微信授权、支付、消息 |
-| AiService | Services/Ai/AiService.php | AI模型调用、结果解析 |
+| Service | 文件路径 | 职责 |
+|---------|---------|------|
+| AiService.php | Services/AiService.php | AI模型调用、结果解析、视觉分析 |
+| AnalysisTimesService.php | Services/AnalysisTimesService.php | 分析次数管理（消耗、赠送、查询） |
+| AnalyticsService.php | Services/AnalyticsService.php | 数据统计（漏斗、留存、收入、增长等） |
+| CacheService.php | Services/CacheService.php | 统一缓存服务（File驱动） |
+| LlmService.php | Services/LlmService.php | 大模型调用封装 |
+| NotificationService.php | Services/NotificationService.php | 消息触达中心 |
+| PaymentService.php | Services/PaymentService.php | 支付订单、支付成功处理 |
+| RefundService.php | Services/RefundService.php | 退款服务 |
+| RiskControlService.php | Services/RiskControlService.php | 风控引擎（规则检查、黑名单） |
+| SystemConfigService.php | Services/SystemConfigService.php | 系统配置服务 |
 
-### 3.2 AI服务示例
+### 3.2 AI 服务示例
 
 ```php
-// app/Services/Ai/AiService.php
+// app/Services/AiService.php
 <?php
 
-namespace App\Services\Ai;
+namespace App\Services;
 
 use App\Models\AiModel;
 use App\Models\AiLog;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 class AiService
 {
     /**
-     * AI分析调用
+     * 舌诊分析
      */
-    public function analyze(string $imageUrl, string $type): array
+    public function analyzeTongue(array $imageUrls, int $gender, int $age): array
     {
-        $model = AiModel::where('type', 'vision')
-            ->where('analysis_type', 'like', "%{$type}%")
-            ->where('is_enabled', 1)
-            ->orderBy('sort_order')
-            ->first();
-
-        if (!$model) {
-            throw new \Exception('未找到可用的AI模型');
-        }
-
-        $startTime = microtime(true);
-
-        try {
-            $response = Http::timeout($model->timeout)
-                ->withHeaders([
-                    'Authorization' => 'Bearer ' . $model->api_key,
-                    'Content-Type' => 'application/json',
-                ])
-                ->post($model->api_url, $this->buildVisionPayload($model, $imageUrl, $type));
-
-            $result = $response->json();
-
-            // 记录调用日志
-            AiLog::create([
-                'model_id' => $model->id,
-                'type' => $type,
-                'prompt_tokens' => $result['usage']['prompt_tokens'] ?? 0,
-                'completion_tokens' => $result['usage']['completion_tokens'] ?? 0,
-                'total_tokens' => $result['usage']['total_tokens'] ?? 0,
-                'cost' => $this->calculateCost($model, $result['usage'] ?? []),
-                'response_time' => intval((microtime(true) - $startTime) * 1000),
-                'status' => 1,
-            ]);
-
-            return $this->parseResult($result, $type);
-
-        } catch (\Exception $e) {
-            AiLog::create([
-                'model_id' => $model->id,
-                'type' => $type,
-                'status' => 0,
-                'error' => $e->getMessage(),
-                'response_time' => intval((microtime(true) - $startTime) * 1000),
-            ]);
-            throw $e;
-        }
+        $model = $this->getVisionModel('tongue');
+        $result = $this->callVisionApi($model, $imageUrls, 'tongue', $gender, $age);
+        $this->logCall($model, 'tongue', $result);
+        return $result;
     }
 
     /**
-     * 健康问答调用
+     * 面诊分析
+     */
+    public function analyzeFace(array $imageUrls, int $gender, int $age): array
+    {
+        $model = $this->getVisionModel('face');
+        $result = $this->callVisionApi($model, $imageUrls, 'face', $gender, $age);
+        $this->logCall($model, 'face', $result);
+        return $result;
+    }
+
+    /**
+     * 健康问答
      */
     public function chat(string $message, array $history = []): array
     {
-        $model = AiModel::where('type', 'chat')
+        $model = $this->getChatModel();
+        $result = $this->callChatApi($model, $message, $history);
+        $this->logCall($model, 'qa', $result);
+        return $result;
+    }
+
+    /**
+     * 获取视觉模型
+     */
+    private function getVisionModel(string $type): AiModel
+    {
+        return AiModel::where('type', 'vision')
+            ->where('analysis_type', 'like', "%{$type}%")
             ->where('is_enabled', 1)
             ->orderBy('sort_order')
-            ->first();
+            ->firstOrFail();
+    }
 
-        $messages = $this->buildChatMessages($message, $history);
-
+    /**
+     * 调用视觉API
+     */
+    private function callVisionApi(AiModel $model, array $imageUrls, string $type, int $gender, int $age): array
+    {
         $response = Http::timeout($model->timeout)
-            ->withHeaders([
-                'Authorization' => 'Bearer ' . $model->api_key,
-            ])
+            ->withToken($model->api_key)
             ->post($model->api_url, [
                 'model' => $model->model,
-                'messages' => $messages,
-                'stream' => false,
+                'messages' => $this->buildVisionMessages($imageUrls, $type, $gender, $age),
             ]);
 
         return $response->json();
@@ -223,727 +284,281 @@ class AiService
 }
 ```
 
-### 3.3 舌诊分析服务示例
+### 3.3 缓存服务示例
 
 ```php
-// app/Services/Analysis/TongueAnalysisService.php
+// app/Services/CacheService.php
 <?php
 
-namespace App\Services\Analysis;
+namespace App\Services;
 
-use App\Jobs\Analysis\TongueAnalysisJob;
-use App\Models\AnalysisTask;
-use App\Models\AnalysisReport;
-use App\Services\Ai\AiService;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 
-class TongueAnalysisService
-{
-    public function __construct(
-        private AiService $aiService
-    ) {}
-
-    /**
-     * 提交舌诊分析任务
-     */
-    public function submit(int $userId, string $imageUrl): AnalysisTask
-    {
-        $imageMd5 = md5_file($imageUrl);
-
-        // 检查是否有相同图片的缓存结果
-        $cacheKey = 'analysis:tongue:' . $imageMd5;
-        if (Cache::has($cacheKey)) {
-            $cachedResult = Cache::get($cacheKey);
-            return $this->createTaskWithResult($userId, $imageUrl, $cachedResult);
-        }
-
-        // 创建新任务
-        $task = AnalysisTask::create([
-            'task_no' => 'TK' . date('Ymd') . Str::random(8),
-            'user_id' => $userId,
-            'type' => 'tongue',
-            'image_url' => $imageUrl,
-            'image_md5' => $imageMd5,
-            'status' => 0,
-        ]);
-
-        // 分发队列任务
-        TongueAnalysisJob::dispatch($task);
-
-        return $task;
-    }
-
-    /**
-     * 获取分析状态
-     */
-    public function getStatus(string $taskNo): AnalysisTask
-    {
-        return AnalysisTask::where('task_no', $taskNo)
-            ->with('report')
-            ->firstOrFail();
-    }
-
-    /**
-     * 获取报告
-     */
-    public function getReport(int $userId, string $taskNo): AnalysisReport
-    {
-        $report = AnalysisReport::whereHas('task', function ($query) use ($taskNo, $userId) {
-            $query->where('task_no', $taskNo)->where('user_id', $userId);
-        })->firstOrFail();
-
-        if (!$report->is_paid) {
-            throw new \Exception('请先支付后查看完整报告');
-        }
-
-        return $report;
-    }
-
-    private function createTaskWithResult(int $userId, string $imageUrl, array $result): AnalysisTask
-    {
-        $task = AnalysisTask::create([
-            'task_no' => 'TK' . date('Ymd') . Str::random(8),
-            'user_id' => $userId,
-            'type' => 'tongue',
-            'image_url' => $imageUrl,
-            'image_md5' => md5_file($imageUrl),
-            'status' => 2,
-            'result' => $result,
-            'model' => $result['model'],
-            'tokens' => $result['tokens'],
-            'cost' => $result['cost'],
-            'completed_at' => now(),
-        ]);
-
-        // 创建报告
-        AnalysisReport::create([
-            'task_id' => $task->id,
-            'user_id' => $userId,
-            'type' => 'tongue',
-            ...$this->extractReportData($result),
-        ]);
-
-        return $task;
-    }
-}
-```
-
-### 3.3 推广员服务示例
-
-```php
-// app/Services/Promote/PromoterService.php
-<?php
-
-namespace App\Services\Promote;
-
-use App\Models\Promoter;
-use App\Models\User;
-use Illuminate\Support\Str;
-
-class PromoterService
+class CacheService
 {
     /**
-     * 开通推广员（注册用户直接开通，无需审核）
+     * 统一走 file cache（项目不使用 Redis）
      */
-    public function activate(int $userId): Promoter
+    public function remember(string $key, int $ttl, callable $callback): mixed
     {
-        // 检查是否已是推广员
-        $promoter = Promoter::where('user_id', $userId)->first();
-        if ($promoter) {
-            throw new \Exception('您已是推广员');
+        if (Cache::has($key)) {
+            return Cache::get($key);
         }
 
-        // 创建推广员记录
-        $promoter = Promoter::create([
-            'user_id' => $userId,
-            'invite_code' => $this->generateInviteCode(),
-            'level' => 1,
-            'commission_rate' => 15.00,
-            'status' => 1,
-            'activated_at' => now(),
-        ]);
-
-        // 更新用户信息
-        User::where('id', $userId)->update(['is_promoter' => 1]);
-
-        return $promoter;
+        $value = $callback();
+        Cache::put($key, $value, $ttl);
+        return $value;
     }
 
     /**
-     * 生成唯一推广码
+     * 清除缓存
      */
-    private function generateInviteCode(): string
+    public function forget(string $key): void
     {
-        do {
-            $code = 'code' . strtoupper(Str::random(6));
-        } while (Promoter::where('invite_code', $code)->exists());
-
-        return $code;
-    }
-
-    /**
-     * 获取推广员信息
-     */
-    public function getInfo(int $userId): ?Promoter
-    {
-        return Promoter::where('user_id', $userId)->first();
-    }
-
-    /**
-     * 计算佣金
-     */
-    public function calculateCommission(int $promoterId, int $orderAmount): float
-    {
-        $promoter = Promoter::find($promoterId);
-        return round($orderAmount * $promoter->commission_rate / 100, 2);
+        Cache::forget($key);
     }
 }
 ```
 
 ---
 
-## 4. Repository层
+## 4. Model 层
 
-### 4.1 仓库清单
-
-| Repository | 路径 | 职责 |
-|------------|------|------|
-| UserRepository | Repositories/User/UserRepository.php | 用户数据访问 |
-| AnalysisRepository | Repositories/Analysis/AnalysisRepository.php | 分析数据访问 |
-| ConstitutionRepository | Repositories/Constitution/ConstitutionRepository.php | 体质测试数据访问 |
-| QaRepository | Repositories/Qa/QaRepository.php | 问答数据访问 |
-| OrderRepository | Repositories/Order/OrderRepository.php | 订单数据访问 |
-| PromoterRepository | Repositories/Promote/PromoterRepository.php | 推广数据访问 |
-
----
-
-## 5. Model层
-
-### 5.1 模型清单
+### 4.1 模型清单
 
 | Model | 表名 | 说明 |
 |-------|------|------|
 | User | users | 用户模型 |
 | UserProfile | user_profiles | 用户详情 |
+| Admin | admins | 管理员 |
 | AnalysisTask | analysis_tasks | 分析任务 |
 | AnalysisReport | analysis_reports | 分析报告 |
 | ConstitutionQuestion | constitution_questions | 体质测试题目 |
-| ConstitutionAnswer | constitution_answers | 答题记录 |
-| QaSession | health_qa_sessions | 问答会话 |
-| QaMessage | health_qa_messages | 问答消息 |
+| HealthQaSession | health_qa_sessions | 问答会话 |
+| HealthQaMessage | health_qa_messages | 问答消息 |
 | Order | orders | 订单 |
 | Payment | payments | 支付记录 |
+| Refund | refunds | 退款单 |
 | Promoter | promoters | 推广员 |
 | Commission | commissions | 佣金记录 |
 | Withdraw | withdraws | 提现记录 |
-| Package | product_packages | 次数包 |
+| ProductPackage | product_packages | 次数包 |
 | Article | articles | 文章 |
 | AiModel | ai_models | AI模型配置 |
 | AiLog | ai_logs | AI调用日志 |
-| Admin | admins | 管理员 |
+| SystemConfig | system_configs | 系统配置 |
+| SystemMessage | system_messages | 系统消息 |
+| Feedback | feedbacks | 用户反馈 |
+| AnalysisAppeal | analysis_appeals | AI诊断申诉 |
+| CustomerServiceSession | customer_service_sessions | 客服会话 |
+| CustomerServiceMessage | customer_service_messages | 客服消息 |
+| CustomerServicePhrase | customer_service_phrases | 客服常用话术 |
+| CustomerServiceRating | customer_service_ratings | 客服评价 |
+| CustomerServiceConfig | customer_service_configs | 客服配置 |
+| RiskRule | risk_rules | 风控规则 |
+| RiskEvent | risk_events | 风控事件 |
+| RiskBlacklist | risk_blacklists | 风控黑名单 |
+| XianyuProduct | xianyu_products | 闲鱼商品 |
+| UserAnalysisLog | user_analysis_logs | 分析次数流水 |
+| UserBalanceLog | user_balance_logs | 余额流水 |
+| BalanceInsufficientLog | balance_insufficient_logs | 余额不足记录 |
+| InviteClick | invite_clicks | 邀请点击记录 |
+| InviteRegistration | invite_registrations | 邀请注册记录 |
 
 ---
 
-## 6. 中间件
+## 5. 中间件
 
-### 6.1 中间件清单
+### 5.1 中间件清单
 
-| Middleware | 路径 | 职责 |
-|------------|------|------|
-| JwtAuth | Middleware/JwtAuth.php | JWT认证验证 |
-| RateLimit | Middleware/RateLimit.php | 接口限流 |
-| LogRequest | Middleware/LogRequest.php | 请求日志记录 |
-| Cors | Middleware/Cors.php | 跨域处理 |
-| AdminAuth | Middleware/AdminAuth.php | 管理员权限验证 |
-| PromoterAuth | Middleware/PromoterAuth.php | 推广员权限验证 |
+| Middleware | 文件路径 | 职责 |
+|------------|---------|------|
+| AdminMiddleware | Middleware/AdminMiddleware.php | 管理员权限验证（检查Token和admin标记） |
+| SuperAdminMiddleware | Middleware/SuperAdminMiddleware.php | 超级管理员权限验证（id===1 或 role_id===1） |
+| AuthenticateOrAdmin | Middleware/AuthenticateOrAdmin.php | 用户或管理员均可访问 |
+| RequestLogMiddleware | Middleware/RequestLogMiddleware.php | 请求日志记录 |
+| RiskControlMiddleware | Middleware/RiskControlMiddleware.php | 风控检查（支持规则：withdraw等） |
+| VisitCounterMiddleware | Middleware/VisitCounterMiddleware.php | 访问计数 |
 
----
-
-## 7. Laravel Queue（队列任务）
-
-### 7.1 队列配置
+### 5.2 中间件示例
 
 ```php
-// config/queue.php
-return [
-    'default' => env('QUEUE_CONNECTION', 'redis'),
-
-    'connections' => [
-        'redis' => [
-            'driver' => 'redis',
-            'connection' => 'default',
-            'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => 90,
-            'block_for' => null,
-            'after_commit' => true,
-        ],
-    ],
-
-    'batching' => [
-        'database' => env('DB_CONNECTION', 'mysql'),
-        'table' => 'job_batches',
-    ],
-
-    'failed' => [
-        'driver' => env('QUEUE_FAILED_DRIVER', 'database-uuids'),
-        'database' => env('DB_CONNECTION', 'mysql'),
-        'table' => 'failed_jobs',
-    ],
-];
-```
-
-### 7.2 队列任务清单
-
-| Job | 路径 | 队列 | 职责 |
-|-----|------|------|------|
-| TongueAnalysisJob | Jobs/Analysis/TongueAnalysisJob.php | analysis | 执行舌诊AI分析 |
-| FaceAnalysisJob | Jobs/Analysis/FaceAnalysisJob.php | analysis | 执行面诊AI分析 |
-| ConstitutionAnalysisJob | Jobs/Analysis/ConstitutionAnalysisJob.php | analysis | 执行体质分析 |
-| PaymentNotifyJob | Jobs/Payment/PaymentNotifyJob.php | payment | 支付成功通知 |
-| CommissionJob | Jobs/Promote/CommissionJob.php | promote | 佣金结算 |
-| SmsJob | Jobs/Notification/SmsJob.php | sms | 短信发送 |
-| WithdrawJob | Jobs/Promote/WithdrawJob.php | promote | 提现处理 |
-| QaJob | Jobs/Qa/QaJob.php | qa | 健康问答处理 |
-
-### 7.3 AI分析任务（舌诊）
-
-```php
-// app/Jobs/Analysis/TongueAnalysisJob.php
+// app/Http/Middleware/AdminMiddleware.php
 <?php
 
-namespace App\Jobs\Analysis;
+namespace App\Http\Middleware;
 
-use App\Models\AnalysisTask;
-use App\Models\AnalysisReport;
-use App\Services\Ai\AiService;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
+use Closure;
+use Illuminate\Http\Request;
 
-class TongueAnalysisJob implements ShouldQueue
+class AdminMiddleware
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    /**
-     * 最大尝试次数
-     */
-    public int $tries = 3;
-
-    /**
-     * 超时时间（秒）
-     */
-    public int $timeout = 60;
-
-    /**
-     * 重试间隔（秒）
-     */
-    public int $backoff = 5;
-
-    public function __construct(
-        private AnalysisTask $task
-    ) {
-        $this->onQueue('analysis');
-    }
-
-    public function handle(AiService $aiService): void
+    public function handle(Request $request, Closure $next)
     {
-        $this->task->update(['status' => 1, 'started_at' => now()]);
-
-        try {
-            $result = $aiService->analyze(
-                $this->task->image_url,
-                'tongue'
-            );
-
-            // 更新任务状态
-            $this->task->update([
-                'status' => 2,
-                'result' => $result,
-                'model' => $result['model'],
-                'tokens' => $result['tokens'],
-                'cost' => $result['cost'],
-                'completed_at' => now(),
-            ]);
-
-            // 创建报告
-            $reportData = $this->extractReportData($result);
-            AnalysisReport::create(array_merge($reportData, [
-                'task_id' => $this->task->id,
-                'user_id' => $this->task->user_id,
-                'type' => 'tongue',
-            ]));
-
-            // 缓存结果（7天）
-            Cache::put('analysis:tongue:' . $this->task->image_md5, $result, 604800);
-
-        } catch (\Exception $e) {
-            $this->task->update([
-                'status' => 3,
-                'error_msg' => $e->getMessage(),
-            ]);
-            Log::error('舌诊AI分析失败', [
-                'task_no' => $this->task->task_no,
-                'error' => $e->getMessage(),
-            ]);
-            throw $e;
-        }
-    }
-
-    /**
-     * 任务失败处理
-     */
-    public function failed(\Throwable $exception): void
-    {
-        $this->task->update([
-            'status' => 3,
-            'error_msg' => '分析失败：' . $exception->getMessage(),
-        ]);
+        $user = $request->user();
         
-        Log::error('舌诊分析任务最终失败', [
-            'task_no' => $this->task->task_no,
-            'error' => $exception->getMessage(),
+        if (!$user || !$user->is_admin) {
+            return response()->json(['code' => 1003, 'message' => '无权限'], 403);
+        }
+
+        return $next($request);
+    }
+}
+
+// app/Http/Middleware/SuperAdminMiddleware.php
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+
+class SuperAdminMiddleware
+{
+    public function handle(Request $request, Closure $next)
+    {
+        $user = $request->user();
+        
+        // 超级管理员：id===1 或 role_id===1
+        if (!$user || ($user->id !== 1 && $user->role_id !== 1)) {
+            return response()->json(['code' => 1003, 'message' => '需要超级管理员权限'], 403);
+        }
+
+        return $next($request);
+    }
+}
+```
+
+---
+
+## 6. 命令行（Console Commands）
+
+### 6.1 命令清单
+
+| Command | 文件路径 | 职责 |
+|---------|---------|------|
+| SettleCommissions | Console/Commands/SettleCommissions.php | 结算冻结佣金 |
+| CleanDuplicateData | Console/Commands/CleanDuplicateData.php | 清理重复数据 |
+| ClearPlaceholderApiKeys | Console/Commands/ClearPlaceholderApiKeys.php | 清理占位API Keys |
+| ResetAdminPassword | Console/Commands/ResetAdminPassword.php | 重置管理员密码 |
+
+### 6.2 调度任务
+
+```php
+// routes/console.php
+use Illuminate\Support\Facades\Schedule;
+
+// 每天凌晨结算佣金
+Schedule::command('commission:settle')->dailyAt('02:00');
+```
+
+---
+
+## 7. 认证机制（Sanctum）
+
+### 7.1 认证流程
+
+```
+用户登录 → AuthController::login() → User::createToken() → 返回 plainTextToken
+                                                     ↓
+请求接口 → Authorization: Bearer {token} → Sanctum 中间件验证 → 获取用户
+```
+
+### 7.2 Token 生成
+
+```php
+// 用户端登录
+$token = $user->createToken('app', ['*'])->plainTextToken;
+
+// 管理端登录
+$token = $admin->createToken('admin', ['*'])->plainTextToken;
+```
+
+### 7.3 Token 验证
+
+```php
+// 通过 auth:sanctum 中间件
+Route::middleware('auth:sanctum')->group(function () {
+    // 需要登录的接口
+});
+
+// 或自定义中间件
+Route::middleware('auth.or.admin')->group(function () {
+    // 用户或管理员均可
+});
+```
+
+---
+
+## 8. 统一响应格式
+
+```php
+// app/Http/Controllers/Controller.php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Routing\Controller as BaseController;
+
+class Controller extends BaseController
+{
+    use ValidatesRequests;
+
+    /**
+     * 成功响应
+     */
+    protected function success($data = null, string $message = 'success'): \Illuminate\Http\JsonResponse
+    {
+        return response()->json([
+            'code' => 0,
+            'message' => $message,
+            'data' => $data,
         ]);
     }
 
-    private function extractReportData(array $result): array
+    /**
+     * 错误响应
+     */
+    protected function error(string $message = 'error', int $code = 400): \Illuminate\Http\JsonResponse
     {
-        return [
-            'health_score' => $result['health_score'] ?? null,
-            'tongue_color' => $result['tongue_color'] ?? null,
-            'tongue_shape' => $result['tongue_shape'] ?? null,
-            'tongue_coating' => $result['tongue_coating'] ?? null,
-            'sublingual_vein' => $result['sublingual_vein'] ?? null,
-            'tongue_analysis' => $result['tongue_analysis'] ?? null,
-            'life_advice' => $result['life_advice'] ?? null,
-            'diet_advice' => $result['diet_advice'] ?? null,
-            'exercise_advice' => $result['exercise_advice'] ?? null,
-            'precautions' => $result['precautions'] ?? null,
-            'summary' => $result['summary'] ?? null,
-            'content' => $result,
-        ];
-    }
-}
-```
-
-### 7.4 健康问答任务
-
-```php
-// app/Jobs/Qa/QaJob.php
-<?php
-
-namespace App\Jobs\Qa;
-
-use App\Models\QaSession;
-use App\Models\QaMessage;
-use App\Services\Ai\AiService;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
-
-class QaJob implements ShouldQueue
-{
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    public int $tries = 3;
-    public int $timeout = 30;
-
-    public function __construct(
-        private QaSession $session,
-        private string $question,
-        private array $history = []
-    ) {
-        $this->onQueue('qa');
-    }
-
-    public function handle(AiService $aiService): void
-    {
-        try {
-            $result = $aiService->chat($this->question, $this->history);
-
-            // 保存AI回复
-            QaMessage::create([
-                'session_id' => $this->session->id,
-                'user_id' => $this->session->user_id,
-                'role' => 'assistant',
-                'content' => $result['choices'][0]['message']['content'] ?? '',
-                'tokens' => $result['usage']['total_tokens'] ?? 0,
-                'cost' => $this->calculateCost($result['usage'] ?? []),
-                'model' => $result['model'] ?? null,
-            ]);
-
-            // 更新会话
-            $this->session->increment('message_count');
-            $this->session->update(['last_question_at' => now()]);
-
-        } catch (\Exception $e) {
-            Log::error('健康问答处理失败', [
-                'session_no' => $this->session->session_no,
-                'error' => $e->getMessage(),
-            ]);
-            throw $e;
-        }
-    }
-}
-```
-
-### 7.5 队列工作进程配置
-
-```ini
-# docker/supervisor/supervisord.conf
-[supervisord]
-nodaemon=true
-user=root
-
-# 舌诊/面诊/体质分析队列
-[program:analysis-worker]
-command=php /var/www/api/artisan queue:work redis --queue=analysis --sleep=3 --tries=3 --max-time=3600 --memory=256
-numprocs=5
-autostart=true
-autorestart=true
-user=www-data
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/analysis-worker.log
-
-# 健康问答队列
-[program:qa-worker]
-command=php /var/www/api/artisan queue:work redis --queue=qa --sleep=2 --tries=3 --max-time=3600 --memory=128
-numprocs=3
-autostart=true
-autorestart=true
-user=www-data
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/qa-worker.log
-
-# 支付通知队列
-[program:payment-worker]
-command=php /var/www/api/artisan queue:work redis --queue=payment --sleep=3 --tries=3 --max-time=3600
-numprocs=3
-autostart=true
-autorestart=true
-user=www-data
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/payment-worker.log
-
-# 推广结算队列
-[program:promote-worker]
-command=php /var/www/api/artisan queue:work redis --queue=promote --sleep=3 --tries=3 --max-time=3600
-numprocs=2
-autostart=true
-autorestart=true
-user=www-data
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/promote-worker.log
-
-# 短信通知队列
-[program:sms-worker]
-command=php /var/www/api/artisan queue:work redis --queue=sms --sleep=3 --tries=3 --max-time=3600
-numprocs=2
-autostart=true
-autorestart=true
-user=www-data
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/sms-worker.log
-```
-
----
-
-## 8. Laravel Horizon（队列监控）
-
-### 8.1 安装配置
-
-```bash
-composer require laravel/horizon
-php artisan horizon:install
-```
-
-### 8.2 配置
-
-```php
-// config/horizon.php
-return [
-    'use' => 'redis',
-
-    'waits' => [
-        'redis:analysis' => 60,
-        'redis:qa' => 30,
-    ],
-
-    'environments' => [
-        'production' => [
-            'supervisor-1' => [
-                'connection' => 'redis',
-                'queue' => ['analysis', 'qa', 'payment', 'promote', 'sms'],
-                'balance' => 'auto',
-                'processes' => 10,
-                'tries' => 3,
-                'memory' => 256,
-            ],
-        ],
-
-        'local' => [
-            'supervisor-1' => [
-                'connection' => 'redis',
-                'queue' => ['default', 'analysis', 'qa'],
-                'balance' => 'simple',
-                'processes' => 3,
-                'tries' => 3,
-            ],
-        ],
-    ],
-];
-```
-
-### 8.3 监控面板访问
-
-```
-URL: /horizon
-权限: 管理员权限
-功能: 实时监控队列状态、任务吞吐量、失败任务、延迟任务
-```
-
----
-
-## 9. 事件与监听
-
-### 9.1 事件清单
-
-| Event | 路径 | 说明 |
-|-------|------|------|
-| OrderPaid | Events/Order/OrderPaid.php | 订单支付成功 |
-| AnalysisCompleted | Events/Analysis/AnalysisCompleted.php | 分析完成 |
-| CommissionEarned | Events/Promote/CommissionEarned.php | 佣金产生 |
-
-### 9.2 监听器清单
-
-| Listener | 路径 | 监听事件 |
-|----------|------|---------|
-| UnlockReport | Listeners/Analysis/UnlockReport.php | OrderPaid |
-| NotifyUser | Listeners/Notification/NotifyUser.php | OrderPaid |
-| CalculateCommission | Listeners/Promote/CalculateCommission.php | OrderPaid |
-
----
-
-## 10. 调度任务
-
-```php
-// app/Console/Kernel.php
-protected function schedule(Schedule $schedule): void
-{
-    // 每5分钟处理超时订单
-    $schedule->command('orders:expire')->everyFiveMinutes();
-
-    // 每天凌晨结算佣金
-    $schedule->command('commissions:settle')->dailyAt('02:00');
-
-    // 每天清理过期缓存
-    $schedule->command('cache:clear-expired')->dailyAt('03:00');
-
-    // 每周清理AI日志
-    $schedule->command('ai-logs:clean')->weekly();
-
-    // 监控队列状态
-    $schedule->command('horizon:snapshot')->everyFiveMinutes();
-}
-```
-
----
-
-## 11. 请求验证
-
-```php
-// app/Http/Requests/TongueAnalysisRequest.php
-<?php
-
-namespace App\Http\Requests;
-
-use Illuminate\Foundation\Http\FormRequest;
-
-class TongueAnalysisRequest extends FormRequest
-{
-    public function authorize(): bool
-    {
-        return true;
-    }
-
-    public function rules(): array
-    {
-        return [
-            'image_url' => 'required|url|max:500',
-        ];
-    }
-}
-
-// app/Http/Requests/ConstitutionSubmitRequest.php
-<?php
-
-namespace App\Http\Requests;
-
-use Illuminate\Foundation\Http\FormRequest;
-
-class ConstitutionSubmitRequest extends FormRequest
-{
-    public function authorize(): bool
-    {
-        return true;
-    }
-
-    public function rules(): array
-    {
-        return [
-            'answers' => 'required|array|min:30',
-            'answers.*.question_id' => 'required|integer|exists:constitution_questions,id',
-            'answers.*.answer' => 'required|string|in:A,B,C,D',
-        ];
+        return response()->json([
+            'code' => $code,
+            'message' => $message,
+            'data' => null,
+        ], $code >= 400 ? $code : 400);
     }
 }
 ```
 
 ---
 
-## 12. 资源转换
+## 9. 文件上传
+
+### 9.1 上传方式
+
+- **直接上传文件**：前端通过 `POST /api/v1/analysis/upload-image` 上传图片文件
+- **存储位置**：`storage/app/public/` 目录
+- **访问方式**：通过 `storage` 符号链接公开访问
+
+### 9.2 上传示例
 
 ```php
-// app/Http/Resources/AnalysisResource.php
-<?php
-
-namespace App\Http\Resources;
-
-use Illuminate\Http\Resources\Json\JsonResource;
-
-class AnalysisResource extends JsonResource
+// app/Http/Controllers/Api/V1/AnalysisController.php
+public function uploadImage(Request $request): JsonResponse
 {
-    public function toArray($request): array
-    {
-        return [
-            'task_no' => $this->task_no,
-            'type' => $this->type,
-            'status' => $this->status,
-            'status_text' => $this->getStatusText(),
-            'summary' => $this->status == 2 ? $this->result['summary'] ?? '' : null,
-            'is_paid' => $this->report?->is_paid ?? false,
-            'created_at' => $this->created_at->format('Y-m-d H:i:s'),
-            'completed_at' => $this->completed_at?->format('Y-m-d H:i:s'),
-        ];
-    }
+    $request->validate([
+        'image' => 'required|image|max:2048', // 最大2MB
+    ]);
 
-    private function getStatusText(): string
-    {
-        return match($this->status) {
-            0 => '待处理',
-            1 => '处理中',
-            2 => '已完成',
-            3 => '失败',
-            default => '未知',
-        };
-    }
+    $file = $request->file('image');
+    $path = $file->store('analysis/' . date('Ymd'), 'public');
+    $url = asset('storage/' . $path);
+
+    return $this->success([
+        'image_url' => $url,
+        'image_path' => $path,
+    ]);
 }
 ```
 
@@ -954,4 +569,3 @@ class AnalysisResource extends JsonResource
 > - [数据库设计](04-database.md)
 > - [API 设计](05-api.md)
 > - [安全设计](10-security.md)
-> - [DevOps](15-devops.md)

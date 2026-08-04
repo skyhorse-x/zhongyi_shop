@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, h, onMounted } from 'vue'
+import { ref, h, onMounted, defineComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Avatar, User, ChatLineRound, FirstAidKit, Money, Wallet } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
@@ -27,6 +27,16 @@ const goToFeature = (path: string) => {
 
 // 当前剩余分析次数（未登录时为 null，不显示）
 const analysisTimes = ref<number | null>(null)
+
+// 图标组件包装器（避免 reactive 警告）
+const IconWrapper = defineComponent({
+  props: {
+    icon: { type: Object as () => Component, required: true },
+  },
+  render() {
+    return h(this.icon)
+  },
+})
 
 const fetchAnalysisTimes = async () => {
   try {
@@ -71,7 +81,7 @@ onMounted(() => {
         @click="goToFeature(item.path)"
       >
         <div class="feature-icon">
-          <el-icon><component :is="item.icon" /></el-icon>
+          <el-icon><IconWrapper :icon="item.icon" /></el-icon>
         </div>
         <div class="feature-title">{{ item.title }}</div>
         <div class="feature-desc">{{ item.desc }}</div>

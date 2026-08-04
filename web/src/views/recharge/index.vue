@@ -12,7 +12,7 @@ interface XianyuProduct {
   id: number
   title: string
   link: string
-  amount: number
+  amount: number | string
   times: number
   description: string
 }
@@ -49,8 +49,16 @@ const fetchProducts = async () => {
     })
     const data = await res.json()
     if (data.code === 0) {
-      systemLink.value = data.data?.system_link || ''
-      products.value = data.data?.products || []
+      // 兼容两种 API 返回结构：
+      // 1. { data: { system_link: '', products: [...] } }
+      // 2. { data: [...] } (直接返回商品数组)
+      if (Array.isArray(data.data)) {
+        systemLink.value = ''
+        products.value = data.data
+      } else {
+        systemLink.value = data.data?.system_link || ''
+        products.value = data.data?.products || []
+      }
     } else {
       ElMessage.error(data.message || '加载商品失败')
     }

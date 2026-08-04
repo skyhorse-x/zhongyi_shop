@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
-import { Edit, Refresh, Wallet, Promotion } from '@element-plus/icons-vue'
+import { Edit, Refresh, Wallet, Promotion, MoreFilled, View, Close, Lock, Plus, Minus, List } from '@element-plus/icons-vue'
 
 const form = ref({
   phone: '',
@@ -579,17 +579,17 @@ const loadLogs = async (row?: any) => {
 
     <el-form :model="form" inline class="search-form">
       <el-row :gutter="16">
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="6">
           <el-form-item label="手机号">
             <el-input v-model="form.phone" placeholder="请输入手机号" clearable />
           </el-form-item>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="6">
           <el-form-item label="用户名">
             <el-input v-model="form.username" placeholder="请输入用户名" clearable />
           </el-form-item>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="6">
           <el-form-item label="状态">
             <el-select v-model="form.status" placeholder="全部" clearable style="width: 100%">
               <el-option label="正常" :value="1" />
@@ -597,7 +597,7 @@ const loadLogs = async (row?: any) => {
             </el-select>
           </el-form-item>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="6">
           <el-form-item>
             <el-button type="primary" @click="handleSearch">搜索</el-button>
             <el-button @click="handleReset">重置</el-button>
@@ -606,79 +606,89 @@ const loadLogs = async (row?: any) => {
       </el-row>
     </el-form>
 
-    <el-table :data="tableData" border stripe style="width: 100%" v-loading="loading">
-      <el-table-column prop="id" label="ID" width="60" align="center" />
-      <el-table-column prop="username" label="用户名" width="120" />
-      <el-table-column prop="phone" label="手机号" width="130" />
-      <el-table-column label="头像" width="80" align="center">
-        <template #default="scope">
-          <el-avatar :size="36" :src="scope.row.avatar" />
-        </template>
-      </el-table-column>
-      <el-table-column prop="gender" label="性别" width="70" align="center">
-        <template #default="scope">
-          <el-tag :type="scope.row.genderText === '男' ? 'primary' : 'danger'" size="small">
-            {{ scope.row.genderText }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="余额" width="100" align="center">
-        <template #default="scope">
-          <span style="color: #fa8c16; font-weight: 600">
-            ¥{{ formatMoney(scope.row.balance) }}
-          </span>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" width="80" align="center">
-        <template #default="scope">
-          <el-tag :type="scope.row.statusValue === 1 ? 'success' : 'danger'" size="small">
-            {{ scope.row.status }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="registerTime" label="注册时间" min-width="170" />
-      <el-table-column label="操作" width="460" align="center" fixed="right">
-        <template #default="scope">
-          <el-button type="primary" link size="small" @click="handleView(scope.row)">查看</el-button>
-          <el-button type="primary" link size="small" @click="openEdit(scope.row)">
-            <el-icon><Edit /></el-icon>
-            <span style="margin-left: 2px">编辑</span>
-          </el-button>
-          <el-button
-            type="primary"
-            link
-            size="small"
-            :style="{ color: scope.row.statusValue === 1 ? '#e6a23c' : '#67c23a' }"
-            @click="handleToggleStatus(scope.row)"
-          >
-            {{ scope.row.statusValue === 1 ? '禁用' : '启用' }}
-          </el-button>
-          <el-button type="warning" link size="small" @click="handleResetPassword(scope.row)">
-            重置密码
-          </el-button>
-          <el-dropdown
-            trigger="click"
-            @command="(cmd: string) => {
-              if (cmd === 'recharge') openAdjust(scope.row, 'recharge')
-              else if (cmd === 'admin_deduct') openAdjust(scope.row, 'admin_deduct')
-              else if (cmd === 'logs') openLogs(scope.row)
-            }"
-          >
-            <el-button type="success" link size="small">
-              <el-icon><Wallet /></el-icon>
-              <span style="margin-left: 2px">余额</span>
-            </el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="recharge">充值</el-dropdown-item>
-                <el-dropdown-item command="admin_deduct" divided>扣减</el-dropdown-item>
-                <el-dropdown-item command="logs" divided>查看流水</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="table-scroll-wrapper">
+      <el-table :data="tableData" border stripe v-loading="loading">
+        <el-table-column prop="id" label="ID" width="50" align="center" />
+        <el-table-column label="用户信息" min-width="140">
+          <template #default="scope">
+            <div class="user-info-cell">
+              <div class="user-name">{{ scope.row.username }}</div>
+              <div class="user-phone">{{ scope.row.phone !== '-' ? scope.row.phone : '未绑定手机' }}</div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="头像" width="60" align="center" class-name="hidden-mobile">
+          <template #default="scope">
+            <el-avatar :size="32" :src="scope.row.avatar" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="gender" label="性别" width="60" align="center" class-name="hidden-mobile">
+          <template #default="scope">
+            <el-tag :type="scope.row.genderText === '男' ? 'primary' : 'danger'" size="small">
+              {{ scope.row.genderText }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="余额" width="90" align="center">
+          <template #default="scope">
+            <span :style="{ color: scope.row.balance > 0 ? '#fa8c16' : '#999', fontWeight: 600 }">
+              ¥{{ formatMoney(scope.row.balance) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="70" align="center">
+          <template #default="scope">
+            <el-tag :type="scope.row.statusValue === 1 ? 'success' : 'danger'" size="small">
+              {{ scope.row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="registerTime" label="注册时间" min-width="150" class-name="hidden-mobile" />
+        <el-table-column label="操作" width="120" align="center" fixed="right">
+          <template #default="scope">
+            <el-dropdown
+              trigger="click"
+              @command="(cmd: string) => {
+                if (cmd === 'view') handleView(scope.row)
+                else if (cmd === 'edit') openEdit(scope.row)
+                else if (cmd === 'toggle') handleToggleStatus(scope.row)
+                else if (cmd === 'resetpwd') handleResetPassword(scope.row)
+                else if (cmd === 'recharge') openAdjust(scope.row, 'recharge')
+                else if (cmd === 'admin_deduct') openAdjust(scope.row, 'admin_deduct')
+                else if (cmd === 'logs') openLogs(scope.row)
+              }"
+            >
+              <el-button type="primary" size="small" circle :icon="MoreFilled" />
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="view">
+                    <el-icon><View /></el-icon> 查看
+                  </el-dropdown-item>
+                  <el-dropdown-item command="edit" divided>
+                    <el-icon><Edit /></el-icon> 编辑
+                  </el-dropdown-item>
+                  <el-dropdown-item command="toggle" divided>
+                    <el-icon><Close /></el-icon> {{ scope.row.statusValue === 1 ? '禁用' : '启用' }}
+                  </el-dropdown-item>
+                  <el-dropdown-item command="resetpwd" divided>
+                    <el-icon><Lock /></el-icon> 重置密码
+                  </el-dropdown-item>
+                  <el-dropdown-item command="recharge">
+                    <el-icon><Plus /></el-icon> 充值
+                  </el-dropdown-item>
+                  <el-dropdown-item command="admin_deduct">
+                    <el-icon><Minus /></el-icon> 扣减
+                  </el-dropdown-item>
+                  <el-dropdown-item command="logs" divided>
+                    <el-icon><List /></el-icon> 查看流水
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
     <el-pagination
       v-model:current-page="currentPage"
@@ -1148,10 +1158,27 @@ const loadLogs = async (row?: any) => {
   color: #fa8c16;
 }
 
+/* 用户信息单元格 */
+.user-info-cell {
+  line-height: 1.5;
+}
+
+.user-name {
+  font-weight: 500;
+  color: #303133;
+}
+
+.user-phone {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+}
+
 /* 手机端适配 */
 @media (max-width: 768px) {
   .page-header {
     flex-direction: column;
+    align-items: flex-start;
     gap: 4px;
   }
 
@@ -1189,8 +1216,8 @@ const loadLogs = async (row?: any) => {
   }
 
   .el-dialog {
-    width: 90% !important;
-    max-width: 400px;
+    width: 95% !important;
+    max-width: none !important;
   }
 
   .el-row {
@@ -1215,6 +1242,52 @@ const loadLogs = async (row?: any) => {
 
   .logs-stat-value {
     font-size: 16px;
+  }
+
+  /* 用户信息单元格 */
+  .user-info-cell {
+    line-height: 1.4;
+  }
+
+  .user-name {
+    font-weight: 500;
+    font-size: 12px;
+  }
+
+  .user-phone {
+    font-size: 11px;
+    color: #999;
+  }
+
+  /* 余额为零时灰色显示 */
+  .el-table .cell span {
+    font-size: 12px;
+  }
+
+  /* 表格滚动提示 */
+  .table-scroll-wrapper {
+    position: relative;
+  }
+
+  .table-scroll-wrapper::after {
+    content: '← 左右滑动查看更多 →';
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    pointer-events: none;
+    opacity: 0;
+    animation: fadeInOut 3s ease-in-out;
+  }
+
+  @keyframes fadeInOut {
+    0%, 100% { opacity: 0; }
+    20%, 80% { opacity: 1; }
   }
 }
 </style>

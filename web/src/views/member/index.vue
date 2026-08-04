@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineComponent, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Document, FirstAidKit, ShoppingBag, Promotion, Headset, Wallet, Money } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
@@ -26,6 +26,16 @@ const menuItems = ref<MenuItem[]>([
   { icon: Promotion, title: '推广中心', path: '/promoter' },
   { icon: Headset, title: '联系客服', path: '' },
 ])
+
+// 图标组件包装器（避免 reactive 警告）
+const IconWrapper = defineComponent({
+  props: {
+    icon: { type: Object as () => Component, required: true },
+  },
+  render() {
+    return h(this.icon)
+  },
+})
 
 const formatBalance = (v: any): string => {
   const n = Number(v ?? 0)
@@ -163,16 +173,17 @@ onMounted(async () => {
     </div>
 
     <div class="menu-group">
-      <div
+      <button
         v-for="item in menuItems"
         :key="item.title"
+        type="button"
         class="menu-item"
         @click="item.path && router.push(item.path)"
       >
-        <el-icon class="menu-item-icon"><component :is="item.icon" /></el-icon>
+        <el-icon class="menu-item-icon"><IconWrapper :icon="item.icon" /></el-icon>
         <span class="menu-item-title">{{ item.title }}</span>
         <el-icon class="menu-item-arrow"><ArrowRight /></el-icon>
-      </div>
+      </button>
     </div>
 
     <div class="logout-btn">
@@ -317,6 +328,13 @@ onMounted(async () => {
   cursor: pointer;
   border-bottom: 0.5px solid #f5f5f5;
   transition: background 0.15s;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
 }
 
 .menu-item:active {

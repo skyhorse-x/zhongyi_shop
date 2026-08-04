@@ -169,65 +169,66 @@ onMounted(() => {
     </div>
 
     <!-- 统计卡片 -->
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-icon stat-icon--blue">
-          <el-icon><Tickets /></el-icon>
+    <div class="stats-row-wrapper">
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--blue">
+            <el-icon><Tickets /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-label">订单总数</div>
+            <div class="stat-value">{{ stats.total }}</div>
+          </div>
         </div>
-        <div class="stat-info">
-          <div class="stat-label">订单总数</div>
-          <div class="stat-value">{{ stats.total }}</div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--green">
+            <el-icon><Check /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-label">已支付</div>
+            <div class="stat-value">{{ stats.paid }}</div>
+          </div>
         </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon stat-icon--green">
-          <el-icon><Check /></el-icon>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--orange">
+            <el-icon><Close /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-label">待支付</div>
+            <div class="stat-value">{{ stats.unpaid }}</div>
+          </div>
         </div>
-        <div class="stat-info">
-          <div class="stat-label">已支付</div>
-          <div class="stat-value">{{ stats.paid }}</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon stat-icon--orange">
-          <el-icon><Close /></el-icon>
-        </div>
-        <div class="stat-info">
-          <div class="stat-label">待支付</div>
-          <div class="stat-value">{{ stats.unpaid }}</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon stat-icon--purple">
-          <el-icon><Money /></el-icon>
-        </div>
-        <div class="stat-info">
-          <div class="stat-label">已支付金额</div>
-          <div class="stat-value">¥{{ stats.totalAmount.toFixed(2) }}</div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--purple">
+            <el-icon><Money /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-label">已支付金额</div>
+            <div class="stat-value">¥{{ stats.totalAmount.toFixed(2) }}</div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- 搜索区 -->
     <el-card class="search-card" shadow="never">
-      <el-form :model="form" inline>
+      <el-form :model="form" inline class="search-form">
         <el-form-item label="订单号">
           <el-input
             v-model="form.orderNo"
             placeholder="请输入订单号"
             clearable
-            style="width: 200px"
           />
         </el-form-item>
         <el-form-item label="支付方式">
-          <el-select v-model="form.payMethod" placeholder="全部" clearable style="width: 150px">
+          <el-select v-model="form.payMethod" placeholder="全部" clearable>
             <el-option label="全部" value="" />
             <el-option label="微信" value="wechat" />
             <el-option label="支付宝" value="alipay" />
           </el-select>
         </el-form-item>
         <el-form-item label="订单状态">
-          <el-select v-model="form.orderStatus" placeholder="全部" clearable style="width: 150px">
+          <el-select v-model="form.orderStatus" placeholder="全部" clearable>
             <el-option label="全部" value="" />
             <el-option label="待支付" value="0" />
             <el-option label="已支付" value="1" />
@@ -244,12 +245,13 @@ onMounted(() => {
 
     <!-- 表格 -->
     <el-card class="table-card" shadow="never">
-      <el-table
-        :data="tableData"
-        stripe
-        v-loading="loading"
-        :header-cell-style="{ background: '#fafafa', color: '#606266' }"
-      >
+      <div class="table-scroll-wrapper">
+        <el-table
+          :data="tableData"
+          stripe
+          v-loading="loading"
+          :header-cell-style="{ background: '#fafafa', color: '#606266' }"
+        >
         <el-table-column prop="orderNo" label="订单号" min-width="180">
           <template #default="scope">
             <span class="order-no">{{ scope.row.orderNo }}</span>
@@ -309,6 +311,7 @@ onMounted(() => {
           </div>
         </template>
       </el-table>
+      </div>
 
       <el-pagination
         v-model:current-page="currentPage"
@@ -608,13 +611,62 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .stats-row {
-    grid-template-columns: 1fr;
+  /* 统计卡片横向滚动 */
+  .stats-row-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -16px;
+    padding: 0 16px;
   }
+
+  .stats-row {
+    display: flex;
+    gap: 10px;
+    width: max-content;
+    grid-template-columns: none;
+  }
+
+  .stats-row .stat-card {
+    min-width: 140px;
+    flex-shrink: 0;
+    padding: 14px 16px;
+  }
+
+  .stats-row .stat-value {
+    font-size: 18px;
+  }
+
+  .stats-row .stat-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+
   .page-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  /* 搜索表单 */
+  .search-form .el-form-item {
+    margin-right: 0;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+
+  .search-form .el-input,
+  .search-form .el-select {
+    width: 100% !important;
+  }
+
+  .search-card .el-form {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .search-card .el-form-item__content {
+    margin-left: 0 !important;
   }
 }
 </style>

@@ -202,8 +202,44 @@ onMounted(() => {
   .stats-grid,
   .stats-grid.mini {
     grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    gap: 8px;
   }
-  .stat-value { font-size: 20px; }
+
+  .stat-card {
+    padding: 12px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
+
+  .stat-title {
+    font-size: 11px;
+  }
+
+  .stat-icon {
+    font-size: 20px !important;
+  }
+
+  .section-label {
+    font-size: 14px;
+    margin-bottom: 8px;
+    margin-top: 16px;
+  }
+
+  .page-title {
+    font-size: 18px;
+  }
+
+  .page-desc {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .stats-grid,
+  .stats-grid.mini {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
-import { Connection, Setting, Money, Promotion, Cpu, ChatDotRound, Message, Wallet, Switch, Link } from '@element-plus/icons-vue'
+import { Connection, Setting, Money, Promotion, Cpu, ChatDotRound, Message, Wallet, Switch } from '@element-plus/icons-vue'
 import { buildAdminHeaders, getAdminToken } from '@/utils/auth'
 
 const form = ref({
@@ -11,7 +11,6 @@ const form = ref({
   siteDescription: '',
   siteUrl: '',
   adminEmail: '',
-  xianyuProductLink: '',
   // 费用设置
   analysisMode: 'paid',
   analysisPrice: 9.99,
@@ -156,7 +155,6 @@ const loadConfigs = async () => {
             site_description: 'siteDescription',
             site_url: 'siteUrl',
             admin_email: 'adminEmail',
-            xianyu_product_link: 'xianyuProductLink',
             analysis_mode: 'analysisMode',
             analysis_price: 'analysisPrice',
             ai_cost_per_time: 'aiCostPerTime',
@@ -196,36 +194,6 @@ const loadConfigs = async () => {
 }
 
 // 保存设置
-// 预览当前域名生成的推广链接示例
-const previewInviteLink = () => {
-  const url = (form.value.siteUrl || '').trim()
-  if (!url) {
-    ElMessage.warning('请先填写网站域名')
-    return
-  }
-  if (!/^https?:\/\//.test(url)) {
-    ElMessage.error('域名必须以 http:// 或 https:// 开头')
-    return
-  }
-  const base = url.replace(/\/+$/, '')
-  const sample = base + '?code=ABC123'
-  ElMessageBox.alert(
-    `<div style="word-break: break-all; line-height: 1.6;">
-      <b>推广员访问示例：</b><br>
-      <code>${sample}</code><br><br>
-      <b>分享海报（带参数 code=ABC123）会指向该 URL</b>
-    </div>`,
-    '推广链接预览',
-    { dangerouslyUseHTMLString: true, confirmButtonText: '复制' }
-  ).then(() => {
-    navigator.clipboard.writeText(sample).then(() => {
-      ElMessage.success('已复制到剪贴板')
-    }).catch(() => {
-      ElMessage.warning('复制失败，请手动复制')
-    })
-  }).catch(() => {})
-}
-
 const handleSave = async () => {
   // 保存前自动去掉尾斜杠（与后端 Site.php 行为一致）
   if (form.value.siteUrl) {
@@ -240,8 +208,8 @@ const handleSave = async () => {
     const configData = {
       site_name: form.value.siteName,
       site_description: form.value.siteDescription,
+      site_url: form.value.siteUrl,
       admin_email: form.value.adminEmail,
-      xianyu_product_link: form.value.xianyuProductLink,
       analysis_mode: form.value.analysisMode,
       analysis_price: form.value.analysisPrice,
       ai_cost_per_time: form.value.aiCostPerTime,
@@ -309,26 +277,22 @@ onMounted(() => {
         <template #label>
           <span class="tab-label">
             <el-icon><Setting /></el-icon>
-            <span>基本设置</span>
+            <span class="tab-text">基本设置</span>
           </span>
         </template>
         <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
           <el-form-item label="站点名称">
-            <el-input v-model="form.siteName" placeholder="请输入站点名称" style="max-width: 400px" />
+            <el-input v-model="form.siteName" placeholder="请输入站点名称" />
+          </el-form-item>
+          <el-form-item label="网站域名">
+            <el-input v-model="form.siteUrl" placeholder="如：https://example.com" />
+            <div class="form-tip">网站访问地址，用于生成推广链接等</div>
           </el-form-item>
           <el-form-item label="站点描述">
-            <el-input v-model="form.siteDescription" placeholder="请输入站点描述" type="textarea" :rows="3" style="max-width: 400px" />
+            <el-input v-model="form.siteDescription" placeholder="请输入站点描述" type="textarea" :rows="3" />
           </el-form-item>
           <el-form-item label="管理员邮箱">
-            <el-input v-model="form.adminEmail" placeholder="请输入管理员邮箱" style="max-width: 400px" />
-          </el-form-item>
-          <el-form-item label="闲鱼商品链接">
-            <el-input v-model="form.xianyuProductLink" placeholder="如：https://www.goofish.com/item/xxxx" style="max-width: 400px">
-              <template #prefix>
-                <el-icon><Link /></el-icon>
-              </template>
-            </el-input>
-            <div class="form-tip">前台充值页展示的闲鱼商品入口链接（可留空，也可在「闲鱼商品管理」中配置多个商品）</div>
+            <el-input v-model="form.adminEmail" placeholder="请输入管理员邮箱" />
           </el-form-item>
         </el-form>
       </el-tab-pane>
@@ -338,7 +302,7 @@ onMounted(() => {
         <template #label>
           <span class="tab-label">
             <el-icon><Money /></el-icon>
-            <span>费用设置</span>
+            <span class="tab-text">费用设置</span>
           </span>
         </template>
         <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
@@ -367,7 +331,7 @@ onMounted(() => {
         <template #label>
           <span class="tab-label">
             <el-icon><Switch /></el-icon>
-            <span>支付方式</span>
+            <span class="tab-text">支付方式</span>
           </span>
         </template>
         <el-form :model="paymentConfig" label-width="160px" class="settings-form" v-loading="paymentLoading">
@@ -419,7 +383,7 @@ onMounted(() => {
         <template #label>
           <span class="tab-label">
             <el-icon><Promotion /></el-icon>
-            <span>推广返利</span>
+            <span class="tab-text">推广返利</span>
           </span>
         </template>
         <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
@@ -451,7 +415,7 @@ onMounted(() => {
         <template #label>
           <span class="tab-label">
             <el-icon><Cpu /></el-icon>
-            <span>大模型配置</span>
+            <span class="tab-text">大模型配置</span>
           </span>
         </template>
         <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
@@ -465,13 +429,13 @@ onMounted(() => {
             </el-select>
           </el-form-item>
           <el-form-item label="API地址">
-            <el-input v-model="form.llmApiUrl" placeholder="https://api.openai.com/v1" style="max-width: 400px" />
+            <el-input v-model="form.llmApiUrl" placeholder="https://api.openai.com/v1" />
           </el-form-item>
           <el-form-item label="API密钥">
-            <el-input v-model="form.llmApiKey" placeholder="请输入API密钥" type="password" show-password style="max-width: 400px" />
+            <el-input v-model="form.llmApiKey" placeholder="请输入API密钥" type="password" show-password />
           </el-form-item>
           <el-form-item label="模型名称">
-            <el-input v-model="form.llmModel" placeholder="gpt-4o-mini" style="max-width: 400px" />
+            <el-input v-model="form.llmModel" placeholder="gpt-4o-mini" />
           </el-form-item>
           <el-form-item label="温度参数">
             <el-input-number v-model="form.llmTemperature" :min="0" :max="2" :precision="1" style="width: 200px" />
@@ -500,21 +464,21 @@ onMounted(() => {
         <template #label>
           <span class="tab-label">
             <el-icon><ChatDotRound /></el-icon>
-            <span>微信配置</span>
+            <span class="tab-text">微信配置</span>
           </span>
         </template>
         <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
           <el-form-item label="小程序AppID">
-            <el-input v-model="form.wechatAppid" placeholder="请输入小程序AppID" style="max-width: 400px" />
+            <el-input v-model="form.wechatAppid" placeholder="请输入小程序AppID" />
           </el-form-item>
           <el-form-item label="小程序Secret">
-            <el-input v-model="form.wechatSecret" placeholder="请输入小程序Secret" type="password" show-password style="max-width: 400px" />
+            <el-input v-model="form.wechatSecret" placeholder="请输入小程序Secret" type="password" show-password />
           </el-form-item>
           <el-form-item label="支付商户号">
-            <el-input v-model="form.wechatMchId" placeholder="请输入微信支付商户号" style="max-width: 400px" />
+            <el-input v-model="form.wechatMchId" placeholder="请输入微信支付商户号" />
           </el-form-item>
           <el-form-item label="支付API密钥">
-            <el-input v-model="form.wechatPayKey" placeholder="请输入微信支付API密钥" type="password" show-password style="max-width: 400px" />
+            <el-input v-model="form.wechatPayKey" placeholder="请输入微信支付API密钥" type="password" show-password />
           </el-form-item>
         </el-form>
       </el-tab-pane>
@@ -524,19 +488,19 @@ onMounted(() => {
         <template #label>
           <span class="tab-label">
             <el-icon><Wallet /></el-icon>
-            <span>支付宝配置</span>
+            <span class="tab-text">支付宝配置</span>
           </span>
         </template>
         <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
           <el-form-item label="AppID">
-            <el-input v-model="form.alipayAppId" placeholder="请输入支付宝AppID" style="max-width: 400px" />
+            <el-input v-model="form.alipayAppId" placeholder="请输入支付宝AppID" />
           </el-form-item>
           <el-form-item label="应用私钥">
-            <el-input v-model="form.alipayPrivateKey" placeholder="请输入应用私钥" type="password" show-password style="max-width: 600px" />
+            <el-input v-model="form.alipayPrivateKey" placeholder="请输入应用私钥" type="password" show-password />
             <div class="form-tip">RSA2 私钥，可从支付宝开放平台生成</div>
           </el-form-item>
           <el-form-item label="支付宝公钥">
-            <el-input v-model="form.alipayPublicKey" placeholder="请输入支付宝公钥" type="textarea" :rows="4" style="max-width: 600px" />
+            <el-input v-model="form.alipayPublicKey" placeholder="请输入支付宝公钥" type="textarea" :rows="4" />
             <div class="form-tip">注意：此为支付宝公钥，不是应用公钥</div>
           </el-form-item>
         </el-form>
@@ -547,7 +511,7 @@ onMounted(() => {
         <template #label>
           <span class="tab-label">
             <el-icon><Message /></el-icon>
-            <span>短信配置</span>
+            <span class="tab-text">短信配置</span>
           </span>
         </template>
         <el-form :model="form" label-width="140px" class="settings-form" v-loading="loading">
@@ -557,10 +521,10 @@ onMounted(() => {
             </el-select>
           </el-form-item>
           <el-form-item label="短信宝账号">
-            <el-input v-model="form.smsBaoUser" placeholder="请输入短信宝账号" style="max-width: 400px" />
+            <el-input v-model="form.smsBaoUser" placeholder="请输入短信宝账号" />
           </el-form-item>
           <el-form-item label="短信宝密码">
-            <el-input v-model="form.smsBaoPass" placeholder="请输入短信宝密码" type="password" show-password style="max-width: 400px" />
+            <el-input v-model="form.smsBaoPass" placeholder="请输入短信宝密码" type="password" show-password />
             <div class="form-tip">系统使用MD5(密码) 调用短信宝API，密码本身不传输</div>
           </el-form-item>
         </el-form>
@@ -655,14 +619,83 @@ onMounted(() => {
     margin-bottom: 16px;
   }
 
+  /* 标签页横向滚动 */
+  .settings-tabs .el-tabs__nav-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-tabs .el-tabs__nav-wrap::after {
+    display: none;
+  }
+
+  .settings-tabs .el-tabs__nav {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+
+  .settings-tabs .el-tabs__item {
+    flex-shrink: 0;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .settings-tabs .el-tabs__item .tab-text {
+    display: none;
+  }
+
+  .settings-tabs .el-tabs__item .el-icon {
+    font-size: 18px;
+    margin: 0;
+  }
+
+  /* 表单标签顶部对齐 */
+  .settings-form {
+    padding: 16px 0;
+  }
+
+  .settings-form .el-form-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .settings-form .el-form-item__label {
+    width: auto !important;
+    text-align: left;
+    margin-bottom: 4px;
+    padding: 0;
+  }
+
+  .settings-form .el-form-item__content {
+    margin-left: 0 !important;
+  }
+
+  .settings-form .el-input,
+  .settings-form .el-select,
+  .settings-form .el-textarea {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* 保存按钮固定底部 */
   .submit-area {
-    margin-top: 16px;
-    padding-top: 16px;
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding: 12px 0;
+    margin: 0 -16px;
+    padding: 12px 16px;
+    border-top: 1px solid #ebeef5;
+    z-index: 10;
   }
 
   .submit-area .el-button {
     width: 100%;
-    margin-bottom: 8px;
+  }
+
+  .form-tip {
+    margin-left: 0;
+    margin-top: 4px;
   }
 }
 </style>

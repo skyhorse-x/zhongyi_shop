@@ -7,6 +7,7 @@ import App from './App.vue'
 import router from './router'
 import { setupPermissionGuard } from '@/permission'
 import '@/styles/index.css'
+import '@/styles/mobile.css'
 
 // 仅 dev: 允许通过 ?_dev_token= 注入 token（E2E 测试用）
 if (import.meta.env.DEV) {

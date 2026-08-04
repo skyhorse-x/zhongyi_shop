@@ -1,0 +1,320 @@
+/* ============================================
+   全局移动端适配样式
+   ============================================ */
+
+/* 移动端断点: 768px */
+@media (max-width: 768px) {
+
+  /* ============================================
+     1. 表格横向滚动容器
+     ============================================ */
+  .table-scroll-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -16px;
+    padding: 0 16px;
+  }
+
+  .table-scroll-wrapper .el-table {
+    min-width: 800px;
+  }
+
+  .el-table {
+    font-size: 12px;
+  }
+
+  .el-table td.el-table__cell,
+  .el-table th.el-table__cell {
+    padding: 8px 4px;
+  }
+
+  .el-table .cell {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .el-table .el-button--small {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  /* 隐藏非关键列的辅助类 */
+  .hidden-mobile {
+    display: none !important;
+  }
+
+  /* ============================================
+     2. 搜索表单布局
+     ============================================ */
+  .search-form {
+    padding: 12px !important;
+  }
+
+  .search-form .el-row {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .search-form .el-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+    margin-bottom: 0 !important;
+  }
+
+  .search-form .el-form-item {
+    margin-right: 0 !important;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+
+  .search-form .el-form-item__content {
+    margin-left: 0 !important;
+  }
+
+  .search-form .el-input,
+  .search-form .el-select,
+  .search-form .el-date-editor {
+    width: 100% !important;
+  }
+
+  .search-form .el-button {
+    margin-right: 8px;
+  }
+
+  /* ============================================
+     3. 弹窗/Dialog 适配
+     ============================================ */
+  .el-dialog {
+    width: 95% !important;
+    max-width: none !important;
+    margin: 5vh auto !important;
+  }
+
+  .el-dialog__body {
+    padding: 16px 12px !important;
+    max-height: 65vh;
+    overflow-y: auto;
+  }
+
+  .el-dialog__header {
+    padding: 14px 16px 10px;
+  }
+
+  .el-dialog__footer {
+    padding: 10px 16px 14px;
+  }
+
+  /* 弹窗内表单 */
+  .el-dialog .el-row {
+    flex-direction: column !important;
+  }
+
+  .el-dialog .el-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  .el-dialog .el-form-item {
+    margin-bottom: 14px;
+  }
+
+  /* ============================================
+     4. 分页组件
+     ============================================ */
+  .el-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 0;
+  }
+
+  .el-pagination .el-pagination__sizes,
+  .el-pagination .el-pagination__jump {
+    display: none !important;
+  }
+
+  .el-pagination .btn-prev,
+  .el-pagination .btn-next {
+    min-width: 32px;
+    height: 32px;
+    line-height: 32px;
+  }
+
+  .el-pagination .el-pager li {
+    min-width: 32px;
+    height: 32px;
+    line-height: 32px;
+  }
+
+  .el-pagination .el-pagination__total {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+
+  /* ============================================
+     5. 页面头部
+     ============================================ */
+  .page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .page-header h2 {
+    font-size: 18px !important;
+  }
+
+  .page-header .page-tip {
+    font-size: 12px !important;
+  }
+
+  .page-header > div:last-child {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  .page-header > div:last-child .el-button {
+    flex: 1;
+  }
+
+  /* ============================================
+     6. 表单全局适配
+     ============================================ */
+  .el-form--inline .el-form-item {
+    margin-right: 0;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+
+  .el-form--inline .el-form-item .el-input,
+  .el-form--inline .el-form-item .el-select {
+    width: 100% !important;
+  }
+
+  /* 标签顶部对齐 */
+  .el-form-item__label {
+    font-size: 13px;
+  }
+
+  /* ============================================
+     7. 描述列表
+     ============================================ */
+  .el-descriptions__body .el-descriptions__table {
+    display: block;
+  }
+
+  .el-descriptions__body .el-descriptions__row {
+    display: block;
+  }
+
+  .el-descriptions__body .el-descriptions__cell {
+    display: block;
+    width: 100% !important;
+  }
+
+  /* ============================================
+     8. 通用组件间距优化
+     ============================================ */
+  .el-card {
+    padding: 12px !important;
+  }
+
+  .el-card__body {
+    padding: 12px !important;
+  }
+
+  .el-alert {
+    padding: 10px 12px;
+  }
+
+  .el-alert__title {
+    font-size: 13px;
+  }
+
+  /* ============================================
+     9. 按钮组
+     ============================================ */
+  .button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .button-group .el-button {
+    flex: 1;
+    min-width: 80px;
+  }
+
+  /* ============================================
+     10. 标签页 Tabs
+     ============================================ */
+  .el-tabs__nav-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .el-tabs__nav-wrap::after {
+    display: none;
+  }
+
+  .el-tabs__nav {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+
+  .el-tabs__item {
+    flex-shrink: 0;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .el-tabs__header {
+    margin-bottom: 12px;
+  }
+}
+
+/* ============================================
+   小屏手机适配 (380px 以下)
+   ============================================ */
+@media (max-width: 380px) {
+  .el-dialog {
+    width: 98% !important;
+    margin: 2vh auto !important;
+  }
+
+  .el-dialog__body {
+    padding: 12px 8px !important;
+    max-height: 60vh;
+  }
+
+  .stat-value {
+    font-size: 18px !important;
+  }
+
+  .el-table {
+    font-size: 11px;
+  }
+}
+
+/* ============================================
+   触摸设备优化
+   ============================================ */
+@media (hover: none) and (pointer: coarse) {
+  .el-button {
+    min-height: 40px;
+  }
+
+  .el-input__inner {
+    height: 40px;
+    line-height: 40px;
+  }
+
+  .el-select .el-input__inner {
+    height: 40px;
+  }
+}

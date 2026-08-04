@@ -1,9 +1,9 @@
 # 系统架构设计
 
-> **版本**：v1.1  
-> **日期**：2026-07-28  
+> **版本**：v2.0  
+> **日期**：2026-08-04  
 > **对应 ai.md 阶段**：第二阶段（系统设计）+ ADR + 模块依赖  
-> **变更说明**：Laravel升级到13，移除RabbitMQ改用Laravel自带队列（Redis驱动）
+> **变更说明**：根据实际代码修正技术栈描述（Sanctum认证、File缓存、Database队列、Element Plus统一UI库、单web项目）
 
 ---
 
@@ -11,42 +11,36 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                            CDN（腾讯云CDN）                          │
+│                            CDN                                      │
 │                     静态资源加速 + 图片加速                          │
 └─────────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        Nginx 网关（负载均衡）                         │
+│                        Nginx 网关                                    │
 │               SSL终止 + 限流 + 反向代理 + 静态缓存                    │
 └─────────────────────────────────────────────────────────────────────┘
                                 │
-            ┌───────────────────┼───────────────────┐
-            ▼                   ▼                   ▼
-┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│   用户端 H5      │   │   管理端 PC      │   │   API 服务器     │
-│   (Vue3+Vant4)  │   │   (Vue3+Element) │   │   (Laravel 13)  │
-└─────────────────┘   └─────────────────┘   └─────────────────┘
-                                                      │
-                        ┌─────────────────────────────┼─────────────────────────────┐
-                        │                             │                             │
-                        ▼                             ▼                             ▼
-              ┌─────────────────┐           ┌─────────────────┐           ┌─────────────────┐
-              │     Redis       │           │     MySQL       │           │   对象存储 OSS   │
-              │   - 会话缓存     │           │   - 用户数据     │           │   - 用户照片     │
-              │   - 数据缓存     │           │   - 订单数据     │           │   - 推广海报     │
-              │   - 限流计数     │           │   - 分析记录     │           └─────────────────┘
-              │   - 队列驱动     │           │                 │
-              └─────────────────┘           └─────────────────┘
-                        │                             │
-                        └─────────────────────────────┼─────────────────────────────┘
-                                                      │
-                                                      ▼
-                                          ┌─────────────────┐
-                                          │   AI 服务       │
-                                          │   - 豆包 Vision  │
-                                          │   - DeepSeek    │
-                                          └─────────────────┘
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Web 前端（单一项目）                             │
+│                  Vue3 + Element Plus + TailwindCSS                  │
+│              同时适配用户端(移动端)和管理端(PC端)                      │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      API 服务器（Laravel 13）                        │
+│               Sanctum 认证 + File 缓存 + Database 队列               │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        │                       │                       │
+        ▼                       ▼                       ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│    SQLite     │     │  本地文件存储  │     │   AI 服务     │
+│  (开发数据库)  │     │  (上传文件)   │     │ (豆包/DeepSeek)│
+└───────────────┘     └───────────────┘     └───────────────┘
 ```
 
 ---
@@ -56,10 +50,10 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              客户端层                                        │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │   H5 移动端  │  │   PC 管理端  │  │   微信小程序  │  │   未来扩展   │        │
-│  │  (Vue3+Vant4)│  │ (Vue3+Element)│  │   (Taro)    │  │   App/小程序 │        │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                   单一 Web 项目 (web/)                               │    │
+│  │     用户端 H5 (postcss-px-to-viewport适配) + 管理端 PC               │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                        │
                                        ▼
@@ -80,13 +74,12 @@
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
 │                                                                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │  会员中心    │  │  健康档案    │  │   消息中心   │  │   CMS内容    │        │
+│  │  健康问答    │  │   客服系统   │  │   风控系统   │  │  数据分析   │        │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
 │                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                     Laravel Queue（Redis驱动）                        │    │
-│  │   - AI分析队列   - 支付通知队列   - 推广结算队列   - 短信通知队列       │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  系统消息    │  │   反馈申诉   │  │   退款管理   │  │  闲鱼商品   │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
                                        │
@@ -95,8 +88,8 @@
 │                              数据层                                          │
 │                                                                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │    Redis    │  │    MySQL    │  │  对象存储    │  │   AI服务    │        │
-│  │  (缓存+队列) │  │  (主数据库)  │  │  (COS/OSS)  │  │ (豆包/DeepSeek)│      │
+│  │   SQLite    │  │  File 缓存   │  │  本地存储    │  │   AI服务    │        │
+│  │  (数据库)    │  │  (CacheService)│ │  (uploads)  │  │ (豆包/DeepSeek)│      │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -110,27 +103,27 @@
 
 | 技术 | 版本 | 用途 | 选择理由 |
 |------|------|------|---------|
-| Vue3 | ^3.5 | 框架 | 组合式API，性能优秀，生态丰富 |
-| TypeScript | ^5.5 | 语言 | 类型安全，减少Bug |
-| Vite | ^6.0 | 构建工具 | 开发体验极佳，构建速度快 |
-| Pinia | ^2.2 | 状态管理 | Vue3官方推荐，轻量简洁 |
-| Vue Router | ^4.4 | 路由 | Vue官方路由 |
-| Vant4 | ^4.9 | UI组件库（H5） | 移动端体验最佳，微信兼容好 |
-| Element Plus | ^2.8 | UI组件库（PC） | PC端管理后台首选 |
-| Axios | ^1.7 | HTTP请求 | 成熟稳定，拦截器丰富 |
-| ECharts | ^5.5 | 图表 | 功能强大，健康数据可视化 |
+| Vue3 | ^3.5.39 | 框架 | 组合式API，性能优秀，生态丰富 |
+| TypeScript | ~6.0.2 | 语言 | 类型安全，减少Bug |
+| Vite | ^8.1.1 | 构建工具 | 开发体验极佳，构建速度快 |
+| Pinia | ^4.0.2 | 状态管理 | Vue3官方推荐，轻量简洁 |
+| Vue Router | ^4.6.4 | 路由 | Vue官方路由 |
+| Element Plus | ^2.14.3 | UI组件库 | 同时用于用户端和管理端 |
+| Axios | ^1.18.1 | HTTP请求 | 成熟稳定，拦截器丰富 |
+| TailwindCSS | ^4.3.3 | 样式框架 | 原子化CSS，开发效率高 |
+| postcss-px-to-viewport | ^1.2.5 | 移动端适配 | 自动将px转为vw实现移动端适配 |
 
 ### 3.2 后端技术栈
 
 | 技术 | 版本 | 用途 | 选择理由 |
 |------|------|------|---------|
-| Laravel | ^13.0 | 框架 | 开发效率高，生态丰富，队列/调度/事件等内置功能完善 |
-| PHP | ^8.4 | 语言 | 最新版本，性能提升，类型系统完善 |
-| Redis | ^7.0 | 缓存+队列 | 高性能，支持多种数据结构，Laravel队列原生支持 |
-| MySQL | ^8.0 | 数据库 | 成熟稳定，JSON支持好 |
-| Supervisor | ^4.0 | 进程管理 | 守护队列消费者 |
+| Laravel | ^13.8 | 框架 | 开发效率高，生态丰富 |
+| PHP | ^8.3 | 语言 | 性能稳定，类型系统完善 |
+| Laravel Sanctum | ^4.0 | API认证 | PersonalAccessToken，轻量级认证 |
+| SQLite | - | 开发数据库 | 零配置，便于开发 |
+| File Cache | - | 缓存驱动 | 无需额外服务，适合中小型项目 |
+| Database Queue | - | 队列驱动 | 无需Redis，降低运维复杂度 |
 | Nginx | ^1.24 | Web服务器 | 高性能，反向代理 |
-| Docker | ^24.0 | 容器化 | 环境一致性，部署便捷 |
 
 ### 3.3 AI服务
 
@@ -140,14 +133,6 @@
 | DeepSeek | 备选模型/健康问答 | 性价比高，中文优秀 |
 | OpenAI | 海外备选 | 技术领先 |
 
-### 3.4 云服务
-
-| 服务 | 用途 | 选择理由 |
-|------|------|---------|
-| 腾讯云COS | 对象存储 | 国内访问快，价格合理 |
-| 腾讯云CDN | 内容加速 | 节点多，加速效果好 |
-| 腾讯云短信 | 短信服务 | 到达率高，稳定 |
-
 ---
 
 ## 4. 模块划分
@@ -156,21 +141,23 @@
 
 | 模块 | 职责 | 技术 |
 |------|------|------|
-| 用户端 H5 | 面向C端用户的移动端自适应页面 | Vue3 + Vant4 |
-| 管理端 PC | 面向运营人员的管理后台 | Vue3 + Element Plus |
+| 用户端 | 面向C端用户的移动端页面 | Vue3 + Element Plus + postcss-px-to-viewport |
+| 管理端 | 面向运营人员的管理后台 | Vue3 + Element Plus + TailwindCSS |
 
 ### 4.2 后端模块
 
 | 模块 | 职责 | 依赖 |
 |------|------|------|
-| 用户中心 | 注册、登录、个人信息、JWT鉴权 | Redis, MySQL |
-| AI分析中心 | 舌诊、面诊、体质测试、健康问答、报告生成 | AI服务, OSS, MySQL, Queue |
-| 支付中心 | 微信支付、支付宝、订单、退款 | 支付SDK, MySQL, Queue |
-| 推广中心 | 推广码、佣金计算、提现 | MySQL, Queue |
-| 会员中心 | 会员等级、权益、次数包 | MySQL, Redis |
-| 健康档案 | 历史记录、趋势分析 | MySQL, Redis |
-| 消息中心 | 系统通知、支付通知、短信 | Queue, 短信SDK |
-| CMS内容 | 文章、Banner、公告 | MySQL, Redis |
+| 用户中心 | 注册、登录、个人信息、Sanctum鉴权 | MySQL, File Cache |
+| AI分析中心 | 舌诊、面诊、体质测试、健康问答、报告生成 | AI服务, MySQL, File Cache |
+| 支付中心 | 微信支付、支付宝、订单、余额支付 | 支付SDK, MySQL |
+| 推广中心 | 推广码、佣金计算、提现 | MySQL |
+| 客服系统 | 客服会话、消息、常用话术、评价 | MySQL |
+| 风控系统 | 规则引擎、黑名单、事件记录 | MySQL, CacheService |
+| 数据分析 | 漏斗、留存、收入、用户增长、推广转化 | MySQL |
+| 系统消息 | 通知、公告 | MySQL |
+| 反馈申诉 | 用户反馈、AI诊断申诉、退款管理 | MySQL |
+| 闲鱼商品 | 充值商品管理 | MySQL |
 
 ---
 
@@ -189,216 +176,277 @@
 │   AI分析中心     │ │    支付中心      │ │    推广中心      │
 │                 │ │                 │ │                 │
 │  依赖：用户中心  │ │  依赖：用户中心  │ │  依赖：用户中心  │
-│  依赖：OSS      │ │  依赖：支付SDK   │ │  依赖：支付中心  │
-│  依赖：AI服务   │ │  依赖：Queue     │ │  依赖：Queue     │
-│  依赖：Queue    │ │                 │ │                 │
+│  依赖：AI服务   │ │  依赖：支付SDK   │ │  依赖：支付中心  │
 └────────┬────────┘ └────────┬────────┘ └────────┬────────┘
          │                   │                   │
          └───────────────────┼───────────────────┘
                              │
                              ▼
                     ┌─────────────────┐
-                    │    健康档案      │
-                    │                 │
-                    │  依赖：AI中心    │
-                    │  依赖：用户中心  │
-                    └─────────────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │    会员中心      │
-                    │                 │
-                    │  依赖：用户中心  │
-                    │  依赖：支付中心  │
+                    │    客服系统      │
+                    │    风控系统      │
+                    │    数据分析      │
+                    │   (业务支撑)     │
                     └─────────────────┘
 ```
 
 ---
 
-## 6. DDD（领域驱动设计）
+## 6. 领域划分
 
-### 6.1 领域划分
+### 6.1 领域定义
 
 | 领域 | 描述 | 核心实体 |
 |------|------|---------|
-| 用户领域 | 用户注册、登录、认证 | User, UserProfile |
+| 用户领域 | 用户注册、登录、认证 | User, UserProfile, Admin |
 | AI分析领域 | AI分析任务、报告 | AnalysisTask, AnalysisReport |
-| 支付领域 | 支付订单、退款 | Order, Payment, Refund |
+| 支付领域 | 支付订单、余额、退款 | Order, Payment, Refund |
 | 推广领域 | 推广关系、佣金 | Promoter, Commission, Withdraw |
-| 会员领域 | 会员、次数包 | Member, MemberOrder |
-| 内容领域 | 文章、Banner | Article, Banner |
-
-### 6.2 聚合根
-
-| 聚合根 | 包含实体 | 业务规则 |
-|--------|---------|---------|
-| User | UserProfile, UserLoginLog | 手机号唯一，密码加密 |
-| Order | Payment, Refund | 订单状态机，幂等处理 |
-| AnalysisTask | AnalysisReport | 任务状态机，结果缓存 |
-| Promoter | Commission, Withdraw | 佣金计算规则，提现审核 |
+| 客服领域 | 客服会话、消息 | CustomerServiceSession, CustomerServiceMessage |
+| 风控领域 | 风控规则、黑名单 | RiskRule, RiskEvent, RiskBlacklist |
+| 内容领域 | 文章、系统消息 | Article, SystemMessage |
 
 ---
 
-## 7. Monolith 或 Microservice 选择
+## 7. 架构选择
 
-**选择：Monolith（单体架构）**
+**选择：Monolith（单体架构）+ 简化分层**
 
-### 理由
-
-| 因素 | 分析 |
-|------|------|
-| 团队规模 | 初期1-3人，单体开发效率高 |
-| 业务复杂度 | 业务相对简单，模块间耦合度高 |
-| 运维成本 | 单体部署简单，运维成本低 |
-| 性能需求 | 单体+缓存+队列完全满足 |
-| 扩展性 | 后期可按模块拆分为微服务 |
-
-### 何时拆分微服务
-
-- 团队规模 > 10人
-- 日活用户 > 10万
-- 需要独立部署和扩展特定模块
-
----
-
-## 8. 高可用方案
-
-| 组件 | 高可用方案 |
-|------|-----------|
-| Nginx | 主备模式 + Keepalived |
-| Laravel | 多实例部署 + 负载均衡 |
-| Redis | 主从复制 + Sentinel |
-| MySQL | 主从复制 + 自动故障转移 |
-| OSS | 多副本存储，跨区域容灾 |
-
----
-
-## 9. 扩展方案
-
-### 9.1 垂直扩展
-
-- 升级服务器配置（CPU、内存、带宽）
-- 增加Redis缓存容量
-- 增加MySQL存储和性能
-
-### 9.2 水平扩展
-
-- 增加Laravel应用服务器
-- MySQL读写分离
-- Redis Cluster集群
-- 对象存储自动扩容
-
-### 9.3 功能扩展
-
-- 新增AI模型：后台配置即可
-- 新增支付方式：实现支付接口即可
-- 新增分析类型：复用任务队列和报告模板
-
----
-
-## 10. 目录结构
-
-### 10.1 前端目录结构（用户端H5 - 移动端自适应）
+### 实际分层结构
 
 ```
-h5/
+┌─────────────────────────────────────────────────────────┐
+│                      Controller 层                       │
+│              接收请求、参数验证、调用Service              │
+├─────────────────────────────────────────────────────────┤
+│                       Service 层                         │
+│              业务逻辑、事务管理                          │
+├─────────────────────────────────────────────────────────┤
+│                       Model 层                           │
+│              数据模型、关系定义、查询构建                 │
+├─────────────────────────────────────────────────────────┤
+│                      数据库                              │
+└─────────────────────────────────────────────────────────┘
+```
+
+**说明**：
+- 无独立 Repository 层（直接使用 Eloquent Model）
+- 无队列 Jobs（AI 分析采用同步处理）
+- 无 Events/Listeners（业务逻辑直接在 Service 中处理）
+- 无 Horizon（未安装）
+
+---
+
+## 8. 目录结构
+
+### 8.1 前端目录结构（单一 web/ 项目）
+
+```
+web/
 ├── public/                     # 静态资源
 │   ├── index.html
-│   └── favicon.ico
+│   ├── favicon.svg
+│   └── icons.svg
 ├── src/
 │   ├── api/                    # API接口
+│   │   ├── admin.ts
+│   │   ├── auth.ts
+│   │   └── request.ts
 │   ├── assets/                 # 静态资源
 │   ├── components/             # 公共组件
 │   │   ├── analysis/           # 分析相关组件
-│   │   ├── common/             # 通用组件
-│   │   └── business/           # 业务组件
+│   │   │   ├── HealthAdvice.vue
+│   │   │   ├── ReportHeader.vue
+│   │   │   └── ReportSummary.vue
+│   │   ├── base/               # 基础组件
+│   │   │   ├── BaseCard.vue
+│   │   │   ├── BaseDialog.vue
+│   │   │   ├── BaseForm.vue
+│   │   │   ├── BasePagination.vue
+│   │   │   ├── BaseSearch.vue
+│   │   │   ├── BaseTable.vue
+│   │   │   └── index.ts
+│   │   └── chat/               # 聊天组件
+│   │       ├── MessageBubble.vue
+│   │       ├── MessageInput.vue
+│   │       └── SessionListItem.vue
 │   ├── composables/            # 组合式函数
+│   ├── config/                 # 配置
+│   ├── hooks/                  # 自定义钩子
+│   ├── layouts/                # 布局组件
+│   │   ├── AdminLayout.vue
+│   │   └── MiniProgramLayout.vue
 │   ├── router/                 # 路由
+│   │   ├── index.ts
+│   │   └── modules/
+│   │       ├── admin.ts
+│   │       ├── analysis.ts
+│   │       ├── common.ts
+│   │       └── user.ts
 │   ├── stores/                 # Pinia状态管理
+│   │   ├── admin.ts
+│   │   ├── analysis.ts
+│   │   ├── auth.ts
+│   │   ├── chat.ts
+│   │   ├── order.ts
+│   │   ├── promoter.ts
+│   │   └── user.ts
 │   ├── styles/                 # 样式文件
-│   │   ├── variables.less      # 变量
-│   │   └── responsive.less     # 响应式适配
+│   │   ├── index.css
+│   │   └── mobile.css
+│   ├── types/                  # 类型定义
 │   ├── utils/                  # 工具函数
-│   │   ├── request.ts          # 请求封装
-│   │   └── validators.ts       # 验证规则
 │   ├── views/                  # 页面
-│   │   ├── home/               # 首页
-│   │   ├── analysis/           # AI分析（舌诊/面诊/体质）
+│   │   ├── admin/              # 管理端页面
+│   │   │   ├── admins.vue
+│   │   │   ├── ai.vue
+│   │   │   ├── analytics.vue
+│   │   │   ├── articles.vue
+│   │   │   ├── constitution.vue
+│   │   │   ├── customer-service.vue
+│   │   │   ├── dashboard.vue
+│   │   │   ├── login.vue
+│   │   │   ├── orders.vue
+│   │   │   ├── packages.vue
+│   │   │   ├── promoters.vue
+│   │   │   ├── risk.vue
+│   │   │   ├── settings.vue
+│   │   │   ├── users.vue
+│   │   │   ├── withdraws.vue
+│   │   │   └── xianyu-products.vue
+│   │   ├── analysis/           # 分析页面
+│   │   │   ├── face.vue
+│   │   │   ├── result.vue
+│   │   │   └── tongue.vue
+│   │   ├── auth/               # 认证页面
+│   │   │   ├── login.vue
+│   │   │   └── register.vue
+│   │   ├── constitution/       # 体质测试
 │   │   ├── health/             # 健康档案
+│   │   ├── home/               # 首页
 │   │   ├── member/             # 会员中心
-│   │   ├── promote/            # 推广中心
-│   │   └── profile/            # 个人中心
+│   │   ├── messages/           # 消息中心
+│   │   ├── packages/           # 套餐
+│   │   ├── promoter/           # 推广中心
+│   │   ├── qa/                 # 健康问答
+│   │   ├── recharge/           # 充值
+│   │   └── user/               # 用户相关
 │   ├── App.vue                 # 根组件
 │   └── main.ts                 # 入口文件
 ├── .env.development            # 开发环境配置
-├── .env.production             # 生产环境配置
+├── .env.example                # 环境变量示例
 ├── package.json
 ├── tsconfig.json
 └── vite.config.ts
 ```
 
-### 10.2 前端目录结构（管理端PC）
+### 8.2 后端目录结构（Laravel 13）
 
 ```
-admin/
-├── public/
-├── src/
-│   ├── api/                    # API接口
-│   ├── assets/                 # 静态资源
-│   ├── components/             # 公共组件
-│   ├── router/                 # 路由
-│   ├── stores/                 # Pinia状态管理
-│   ├── utils/                  # 工具函数
-│   ├── views/                  # 页面
-│   ├── App.vue
-│   └── main.ts
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
-```
-
-### 10.3 后端目录结构（Laravel 13）
-
-```
-api/
-├── app/
-│   ├── Console/Commands/       # 命令行
-│   ├── Events/                 # 事件
-│   ├── Exceptions/             # 异常
-│   ├── Http/
-│   │   ├── Controllers/        # 控制器
-│   │   ├── Middleware/         # 中间件
-│   │   ├── Requests/           # 请求验证
-│   │   └── Resources/          # 资源转换
-│   ├── Jobs/                   # 队列任务
-│   │   ├── Analysis/           # AI分析任务
-│   │   ├── Payment/            # 支付通知任务
-│   │   ├── Promote/            # 推广结算任务
-│   │   └── Notification/       # 通知任务
-│   ├── Listeners/              # 事件监听
-│   ├── Models/                 # 模型
-│   ├── Notifications/          # 通知
-│   ├── Providers/              # 服务提供者
-│   ├── Repositories/           # 仓库层
-│   ├── Services/               # 服务层
-│   └── Traits/                 # 特性
-├── config/                     # 配置
-├── database/
-│   ├── migrations/             # 迁移
-│   └── seeders/                # 种子
-├── routes/                     # 路由
-├── resources/                  # 资源
-├── storage/                    # 存储
-├── tests/                      # 测试
-├── .env                        # 环境配置
-├── artisan                     # Artisan命令
-├── composer.json
-└── phpunit.xml
+app/
+├── Console/Commands/           # 命令行
+│   ├── CleanDuplicateData.php
+│   ├── ClearPlaceholderApiKeys.php
+│   ├── ResetAdminPassword.php
+│   └── SettleCommissions.php
+├── Http/
+│   ├── Controllers/            # 控制器
+│   │   ├── Api/V1/
+│   │   │   ├── Admin/          # 管理端控制器
+│   │   │   │   ├── AnalyticsController.php
+│   │   │   │   ├── AppealController.php
+│   │   │   │   ├── CustomerServiceController.php
+│   │   │   │   ├── CustomerServiceManageController.php
+│   │   │   │   ├── CustomerServiceRatingController.php
+│   │   │   │   ├── FeedbackController.php
+│   │   │   │   ├── RefundController.php
+│   │   │   │   ├── RiskController.php
+│   │   │   │   └── XianyuProductController.php
+│   │   │   ├── AdminController.php (统一后台管理)
+│   │   │   ├── AnalysisController.php
+│   │   │   ├── AppealController.php
+│   │   │   ├── ArticleController.php
+│   │   │   ├── AuthController.php
+│   │   │   ├── ConfigController.php
+│   │   │   ├── ConstitutionController.php
+│   │   │   ├── CustomerServiceController.php
+│   │   │   ├── CustomerServiceRatingController.php
+│   │   │   ├── FeedbackController.php
+│   │   │   ├── HealthController.php
+│   │   │   ├── PackageController.php
+│   │   │   ├── PaymentController.php
+│   │   │   ├── PromoterController.php
+│   │   │   ├── QaController.php
+│   │   │   ├── RefundController.php
+│   │   │   ├── SystemMessageController.php
+│   │   │   ├── UserController.php
+│   │   │   └── XianyuProductController.php
+│   │   └── Controller.php
+│   └── Middleware/             # 中间件
+│       ├── AdminMiddleware.php
+│       ├── AuthenticateOrAdmin.php
+│       ├── RequestLogMiddleware.php
+│       ├── RiskControlMiddleware.php
+│       ├── SuperAdminMiddleware.php
+│       └── VisitCounterMiddleware.php
+├── Models/                     # 模型
+│   ├── Admin.php
+│   ├── AiLog.php
+│   ├── AiModel.php
+│   ├── AnalysisAppeal.php
+│   ├── AnalysisReport.php
+│   ├── AnalysisTask.php
+│   ├── Article.php
+│   ├── BalanceInsufficientLog.php
+│   ├── Commission.php
+│   ├── ConstitutionQuestion.php
+│   ├── CustomerServiceConfig.php
+│   ├── CustomerServiceMessage.php
+│   ├── CustomerServicePhrase.php
+│   ├── CustomerServiceRating.php
+│   ├── CustomerServiceSession.php
+│   ├── Feedback.php
+│   ├── HealthQaMessage.php
+│   ├── HealthQaSession.php
+│   ├── InviteClick.php
+│   ├── InviteRegistration.php
+│   ├── Order.php
+│   ├── Payment.php
+│   ├── ProductPackage.php
+│   ├── Promoter.php
+│   ├── Refund.php
+│   ├── RiskBlacklist.php
+│   ├── RiskEvent.php
+│   ├── RiskRule.php
+│   ├── SystemConfig.php
+│   ├── SystemMessage.php
+│   ├── User.php
+│   ├── UserAnalysisLog.php
+│   ├── UserBalanceLog.php
+│   ├── UserProfile.php
+│   ├── Withdraw.php
+│   └── XianyuProduct.php
+├── Providers/
+│   └── AppServiceProvider.php
+├── Services/                   # 服务层
+│   ├── AiService.php
+│   ├── AnalysisTimesService.php
+│   ├── AnalyticsService.php
+│   ├── CacheService.php
+│   ├── LlmService.php
+│   ├── NotificationService.php
+│   ├── PaymentService.php
+│   ├── RefundService.php
+│   ├── RiskControlService.php
+│   └── SystemConfigService.php
+└── Support/
+    ├── InviteTracker.php
+    └── Site.php
 ```
 
 ---
 
-## 11. 架构决策记录（ADR）
+## 9. 架构决策记录（ADR）
 
 ### ADR-001：为什么选择Vue3而不是React？
 
@@ -407,12 +455,7 @@ api/
 **理由**：
 - 学习曲线低，团队上手快
 - 组合式API更适合复杂业务逻辑
-- Vant组件库对移动端支持最好
 - 微信浏览器兼容性优秀
-- 后续开发微信小程序可复用部分代码
-
-**替代方案**：React + Ant Design Mobile
-- 缺点：学习曲线陡，移动端组件库不如Vant丰富
 
 ### ADR-002：为什么选择Laravel 13？
 
@@ -420,73 +463,63 @@ api/
 
 **理由**：
 - 最新版本，性能更好，安全性更高
-- 内置队列系统完善，支持Redis驱动
-- 开发速度比Spring Boot快2-3倍
-- 80%是后台管理，Laravel的Eloquent ORM和后台生成器非常适合
+- 内置队列系统完善
+- 开发速度快
 - AI全部走HTTP调用，PHP完全够用
 - 部署简单，运维成本低
-- 生态丰富，支付、存储、队列都有成熟包
-- 队列/调度/事件/通知等功能开箱即用
+- 生态丰富，支付、存储都有成熟包
 
-**替代方案**：Spring Boot
-- 缺点：开发速度慢，配置复杂，对于本项目来说过度设计
+### ADR-003：为什么选择Sanctum而不是JWT？
 
-### ADR-003：为什么选择MySQL而不是PostgreSQL？
-
-**决策**：选择MySQL 8.0作为主数据库
+**决策**：使用Laravel Sanctum进行API认证
 
 **理由**：
-- 团队熟悉度高，运维经验丰富
-- 性能优秀，满足百万用户需求
-- 主从复制方案成熟
-- 云服务支持好（腾讯云、阿里云）
-- JSON字段支持满足需求
+- Laravel原生支持，集成度最高
+- PersonalAccessToken轻量级，适合本项目
+- 无需额外维护JWT密钥
+- 支持Token过期时间配置
+- 与Laravel生态系统无缝集成
 
-**替代方案**：PostgreSQL
-- 缺点：团队熟悉度低，云服务价格略高
+### ADR-004：为什么使用File缓存而不是Redis？
 
-### ADR-004：为什么选择JWT而不是Session？
-
-**决策**：选择JWT作为API鉴权方案
+**决策**：使用File缓存驱动
 
 **理由**：
-- 无状态，易于水平扩展
-- 适合移动端和跨域场景
-- 减少服务器存储压力
-- 支持Token过期和刷新
+- 无需额外安装Redis服务
+- 降低运维复杂度
+- 中小型项目性能足够
+- 部署简单，环境一致性高
 
-**替代方案**：Session + Cookie
-- 缺点：需要共享Session存储，不适合跨域
+### ADR-005：为什么使用Database队列而不是Redis队列？
 
-### ADR-005：为什么选择Laravel Queue（Redis驱动）而不是RabbitMQ？
-
-**决策**：使用Laravel内置队列，以Redis作为驱动
+**决策**：使用Database作为队列驱动
 
 **理由**：
-- Laravel Queue是框架原生功能，集成度最高
-- 无需额外维护消息队列服务，降低运维成本
-- Redis驱动性能优秀，满足百万用户需求
-- 支持延迟队列、失败重试、队列优先级
-- Laravel Horizon提供美观的队列监控面板
-- 减少技术栈复杂度，团队学习成本低
-- 与Laravel调度器无缝集成
+- 无需额外安装Redis服务
+- 数据持久化，重启不丢失
+- 适合中小型项目
+- 降低运维复杂度
 
-**替代方案**：RabbitMQ
-- 缺点：需要额外安装维护，增加运维负担，对于当前规模来说过度设计
+### ADR-006：为什么使用单一Web项目而不是分离H5/Admin？
 
-### ADR-006：为什么选择移动端自适应而不是独立开发App？
+**决策**：使用单一web/项目同时服务用户端和管理端
 
-**决策**：H5移动端自适应方案
+**理由**
+- 共享组件、工具函数、状态管理
+- 减少代码重复
+- 统一构建部署流程
+- 通过postcss-px-to-viewport实现移动端适配
+- 管理端使用TailwindCSS实现PC端布局
+
+### ADR-007：为什么AI分析采用同步处理而不是队列？
+
+**决策**：AI分析采用同步处理
 
 **理由**：
-- 开发成本低，一套代码适配所有设备
-- 无需上架应用商店，更新迭代快
-- 微信内可直接打开，分享传播方便
-- 自适应布局可完美适配手机、平板
-- 后续可通过Taro打包为微信小程序或App
-
-**替代方案**：原生App开发
-- 缺点：开发成本高，上架审核慢，迭代周期长
+- 简化架构复杂度
+- 用户可立即获得结果反馈
+- 当前业务规模下性能可接受
+- 避免队列消费延迟导致的用户等待
 
 ---
 
