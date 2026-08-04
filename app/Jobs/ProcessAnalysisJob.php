@@ -89,6 +89,8 @@ class ProcessAnalysisJob implements ShouldQueue
                 'task_id' => $task->id,
                 'user_id' => $task->user_id,
                 'type' => $task->type,
+                'gender' => $task->gender,
+                'age' => $task->age,
                 'health_score' => $this->calculateHealthScore($content),
                 'summary' => $this->extractSummary($content),
                 'content' => ['text' => $content],

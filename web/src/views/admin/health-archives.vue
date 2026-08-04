@@ -138,6 +138,19 @@
             <span v-else class="no-image">无图片</span>
           </template>
         </el-table-column>
+        <el-table-column label="性别" width="70" align="center">
+          <template #default="{ row }">
+            <span v-if="row.gender === 1" class="gender-male">男</span>
+            <span v-else-if="row.gender === 2" class="gender-female">女</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="年龄" width="70" align="center">
+          <template #default="{ row }">
+            <span v-if="row.age > 0">{{ row.age }}岁</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="健康评分" width="120" align="center">
           <template #default="{ row }">
             <span v-if="row.health_score" :class="scoreClass(row.health_score)">
@@ -206,9 +219,9 @@
             <el-descriptions-item label="邮箱">{{ currentDetail.user?.email || '-' }}</el-descriptions-item>
             <el-descriptions-item label="手机号">{{ currentDetail.user?.mobile || '-' }}</el-descriptions-item>
             <el-descriptions-item label="性别">
-              {{ currentDetail.task?.gender === 1 ? '男' : currentDetail.task?.gender === 2 ? '女' : '-' }}
+              {{ currentDetail.gender === 1 ? '男' : currentDetail.gender === 2 ? '女' : '-' }}
             </el-descriptions-item>
-            <el-descriptions-item label="年龄">{{ currentDetail.task?.age ? currentDetail.task.age + '岁' : '-' }}</el-descriptions-item>
+            <el-descriptions-item label="年龄">{{ currentDetail.age ? currentDetail.age + '岁' : '-' }}</el-descriptions-item>
             <el-descriptions-item label="健康评分">
               <span v-if="currentDetail.health_score" :class="scoreClass(currentDetail.health_score)">
                 {{ currentDetail.health_score }}分
@@ -681,6 +694,17 @@ onMounted(() => {
 .no-image {
   color: #ccc;
   font-size: 12px;
+}
+
+/* 性别样式 */
+.gender-male {
+  color: #409eff;
+  font-weight: 500;
+}
+
+.gender-female {
+  color: #f56c6c;
+  font-weight: 500;
 }
 
 /* 评分样式 */

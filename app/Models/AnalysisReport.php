@@ -13,6 +13,8 @@ class AnalysisReport extends Model
         'task_id',
         'user_id',
         'type',
+        'gender',
+        'age',
         'health_score',
         'tongue_color',
         'tongue_shape',
@@ -40,6 +42,8 @@ class AnalysisReport extends Model
     {
         return [
             'health_score' => 'integer',
+            'gender' => 'integer',
+            'age' => 'integer',
             'content' => 'array',
             'is_paid' => 'boolean',
             'viewed_at' => 'datetime',
