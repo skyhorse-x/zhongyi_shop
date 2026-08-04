@@ -99,7 +99,6 @@ const checkNewMessages = async () => {
     const data = await res.json()
     if (data.code === 0 && data.data.data && data.data.data.length > 0) {
       const sessions = data.data.data
-      const currentAdminId = request.user()?.id
 
       for (const session of sessions) {
         // 检查是否有新的用户消息（未读 > 0 且不是当前页面）
