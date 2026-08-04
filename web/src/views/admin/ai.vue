@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { Document } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 
@@ -320,6 +321,69 @@ watch(() => editForm.value.provider, (newProvider) => {
   }
 })
 
+// ===== 提示词管理 =====
+const promptsDialogVisible = ref(false)
+const promptsLoading = ref(false)
+const promptsList = ref<any[]>([])
+const activePromptsTab = ref('tongue')
+
+const promptsTypeLabels: Record<string, string> = {
+  tongue: '舌诊分析（图片）',
+  tongue_text: '舌诊分析（文字）',
+  face: '面诊分析（图片）',
+  face_text: '面诊分析（文字）',
+  qa: '健康问答',
+}
+
+const loadPrompts = async () => {
+  promptsLoading.value = true
+  try {
+    const res = await safeFetch('/api/v1/admin/ai/prompts', {
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        Accept: 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      promptsList.value = data.data || []
+    } else {
+      ElMessage.error(data.message || '加载提示词失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载提示词失败')
+  } finally {
+    promptsLoading.value = false
+  }
+}
+
+const openPromptsDialog = () => {
+  promptsDialogVisible.value = true
+  loadPrompts()
+}
+
+const updatePrompt = async (id: number, prompt: string) => {
+  try {
+    const res = await safeFetch(`/api/v1/admin/ai/prompts/${id}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt }),
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      ElMessage.success('提示词更新成功')
+    } else {
+      ElMessage.error(data.message || '更新失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '更新失败')
+  }
+}
+
 onMounted(() => {
   loadModels()
   loadCallRecords()
@@ -331,7 +395,11 @@ onMounted(() => {
   <div class="admin-page-wrapper">
     <div class="page-header">
       <h2 class="page-title">AI管理</h2>
-      <p class="page-desc">AI模型配置与调用日志</p>
+      <div class="header-actions">
+        <el-button type="primary" size="small" @click="openPromptsDialog">
+          <el-icon><Document /></el-icon> 查看提示词
+        </el-button>
+      </div>
     </div>
 
     <el-row :gutter="16">
@@ -487,6 +555,45 @@ onMounted(() => {
       <template #footer>
         <el-button @click="editDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSaveModel">确认</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 提示词管理弹窗 -->
+    <el-dialog
+      v-model="promptsDialogVisible"
+      title="AI 提示词管理"
+      width="900px"
+      :close-on-click-modal="false"
+    >
+      <el-tabs v-model="activePromptsTab">
+        <el-tab-pane
+          v-for="prompt in promptsList"
+          :key="prompt.type"
+          :label="promptsTypeLabels[prompt.type] || prompt.type"
+          :name="prompt.type"
+        >
+          <div class="prompt-editor">
+            <div class="prompt-header">
+              <span class="prompt-type-tag">{{ promptsTypeLabels[prompt.type] || prompt.type }}</span>
+              <el-button
+                type="primary"
+                size="small"
+                @click="updatePrompt(prompt.id, prompt.prompt)"
+              >
+                保存修改
+              </el-button>
+            </div>
+            <el-input
+              v-model="prompt.prompt"
+              type="textarea"
+              :rows="20"
+              placeholder="请输入提示词内容"
+            />
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+      <template #footer>
+        <el-button @click="promptsDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
