@@ -46,35 +46,17 @@ const loadPromoterInfo = async () => {
 
     if (data.code === 0) {
       promoterInfo.value = data.data
-      // 使用真实数据，若为0则显示模拟数据
-      const realCommission = Number(data.data.available_commission) || 0
-      const realTodayCommission = 0
-      const realTotalOrders = Number(data.data.total_consume) || 0
-      const realPending = Number(data.data.frozen_commission) || 0
-
       stats.value = {
-        totalCommission: realCommission > 0 ? toMoney(realCommission) : '128.50',
-        todayCommission: realTodayCommission > 0 ? toMoney(realTodayCommission) : '15.80',
-        totalOrders: realTotalOrders > 0 ? realTotalOrders : 23,
-        pendingCommission: realPending > 0 ? toMoney(realPending) : '36.20',
+        totalCommission: toMoney(data.data.available_commission || 0),
+        todayCommission: toMoney(data.data.today_commission || 0),
+        totalOrders: Number(data.data.total_consume) || 0,
+        pendingCommission: toMoney(data.data.frozen_commission || 0),
       }
     } else {
-      // API 失败时显示模拟数据
-      stats.value = {
-        totalCommission: '128.50',
-        todayCommission: '15.80',
-        totalOrders: 23,
-        pendingCommission: '36.20',
-      }
+      loadError.value = data.message || '加载推广信息失败'
     }
   } catch (e: any) {
-    // 网络错误时显示模拟数据
-    stats.value = {
-      totalCommission: '128.50',
-      todayCommission: '15.80',
-      totalOrders: 23,
-      pendingCommission: '36.20',
-    }
+    loadError.value = e.message || '网络错误，请稍后重试'
   } finally {
     loading.value = false
   }
