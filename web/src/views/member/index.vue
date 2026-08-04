@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, defineComponent, h } from 'vue'
+import { ref, onMounted, defineComponent, h, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Document, FirstAidKit, ShoppingBag, Promotion, Headset, Wallet, Money, Present, Bell, Coin } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
@@ -17,7 +17,7 @@ interface MenuItem {
   path: string
 }
 
-const menuItems = ref<MenuItem[]>([
+const menuItems = shallowRef<MenuItem[]>([
   { icon: Wallet, title: '余额明细', path: '/member/balance' },
   { icon: Money, title: '提现', path: '/promoter/withdraw' },
   { icon: Document, title: '我的订单', path: '/member/orders' },

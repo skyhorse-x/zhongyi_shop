@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, markRaw } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   ArrowRight,
@@ -36,14 +36,14 @@ const goBack = () => {
   }
 }
 
-// 胶囊菜单项
-const menuItems = [
+// 胶囊菜单项（使用 markRaw 防止图标组件被 Vue 转为响应式对象）
+const menuItems = markRaw([
   { icon: HomeFilled, label: '首页', path: '/' },
   { icon: User, label: '个人中心', path: '/member' },
   { icon: Document, label: '我的订单', path: '/member/orders' },
   { icon: ChatLineRound, label: '健康问答', path: '/qa/chat' },
   { icon: Setting, label: '设置', path: '/member' },
-]
+])
 
 // 跳转页面
 const navigateTo = (path: string) => {

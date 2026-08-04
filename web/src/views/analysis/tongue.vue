@@ -159,6 +159,32 @@ onMounted(() => {
 
 <template>
   <div class="tongue-page" v-loading="loading">
+    <!-- 基本信息（必填） -->
+    <div class="profile-section">
+      <div class="ai-text-header">
+        <el-icon><User /></el-icon>
+        <span>基本信息 <span class="required-tip">*</span></span>
+      </div>
+      <div class="profile-row">
+        <span class="profile-label">性别</span>
+        <el-radio-group v-model="gender">
+          <el-radio :value="1">男</el-radio>
+          <el-radio :value="2">女</el-radio>
+        </el-radio-group>
+      </div>
+      <div class="profile-row">
+        <span class="profile-label">年龄</span>
+        <el-select v-model="age" placeholder="请选择年龄" style="width: 120px;">
+          <el-option
+            v-for="ageVal in ageOptions"
+            :key="ageVal"
+            :label="ageVal + '岁'"
+            :value="ageVal"
+          />
+        </el-select>
+      </div>
+    </div>
+
     <!-- 图片上传区域（必填） -->
     <div class="upload-section">
       <div class="upload-tip">
@@ -201,32 +227,6 @@ onMounted(() => {
           <span class="upload-hint">支持多张上传，建议拍摄舌面、舌侧</span>
         </div>
       </el-upload>
-    </div>
-
-    <!-- 基本信息（必填） -->
-    <div class="profile-section">
-      <div class="ai-text-header">
-        <el-icon><User /></el-icon>
-        <span>基本信息 <span class="required-tip">*</span></span>
-      </div>
-      <div class="profile-row">
-        <span class="profile-label">性别</span>
-        <el-radio-group v-model="gender">
-          <el-radio :value="1">男</el-radio>
-          <el-radio :value="2">女</el-radio>
-        </el-radio-group>
-      </div>
-      <div class="profile-row">
-        <span class="profile-label">年龄</span>
-        <el-select v-model="age" placeholder="请选择年龄" style="width: 120px;">
-          <el-option
-            v-for="ageVal in ageOptions"
-            :key="ageVal"
-            :label="ageVal + '岁'"
-            :value="ageVal"
-          />
-        </el-select>
-      </div>
     </div>
 
     <!-- AI 文本输入框（可折叠） -->
@@ -426,13 +426,54 @@ onMounted(() => {
   border-color: #60a5fa;
 }
 
+.upload-trigger {
+  width: 100%;
+  min-height: 140px;
+  border: 2px dashed #dcdee0;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #969799;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 24px;
+}
+
+.upload-trigger:hover {
+  border-color: #60a5fa;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.15);
+}
+
+.upload-trigger:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(96, 165, 250, 0.1);
+}
+
+.upload-icon {
+  font-size: 36px;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  transition: color 0.3s ease;
+}
+
+.upload-trigger:hover .upload-icon {
+  color: #60a5fa;
+}
+
 .upload-text {
   margin-top: 8px;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #64748b;
 }
 
 .upload-hint {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 12px;
   color: #c0c4cc;
 }

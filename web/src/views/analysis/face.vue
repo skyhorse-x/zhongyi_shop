@@ -141,32 +141,6 @@ const handleSubmit = async () => {
 
 <template>
   <div class="face-page" v-loading="loading">
-    <!-- 图片上传区域（必填） -->
-    <div class="upload-section">
-      <div class="upload-tip">
-        <span class="required-tag">必填</span> 上传清晰的面部照片，至少一张
-      </div>
-
-      <div v-if="imageUrl" class="image-preview">
-        <el-image :src="imageUrl" alt="面部照片" style="max-width: 100%; border-radius:12px;" />
-      </div>
-
-      <el-upload
-        :auto-upload="false"
-        accept="image/*"
-        capture="user"
-        :show-file-list="false"
-        @change="handleFileChange"
-      >
-        <template #trigger>
-          <div class="upload-area">
-            <el-icon :size="48"><CameraFilled /></el-icon>
-            <div class="upload-text">{{ imageUrl ? '重新上传' : '点击拍摄或上传' }}</div>
-          </div>
-        </template>
-      </el-upload>
-    </div>
-
     <!-- 基本信息（必填） -->
     <div class="profile-section">
       <div class="ai-text-header">
@@ -191,6 +165,32 @@ const handleSubmit = async () => {
           />
         </el-select>
       </div>
+    </div>
+
+    <!-- 图片上传区域（必填） -->
+    <div class="upload-section">
+      <div class="upload-tip">
+        <span class="required-tag">必填</span> 上传清晰的面部照片，至少一张
+      </div>
+
+      <div v-if="imageUrl" class="image-preview">
+        <el-image :src="imageUrl" alt="面部照片" style="max-width: 100%; border-radius:12px;" />
+      </div>
+
+      <el-upload
+        :auto-upload="false"
+        accept="image/*"
+        capture="user"
+        :show-file-list="false"
+        @change="handleFileChange"
+      >
+        <template #trigger>
+          <div class="upload-area">
+            <el-icon :size="48"><CameraFilled /></el-icon>
+            <div class="upload-text">{{ imageUrl ? '重新上传' : '点击拍摄或上传' }}</div>
+          </div>
+        </template>
+      </el-upload>
     </div>
 
     <!-- 症状描述（可折叠） -->
@@ -375,7 +375,7 @@ const handleSubmit = async () => {
 
 .upload-area {
   width: 100%;
-  height: 120px;
+  min-height: 140px;
   border: 2px dashed #dcdee0;
   border-radius: 12px;
   display: flex;
@@ -384,11 +384,28 @@ const handleSubmit = async () => {
   justify-content: center;
   color: #969799;
   cursor: pointer;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 24px;
+}
+
+.upload-area:hover {
+  border-color: #60a5fa;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.15);
+}
+
+.upload-area:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(96, 165, 250, 0.1);
 }
 
 .upload-text {
   margin-top: 8px;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #64748b;
 }
 
 .image-preview {
