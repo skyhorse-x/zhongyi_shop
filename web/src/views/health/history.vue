@@ -9,7 +9,7 @@ const router = useRouter()
 
 interface AnalysisRecord {
   task_no: string
-  type: 'face' | 'tongue'
+  type: 'face' | 'tongue' | 'constitution'
   type_name: string
   created_at: string
   summary: string

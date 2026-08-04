@@ -55,6 +55,10 @@ const handleFileChange = (uploadFile: any) => {
   }
 }
 
+const handleRemove = () => {
+  // 移除图片的回调，实际移除逻辑由 removeImage 处理
+}
+
 const removeImage = (index: number) => {
   URL.revokeObjectURL(imageList.value[index].url)
   imageList.value.splice(index, 1)

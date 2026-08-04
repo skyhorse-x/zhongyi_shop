@@ -1,0 +1,1 @@
+import{r as e}from"./rolldown-runtime-hePW80VL.js";import{s as t}from"./element-plus-C1K-HQCh.js";var n=e(t(),1);function r(e,t=`YYYY-MM-DD`){return e?(0,n.default)(e).format(t):`-`}function i(e){let t=Number(e??0);return isNaN(t)?`0.00`:t.toFixed(2)}export{i as n,r as t};
