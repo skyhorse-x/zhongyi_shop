@@ -150,7 +150,7 @@ class AdminController extends Controller
         $query = User::query();
         if ($request->phone) $query->where('mobile', 'like', "%{$request->phone}%");
         if ($request->nickname) $query->where('nickname', 'like', "%{$request->nickname}%");
-        return response()->json(['code' => 0, 'data' => $query->paginate($request->per_page ?? 10)]);
+        return response()->json(['code' => 0, 'data' => $query->orderByDesc('id')->paginate($request->per_page ?? 10)]);
     }
 
     /**

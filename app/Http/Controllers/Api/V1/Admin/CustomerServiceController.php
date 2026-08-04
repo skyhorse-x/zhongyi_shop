@@ -7,6 +7,7 @@ use App\Models\CustomerServiceSession;
 use App\Models\CustomerServiceMessage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class CustomerServiceController extends Controller
 {

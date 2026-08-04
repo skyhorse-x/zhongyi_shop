@@ -328,38 +328,74 @@ const parseSuggestions = (content: string): string[] => {
   const suggestions: string[] = []
   const lines = content.split('\n')
   let inSuggestionSection = false
+  let currentSuggestion = ''
 
-  for (const line of lines) {
+  const flushSuggestion = () => {
+    if (currentSuggestion.trim()) {
+      suggestions.push(currentSuggestion.trim())
+    }
+    currentSuggestion = ''
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
     const trimmed = line.trim()
-    if (trimmed.includes('健康建议') || trimmed.includes('调理建议') || trimmed.includes('健康调理')) {
+    
+    // 检测建议章节开始
+    if (trimmed.includes('健康建议') || trimmed.includes('调理建议') || trimmed.includes('健康调养') || trimmed.includes('日常调养')) {
       inSuggestionSection = true
       continue
     }
     
-    // 遇到下一个空行或新章节，结束建议解析
-    if (inSuggestionSection && trimmed === '') {
-      // 如果已经有建议了，就结束；否则继续等待内容
-      if (suggestions.length > 0) break
-      continue
+    // 遇到新章节标题，结束建议解析
+    if (inSuggestionSection && (trimmed.startsWith('## ') || trimmed.startsWith('# '))) {
+      if (trimmed.includes('温馨提示') || trimmed.includes('参考') || trimmed.includes('进一步')) {
+        flushSuggestion()
+        break
+      }
     }
     
-    if (inSuggestionSection && trimmed.startsWith('-')) {
-      const text = trimmed.replace(/^[-*]\s*/, '')
-      // 提取 - 后面的实际内容（去掉 **标签**：）
-      const cleanText = text.replace(/^\*\*[^*]+\*\*[：:]\s*/, '')
-      if (cleanText && cleanText.trim()) suggestions.push(cleanText.trim())
-    } else if (inSuggestionSection && trimmed.match(/^\d+\./)) {
-      const text = trimmed.replace(/^\d+\.\s*/, '')
-      const cleanText = text.replace(/^\*\*[^*]+\*\*[：:]\s*/, '')
-      if (cleanText && cleanText.trim()) suggestions.push(cleanText.trim())
-    } else if (inSuggestionSection && trimmed.match(/^[一二三四五六七八九十]+[、.]/)) {
-      const text = trimmed.replace(/^[一二三四五六七八九十]+[、.]\s*/, '')
-      const cleanText = text.replace(/^\*\*[^*]+\*\*[：:]\s*/, '')
-      if (cleanText && cleanText.trim()) suggestions.push(cleanText.trim())
+    if (!inSuggestionSection) continue
+    
+    // 检测列表项开头（数字、横线、圆点）
+    const isNumberedItem = trimmed.match(/^\d+[.、]\s*/)
+    const isBulletItem = trimmed.startsWith('-') || trimmed.startsWith('•') || trimmed.startsWith('○')
+    
+    if (isNumberedItem || isBulletItem) {
+      // 保存之前的建议
+      flushSuggestion()
+      
+      // 提取当前行内容
+      let itemText = trimmed
+        .replace(/^\d+[.、]\s*/, '')  // 去掉数字编号
+        .replace(/^[-•○]\s*/, '')     // 去掉横线/圆点
+        .replace(/^\*\*[^*]+\*\*[：:]\s*/, '')  // 去掉加粗标签
+        .trim()
+      
+      // 如果当前行只有标签没有内容，查看下一行
+      if (!itemText && i + 1 < lines.length) {
+        const nextTrimmed = lines[i + 1].trim()
+        if (nextTrimmed.startsWith('-') || nextTrimmed.startsWith('•')) {
+          itemText = nextTrimmed.replace(/^[-•]\s*/, '').trim()
+          i++ // 跳过下一行
+        }
+      }
+      
+      if (itemText) {
+        currentSuggestion = itemText
+      }
+    } else if (trimmed && currentSuggestion) {
+      // 追加多行内容
+      currentSuggestion += ' ' + trimmed.replace(/^\*\*[^*]+\*\*[：:]\s*/, '')
     }
   }
+  
+  // 保存最后一条建议
+  flushSuggestion()
 
-  return suggestions.length > 0 ? suggestions.slice(0, 6) : ['请咨询专业中医师获取详细建议']
+  // 过滤空项并返回
+  const validSuggestions = suggestions.filter(s => s && s.trim().length > 0)
+  return validSuggestions.length > 0 ? validSuggestions.slice(0, 6) : ['请咨询专业中医师获取详细建议']
 }
 
 const formatDateTime = (dateStr: string) => {
