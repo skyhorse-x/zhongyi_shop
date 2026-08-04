@@ -17,6 +17,7 @@ interface Session {
   is_actually_online: boolean
   last_active_at: string
   ip_address: string
+  ip_location?: string
   browser_info: string
   browser_short: string
   message_count: number
@@ -236,6 +237,12 @@ const loadMessages = async (sessionNo: string, silent = false) => {
       lastMessageCount.value = newMessages.length
       messages.value = newMessages
       await scrollToBottom()
+      
+      // 更新本地会话未读数（后端已清除，前端同步更新）
+      const session = sessions.value.find(s => s.session_no === sessionNo)
+      if (session && session.admin_unread > 0) {
+        session.admin_unread = 0
+      }
     }
   } catch (e) { /* 忽略 */ }
 }
