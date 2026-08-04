@@ -205,6 +205,10 @@
             <el-descriptions-item label="用户名">{{ currentDetail.user?.username || '-' }}</el-descriptions-item>
             <el-descriptions-item label="邮箱">{{ currentDetail.user?.email || '-' }}</el-descriptions-item>
             <el-descriptions-item label="手机号">{{ currentDetail.user?.mobile || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="性别">
+              {{ currentDetail.task?.gender === 1 ? '男' : currentDetail.task?.gender === 2 ? '女' : '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="年龄">{{ currentDetail.task?.age ? currentDetail.task.age + '岁' : '-' }}</el-descriptions-item>
             <el-descriptions-item label="健康评分">
               <span v-if="currentDetail.health_score" :class="scoreClass(currentDetail.health_score)">
                 {{ currentDetail.health_score }}分
@@ -218,21 +222,25 @@
           </el-descriptions>
         </div>
 
-        <!-- 分析结果 -->
-        <div class="detail-section">
-          <h4 class="section-title">分析结果</h4>
+        <!-- 用户输入 -->
+        <div v-if="currentDetail.task?.text" class="detail-section">
+          <h4 class="section-title">用户输入</h4>
           <div class="result-content">
-            <pre v-if="currentDetail.content?.text">{{ currentDetail.content.text }}</pre>
-            <pre v-else-if="currentDetail.tongue_analysis">{{ currentDetail.tongue_analysis }}</pre>
-            <pre v-else-if="currentDetail.face_analysis">{{ currentDetail.face_analysis }}</pre>
-            <pre v-else-if="currentDetail.task?.result?.content">{{ currentDetail.task.result.content }}</pre>
-            <div v-else class="empty-content">暂无分析结果</div>
+            <pre>{{ currentDetail.task.text }}</pre>
           </div>
         </div>
 
-        <!-- 原始图片 -->
-        <div v-if="currentDetail.task?.image_url || currentDetail.task?.image_urls?.length" class="detail-section">
-          <h4 class="section-title">上传图片</h4>
+        <!-- AI提示词 -->
+        <div v-if="currentDetail.task?.prompt" class="detail-section">
+          <h4 class="section-title">AI提示词</h4>
+          <div class="result-content prompt-content">
+            <pre>{{ currentDetail.task.prompt }}</pre>
+          </div>
+        </div>
+
+        <!-- 上传图片 -->
+        <div v-if="getImageUrls(currentDetail.task).length > 0" class="detail-section">
+          <h4 class="section-title">上传图片 ({{ getImageUrls(currentDetail.task).length }}张)</h4>
           <div class="image-gallery">
             <el-image
               v-for="(img, idx) in getImageUrls(currentDetail.task)"
@@ -243,6 +251,18 @@
               class="analysis-image"
               preview-teleported
             />
+          </div>
+        </div>
+
+        <!-- 分析结果 -->
+        <div class="detail-section">
+          <h4 class="section-title">分析结果</h4>
+          <div class="result-content">
+            <pre v-if="currentDetail.content?.text">{{ currentDetail.content.text }}</pre>
+            <pre v-else-if="currentDetail.tongue_analysis">{{ currentDetail.tongue_analysis }}</pre>
+            <pre v-else-if="currentDetail.face_analysis">{{ currentDetail.face_analysis }}</pre>
+            <pre v-else-if="currentDetail.task?.result?.content">{{ currentDetail.task.result.content }}</pre>
+            <div v-else class="empty-content">暂无分析结果</div>
           </div>
         </div>
       </div>
@@ -721,6 +741,17 @@ onMounted(() => {
   line-height: 1.6;
   color: #333;
   margin: 0;
+}
+
+.prompt-content {
+  background: #f0f9f4;
+  border-left: 3px solid #67c23a;
+}
+
+.prompt-content pre {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  color: #333;
 }
 
 .empty-content {
