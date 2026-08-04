@@ -63,14 +63,14 @@ const handleShare = () => {
   }
 }
 
-// 底部导航项
-const tabItems = [
+// 底部导航项（使用 markRaw 防止图标组件被 Vue 转为响应式对象）
+const tabItems = markRaw([
   { icon: HomeFilled, label: '首页', path: '/' },
   { icon: Document, label: '订单', path: '/member/orders' },
   { icon: ChatLineRound, label: '问答', path: '/qa/chat' },
   { icon: Bell, label: '消息', path: '/messages' },
   { icon: User, label: '我的', path: '/member' },
-]
+])
 
 // 当前激活的tab
 const activeTab = computed(() => {
