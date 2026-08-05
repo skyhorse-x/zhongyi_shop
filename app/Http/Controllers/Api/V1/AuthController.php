@@ -70,6 +70,7 @@ class AuthController extends Controller
                     'password' => Hash::make($request->password),
                     'parent_id' => $parentId,
                     'invite_code' => $this->generateUniqueInviteCode(),
+                    'register_ip' => $request->ip(),
                 ]);
                 $user->grantInitialAnalysisTimes();
 
@@ -290,6 +291,14 @@ class AuthController extends Controller
                 'message' => '账号或密码错误',
             ], 401);
         }
+
+        // 记录登录信息
+        $user->last_login_at = now();
+        $user->last_login_ip = $request->ip();
+        if (empty($user->register_ip)) {
+            $user->register_ip = $request->ip();
+        }
+        $user->save();
 
         $token = $user->createToken('auth_token')->plainTextToken;
 

@@ -26,7 +26,7 @@ const goToFeature = (path: string) => {
   router.push(path)
 }
 
-// 当前剩余分析次数（未登录时为 null，不显示）
+// 当前剩余分析积分（未登录时为 null，不显示）
 const analysisTimes = ref<number | null>(null)
 const siteName = ref<string>('AI 中医健康助手') // 默认标题
 
@@ -41,10 +41,14 @@ const IconWrapper = defineComponent({
 })
 
 const fetchAnalysisTimes = async () => {
+  // 仅在已登录时获取用户信息
+  const token = getToken()
+  if (!token) return
+
   try {
     const res = await safeFetch('/api/v1/user/info', {
       headers: {
-        'Authorization': `Bearer ${getToken()}`,
+        'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
       },
     })
@@ -53,7 +57,7 @@ const fetchAnalysisTimes = async () => {
       analysisTimes.value = data.data?.analysis_times ?? 0
     }
   } catch (e) {
-    // 未登录等情况忽略
+    // 忽略错误
   }
 }
 
@@ -117,7 +121,7 @@ onMounted(() => {
         <div class="recharge-entry-title">充值积分</div>
         <div class="recharge-entry-desc">
           <template v-if="analysisTimes !== null">当前剩余 {{ analysisTimes }} 积分，点击充值</template>
-          <template v-else>充值分析次数，畅享 AI 健康分析</template>
+          <template v-else>充值分析积分，畅享 AI 健康分析</template>
         </div>
       </div>
       <el-button class="recharge-btn" round size="small" type="primary">立即充值</el-button>

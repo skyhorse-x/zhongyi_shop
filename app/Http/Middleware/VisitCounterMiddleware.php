@@ -2,9 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use App\Services\CacheService;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class VisitCounterMiddleware
@@ -14,6 +16,7 @@ class VisitCounterMiddleware
      * - 按天自增访问量（走 stats 命名空间，存于 file cache）
      * - 排除 API 内部调用、静态资源
      * - 失败自动降级（CacheService 内部处理）
+     * - 记录已登录用户的最后访问时间和IP
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -34,6 +37,21 @@ class VisitCounterMiddleware
             if ($count === 1) {
                 $ttl = max(60, now()->endOfDay()->getTimestamp() - time());
                 $statsCache->put($key, $count, $ttl);
+            }
+        }
+
+        // 记录已登录用户的最后访问时间和IP（非admin接口）
+        if (Auth::check() && !str_starts_with($path, 'api/v1/admin')) {
+            $user = Auth::user();
+            if ($user && $user instanceof User) {
+                // 每5分钟更新一次，避免频繁写数据库
+                $cacheKey = 'user_last_visit:' . $user->id;
+                if (!CacheService::get($cacheKey)) {
+                    $user->last_visit_at = now();
+                    $user->last_visit_ip = $request->ip();
+                    $user->save();
+                    CacheService::put($cacheKey, true, 300); // 5分钟缓存
+                }
             }
         }
 

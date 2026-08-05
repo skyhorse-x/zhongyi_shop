@@ -31,10 +31,13 @@ const getAuthToken = (): string => getToken() || ''
 
 // 加载用户剩余积分
 const loadUserInfo = async () => {
+  const token = getToken()
+  if (!token) return
+
   try {
     const res = await safeFetch('/api/v1/user/info', {
       headers: {
-        'Authorization': `Bearer ${getToken()}`,
+        'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
       },
     })

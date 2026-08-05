@@ -25,10 +25,13 @@ const wechatService = ref('') // 微信客服
 
 // 获取当前剩余分析次数
 const fetchUserInfo = async () => {
+  const token = getToken()
+  if (!token) return
+
   try {
     const res = await safeFetch('/api/v1/user/info', {
       headers: {
-        'Authorization': `Bearer ${getToken()}`,
+        'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
       },
     })

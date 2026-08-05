@@ -16,7 +16,7 @@ class HealthArchiveController extends Controller
      */
     public function index(Request $request)
     {
-        $query = AnalysisReport::with(['user:id,username,email,mobile,gender,birthday', 'task:task_no,type,created_at,image_urls,text'])
+        $query = AnalysisReport::with(['user:id,username,email,mobile,gender,birthday', 'task:id,task_no,type,created_at,image_url,image_urls,text'])
             ->orderBy('id', 'desc');
 
         // 按类型筛选
@@ -45,6 +45,15 @@ class HealthArchiveController extends Controller
         $perPage = $request->input('per_page', 15);
         $reports = $query->paginate($perPage);
 
+        // 格式化图片URL
+        $reports->getCollection()->transform(function ($report) {
+            if ($report->task) {
+                $report->task->image_urls = $this->formatImageUrls($report->task->image_urls);
+                $report->task->image_url = $report->task->image_url ? $this->formatSingleUrl($report->task->image_url) : null;
+            }
+            return $report;
+        });
+
         return response()->json([
             'code' => 0,
             'message' => 'success',
@@ -61,11 +70,66 @@ class HealthArchiveController extends Controller
         $report = AnalysisReport::with(['user:id,username,email,mobile,avatar', 'task:task_no,type,gender,age,image_url,image_urls,text,prompt,result,created_at,completed_at'])
             ->findOrFail($id);
 
+        // 格式化图片URL
+        if ($report->task) {
+            $report->task->image_urls = $this->formatImageUrls($report->task->image_urls);
+            $report->task->image_url = $report->task->image_url ? $this->formatSingleUrl($report->task->image_url) : null;
+        }
+
         return response()->json([
             'code' => 0,
             'message' => 'success',
             'data' => $report,
         ]);
+    }
+
+    /**
+     * 格式化图片URL数组
+     */
+    private function formatImageUrls($imageUrls): array
+    {
+        if (empty($imageUrls)) {
+            return [];
+        }
+
+        if (is_string($imageUrls)) {
+            $imageUrls = json_decode($imageUrls, true) ?? [];
+        }
+
+        if (!is_array($imageUrls)) {
+            return [];
+        }
+
+        return array_map(function ($url) {
+            return $this->formatSingleUrl($url);
+        }, array_filter($imageUrls));
+    }
+
+    /**
+     * 格式化单个图片URL
+     */
+    private function formatSingleUrl(?string $url): ?string
+    {
+        if (empty($url)) {
+            return null;
+        }
+
+        // 如果已经是完整URL，直接返回
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+
+        // 如果是相对路径，添加基础URL
+        if (str_starts_with($url, '/')) {
+            return rtrim(config('app.url'), '/') . $url;
+        }
+
+        // 如果以 storage 开头，添加基础URL
+        if (str_starts_with($url, 'storage/')) {
+            return rtrim(config('app/url'), '/') . '/' . $url;
+        }
+
+        return $url;
     }
 
     /**

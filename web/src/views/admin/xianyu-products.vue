@@ -250,9 +250,9 @@ onMounted(() => {
             <span class="price">¥{{ Number(row.amount).toFixed(2) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="赠送次数" width="110" align="center">
+        <el-table-column label="赠送积分" width="110" align="center">
           <template #default="{ row }">
-            <span class="num">{{ row.times }}</span> 次
+            <span class="num">{{ row.times }}</span> 积分
           </template>
         </el-table-column>
         <el-table-column prop="description" label="说明" min-width="140" show-overflow-tooltip />
@@ -313,7 +313,7 @@ onMounted(() => {
     >
       <el-form :model="form" label-width="100px">
         <el-form-item label="商品名称" required>
-          <el-input v-model="form.title" maxlength="100" placeholder="如：AI分析次数 10次充值" />
+          <el-input v-model="form.title" maxlength="100" placeholder="如：AI分析积分 100积分充值" />
         </el-form-item>
         <el-form-item label="闲鱼链接" required>
           <el-input v-model="form.link" maxlength="500" placeholder="闲鱼商品分享链接，点击后直接跳转闲鱼">
@@ -325,9 +325,9 @@ onMounted(() => {
         <el-form-item label="售价(元)" required>
           <el-input-number v-model="form.amount" :min="0.01" :precision="2" :step="1" style="width: 200px" />
         </el-form-item>
-        <el-form-item label="赠送次数">
+        <el-form-item label="赠送积分">
           <el-input-number v-model="form.times" :min="0" :max="100000" style="width: 200px" />
-          <span class="form-tip">次</span>
+          <span class="form-tip">积分</span>
         </el-form-item>
         <el-form-item label="商品说明">
           <el-input v-model="form.description" maxlength="255" type="textarea" :rows="2" placeholder="展示在前台商品卡片上的说明文字" />

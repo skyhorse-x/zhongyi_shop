@@ -156,6 +156,11 @@ const loadUsers = async () => {
         is_promoter: !!user.is_promoter,
         birthday: user.birthday || '',
         registerTime: user.created_at || '-',
+        register_ip: user.register_ip || '',
+        last_visit_at: user.last_visit_at || '',
+        last_visit_ip: user.last_visit_ip || '',
+        last_login_at: user.last_login_at || '',
+        last_login_ip: user.last_login_ip || '',
         balance: Number(user.balance ?? 0),
         analysis_times: Number(user.analysis_times ?? 0),
       }))
@@ -813,7 +818,26 @@ const loadLogs = async (row?: any) => {
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="registerTime" label="注册时间" min-width="150" class-name="hidden-mobile" />
+        <el-table-column prop="registerTime" label="注册时间" min-width="160" class-name="hidden-mobile">
+          <template #default="scope">
+            {{ formatTime(scope.row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="注册IP" width="130" class-name="hidden-mobile">
+          <template #default="scope">
+            {{ scope.row.register_ip || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="最后访问" width="160" class-name="hidden-mobile">
+          <template #default="scope">
+            {{ formatTime(scope.row.last_visit_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="访问IP" width="130" class-name="hidden-mobile">
+          <template #default="scope">
+            {{ scope.row.last_visit_ip || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="120" align="center" :fixed="isMobile ? false : 'right'">
           <template #default="scope">
             <el-dropdown

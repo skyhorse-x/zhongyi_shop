@@ -322,17 +322,107 @@ function calculateAge(birthday: string): number {
 // 获取报告图片列表
 function getReportImages(row: any): string[] {
   const images: string[] = []
-  
+
   // 从任务的 image_urls 字段获取图片
-  if (row.task?.image_urls && Array.isArray(row.task.image_urls)) {
-    images.push(...row.task.image_urls)
+  if (row.task?.image_urls) {
+    let imageUrls = row.task.image_urls
+    // 如果是 JSON 字符串，尝试解析
+    if (typeof imageUrls === 'string') {
+      try {
+        imageUrls = JSON.parse(imageUrls)
+      } catch {
+        // 如果不是有效 JSON，按逗号分割
+        imageUrls = imageUrls.split(',').filter(Boolean)
+      }
+    }
+    if (Array.isArray(imageUrls)) {
+      imageUrls.forEach((url: string) => {
+        if (url && typeof url === 'string') {
+          images.push(formatImageUrl(url))
+        }
+      })
+    }
   }
-  
-  // 从报告的图片字段获取
-  if (row.images && Array.isArray(row.images)) {
-    images.push(...row.images)
+
+  // 从任务的单个 image_url 字段获取
+  if (row.task?.image_url && typeof row.task.image_url === 'string') {
+    const url = formatImageUrl(row.task.image_url)
+    if (!images.includes(url)) {
+      images.unshift(url)
+    }
   }
-  
+
+  // 从报告的图片字段获取（兼容旧数据）
+  if (row.images) {
+    let reportImages = row.images
+    if (typeof reportImages === 'string') {
+      try {
+        reportImages = JSON.parse(reportImages)
+      } catch {
+        reportImages = reportImages.split(',').filter(Boolean)
+      }
+    }
+    if (Array.isArray(reportImages)) {
+      reportImages.forEach((url: string) => {
+        if (url && typeof url === 'string') {
+          const formattedUrl = formatImageUrl(url)
+          if (!images.includes(formattedUrl)) {
+            images.push(formattedUrl)
+          }
+        }
+      })
+    }
+  }
+
+  return images
+}
+
+// 格式化图片URL（确保是完整URL）
+function formatImageUrl(url: string): string {
+  if (!url) return ''
+  // 如果已经是完整URL，直接返回
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  // 如果是相对路径，添加基础URL
+  if (url.startsWith('/')) {
+    return window.location.origin + url
+  }
+  // 如果以 storage 开头，添加基础URL
+  if (url.startsWith('storage/')) {
+    return window.location.origin + '/' + url
+  }
+  return url
+}
+
+// 获取图片URL列表（用于详情页）
+const getImageUrls = (task: any): string[] => {
+  if (!task) return []
+  const images: string[] = []
+
+  if (task.image_urls) {
+    let imageUrls = task.image_urls
+    if (typeof imageUrls === 'string') {
+      try {
+        imageUrls = JSON.parse(imageUrls)
+      } catch {
+        imageUrls = imageUrls.split(',').filter(Boolean)
+      }
+    }
+    if (Array.isArray(imageUrls)) {
+      imageUrls.forEach((url: string) => {
+        if (url) images.push(formatImageUrl(url))
+      })
+    }
+  }
+
+  if (task.image_url && typeof task.image_url === 'string') {
+    const url = formatImageUrl(task.image_url)
+    if (!images.includes(url)) {
+      images.unshift(url)
+    }
+  }
+
   return images
 }
 
@@ -508,18 +598,6 @@ const formatDetail = (detail: any) => {
   } catch {
     return String(detail)
   }
-}
-
-// 获取图片URL列表
-const getImageUrls = (task: any) => {
-  if (!task) return []
-  if (task.image_urls && task.image_urls.length > 0) {
-    return task.image_urls
-  }
-  if (task.image_url) {
-    return [task.image_url]
-  }
-  return []
 }
 
 onMounted(() => {

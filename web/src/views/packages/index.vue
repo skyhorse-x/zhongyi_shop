@@ -228,9 +228,12 @@ const handlePurchase = async (pkg: any) => {
 
 // 拉取用户信息
 const fetchUserInfo = async () => {
+  const token = getToken()
+  if (!token) return
+
   try {
     const res = await safeFetch('/api/v1/user/info', {
-      headers: { Authorization: `Bearer ${getToken()}`, Accept: 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     })
     const data = await res.json()
     if (data.code === 0) {

@@ -28,10 +28,13 @@ import { getToken } from '@/utils/auth'
 
 // 获取用户剩余分析次数
 const fetchAnalysisTimes = async () => {
+  const token = getToken()
+  if (!token) return
+
   try {
     const res = await safeFetch('/api/v1/user/info', {
       headers: {
-        'Authorization': `Bearer ${getToken()}`,
+        'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
       },
     })
