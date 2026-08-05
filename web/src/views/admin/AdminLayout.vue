@@ -11,7 +11,7 @@ const route = useRoute()
 
 const sidebarCollapsed = ref(false)
 const mobileSidebarOpen = ref(false)
-const waitingCount = ref(0)
+const activeCount = ref(0) // 正在服务的人数
 
 // 客服通知相关
 interface CustomerNotification {
@@ -31,7 +31,7 @@ const pollingInterval = ref<ReturnType<typeof setInterval> | null>(null)
 // 使用 shallowRef 避免图标组件被 reactive 包裹，消除 Vue 警告
 const menuItems = shallowRef([
   { title: '仪表盘', icon: TrendCharts, path: '/admin/dashboard' },
-  { title: '客服管理', icon: Service, path: '/admin/customer-service', badge: () => waitingCount.value },
+  { title: '客服管理', icon: Service, path: '/admin/customer-service', badge: () => activeCount.value },
   { title: '用户管理', icon: UserFilled, path: '/admin/users' },
   { title: '订单管理', icon: Tickets, path: '/admin/orders' },
   { title: '次数包管理', icon: Goods, path: '/admin/packages' },
@@ -51,8 +51,8 @@ const menuItems = shallowRef([
   { title: '系统设置', icon: Setting, path: '/admin/settings' },
 ])
 
-// 加载待接入客服数量
-const loadWaitingCount = async () => {
+// 加载正在服务的人数
+const loadActiveCount = async () => {
   try {
     const res = await safeFetch('/api/v1/admin/customer-service/statistics', {
       headers: {
@@ -62,7 +62,7 @@ const loadWaitingCount = async () => {
     })
     const data = await res.json()
     if (data.code === 0) {
-      waitingCount.value = data.data.waiting || 0
+      activeCount.value = data.data.active || 0
     }
   } catch (e) {
     // 忽略错误
@@ -288,9 +288,9 @@ onMounted(() => {
   if (appEl) appEl.classList.add('admin-app')
 
   // 加载客服待接入数量
-  loadWaitingCount()
+  loadActiveCount()
   // 每30秒刷新一次
-  setInterval(loadWaitingCount, 30000)
+  setInterval(loadActiveCount, 30000)
 
   // 启动客服消息轮询（每10秒检查一次）
   pollingInterval.value = setInterval(checkNewMessages, 10000)

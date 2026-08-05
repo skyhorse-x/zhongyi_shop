@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, Picture, User, Headset } from '@element-plus/icons-vue'
+import { Plus, Picture, User, Headset, ChatDotRound, RefreshLeft, Delete, Close } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
 
 interface ChatMessage {
@@ -13,6 +13,10 @@ interface ChatMessage {
   file_name: string
   created_at: string
   read_at: string | null
+  is_deleted?: boolean
+  is_recalled?: boolean
+  reply_to_id?: number | null
+  reply_to?: ChatMessage | null
 }
 
 const sessionNo = ref('')
@@ -25,6 +29,12 @@ const isTyping = ref(false)
 const typingTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const heartbeatInterval = ref<ReturnType<typeof setInterval> | null>(null)
 const isLeaving = ref(false) // 标记是否正在离开页面
+
+// 消息操作相关
+const replyToMessage = ref<ChatMessage | null>(null)
+const contextMenuVisible = ref(false)
+const contextMenuPosition = ref({ x: 0, y: 0 })
+const contextMenuMessage = ref<ChatMessage | null>(null)
 
 // 获取认证token
 import { getToken } from '@/utils/auth'
@@ -79,6 +89,12 @@ const loadMessages = async () => {
 const sendMessage = async () => {
   const text = inputText.value.trim()
   if (!text) return
+
+  // 如果有引用消息，发送引用消息
+  if (replyToMessage.value) {
+    await sendReplyMessage()
+    return
+  }
 
   if (!sessionNo.value) {
     await getOrCreateSession()
@@ -204,8 +220,8 @@ const sendHeartbeat = async () => {
   }
 }
 
-// 关闭会话（用户离开时调用）
-const closeSessionOnLeave = async () => {
+// 用户离开页面时标记为离线（不关闭会话，保留对话记录）
+const markOfflineOnLeave = async () => {
   if (!sessionNo.value || isLeaving.value) return
   isLeaving.value = true
 
@@ -216,7 +232,7 @@ const closeSessionOnLeave = async () => {
   }
 
   // 使用 sendBeacon 确保请求在页面关闭时也能发送
-  const url = `${window.location.origin}/api/v1/customer-service/sessions/${sessionNo.value}/close`
+  const url = `${window.location.origin}/api/v1/customer-service/sessions/${sessionNo.value}/mark-offline`
   const token = getToken()
 
   if (navigator.sendBeacon) {
@@ -249,6 +265,132 @@ const simulateTyping = () => {
   }, 3000)
 }
 
+// ========== 消息操作：删除、撤回、引用 ==========
+
+// 删除消息
+const deleteMessage = async (msg: ChatMessage) => {
+  if (!sessionNo.value) return
+  try {
+    const res = await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/messages/${msg.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      msg.is_deleted = true
+      ElMessage.success('消息已删除')
+    } else {
+      ElMessage.error(data.message || '删除失败')
+    }
+  } catch {
+    ElMessage.error('删除失败')
+  }
+  contextMenuVisible.value = false
+}
+
+// 撤回消息
+const recallMessage = async (msg: ChatMessage) => {
+  if (!sessionNo.value) return
+  try {
+    const res = await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/messages/${msg.id}/recall`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      msg.is_recalled = true
+      ElMessage.success('消息已撤回')
+    } else {
+      ElMessage.error(data.message || '撤回失败')
+    }
+  } catch {
+    ElMessage.error('撤回失败')
+  }
+  contextMenuVisible.value = false
+}
+
+// 引用消息
+const setReplyTo = (msg: ChatMessage) => {
+  replyToMessage.value = msg
+  contextMenuVisible.value = false
+}
+
+// 取消引用
+const cancelReply = () => {
+  replyToMessage.value = null
+}
+
+// 发送引用消息
+const sendReplyMessage = async () => {
+  const text = inputText.value.trim()
+  if (!text || !sessionNo.value || !replyToMessage.value) return
+  try {
+    const res = await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/reply`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        content: text,
+        reply_to_id: replyToMessage.value.id,
+      }),
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      messages.value.push(data.data)
+      inputText.value = ''
+      replyToMessage.value = null
+      await scrollToBottom()
+    } else {
+      ElMessage.error(data.message || '发送失败')
+    }
+  } catch {
+    ElMessage.error('发送失败')
+  }
+}
+
+// 显示右键菜单
+const showContextMenu = (event: MouseEvent, msg: ChatMessage) => {
+  event.preventDefault()
+  contextMenuMessage.value = msg
+  contextMenuPosition.value = { x: event.clientX, y: event.clientY }
+  contextMenuVisible.value = true
+}
+
+// 关闭右键菜单
+const closeContextMenu = () => {
+  contextMenuVisible.value = false
+  contextMenuMessage.value = null
+}
+
+// 判断消息是否可以撤回（2分钟内，自己发送的）
+const canRecall = (msg: ChatMessage): boolean => {
+  if (msg.sender_type !== 'user') return false
+  if (msg.is_deleted || msg.is_recalled) return false
+  const createdAt = new Date(msg.created_at)
+  const now = new Date()
+  return (now.getTime() - createdAt.getTime()) < 2 * 60 * 1000
+}
+
+// 判断消息是否可以删除（只能删除自己发送的）
+const canDelete = (msg: ChatMessage): boolean => {
+  if (msg.sender_type !== 'user') return false
+  return !msg.is_deleted && !msg.is_recalled
+}
+
+// 判断消息是否可以引用
+const canReply = (msg: ChatMessage): boolean => {
+  return !msg.is_deleted && !msg.is_recalled
+}
+
 // 格式化时间
 const formatTime = (timestamp: string): string => {
   const date = new Date(timestamp)
@@ -269,7 +411,7 @@ onMounted(() => {
   }, 30000)
 
   // 监听页面关闭/刷新事件
-  window.addEventListener('beforeunload', closeSessionOnLeave)
+  window.addEventListener('beforeunload', markOfflineOnLeave)
 })
 
 onUnmounted(() => {
@@ -279,11 +421,11 @@ onUnmounted(() => {
     heartbeatInterval.value = null
   }
 
-  // 如果用户离开页面（非 beforeunload 触发），关闭会话
-  closeSessionOnLeave()
+  // 如果用户离开页面（非 beforeunload 触发），标记离线
+  markOfflineOnLeave()
 
   // 移除事件监听
-  window.removeEventListener('beforeunload', closeSessionOnLeave)
+  window.removeEventListener('beforeunload', markOfflineOnLeave)
 })
 </script>
 
@@ -300,7 +442,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 消息列表 -->
-    <div ref="messageListRef" class="message-list">
+    <div ref="messageListRef" class="message-list" @click="closeContextMenu">
       <!-- 服务提示 -->
       <div class="service-tip">
         <span class="tip-text">工作日 9:00-18:00 在线服务</span>
@@ -319,28 +461,78 @@ onUnmounted(() => {
         :key="msg.id"
         class="message-item"
         :class="msg.sender_type"
+        @contextmenu.prevent="showContextMenu($event, msg)"
       >
         <div class="avatar">
           <el-icon v-if="msg.sender_type === 'user'"><User /></el-icon>
           <el-icon v-else><Headset /></el-icon>
         </div>
         <div class="message-content">
-          <!-- 文本消息 -->
-          <div v-if="msg.msg_type === 'text'" class="message-bubble">
-            {{ msg.content }}
+          <!-- 引用消息预览 -->
+          <div v-if="msg.reply_to_id && msg.reply_to" class="reply-preview">
+            <div class="reply-line"></div>
+            <div class="reply-content">
+              <span class="reply-sender">{{ msg.reply_to.sender_type === 'user' ? '我' : '客服' }}：</span>
+              <span class="reply-text">{{ msg.reply_to.content || '[图片]' }}</span>
+            </div>
           </div>
-          <!-- 图片消息 -->
-          <div v-else-if="msg.msg_type === 'image'" class="message-bubble image-bubble">
-            <img :src="msg.file_url" class="message-image" @click="previewImage(msg.file_url)" />
+          <!-- 已删除/撤回提示 -->
+          <div v-if="msg.is_deleted || msg.is_recalled" class="message-bubble deleted-bubble">
+            <el-icon><Close /></el-icon>
+            {{ msg.is_recalled ? '消息已撤回' : '消息已删除' }}
           </div>
+          <!-- 正常消息内容 -->
+          <template v-else>
+            <!-- 文本消息 -->
+            <div v-if="msg.msg_type === 'text'" class="message-bubble">
+              {{ msg.content }}
+            </div>
+            <!-- 图片消息 -->
+            <div v-else-if="msg.msg_type === 'image'" class="message-bubble image-bubble">
+              <img :src="msg.file_url" class="message-image" @click.stop="previewImage(msg.file_url)" />
+            </div>
+          </template>
           <div class="message-time">
             {{ formatTime(msg.created_at) }}
             <!-- 已读/未读状态（仅自己发送的消息显示） -->
-            <span v-if="msg.sender_type === 'user'" class="read-status">
+            <span v-if="msg.sender_type === 'user' && !msg.is_deleted && !msg.is_recalled" class="read-status">
               {{ msg.read_at ? '已读' : '未读' }}
             </span>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 引用消息预览条 -->
+    <div v-if="replyToMessage" class="reply-bar">
+      <div class="reply-bar-content">
+        <el-icon class="reply-icon"><ChatDotRound /></el-icon>
+        <span class="reply-label">引用：</span>
+        <span class="reply-text">{{ replyToMessage.content || '[图片]' }}</span>
+      </div>
+      <button class="reply-cancel" @click="cancelReply">
+        <el-icon><Close /></el-icon>
+      </button>
+    </div>
+
+    <!-- 消息右键菜单 -->
+    <div
+      v-if="contextMenuVisible"
+      class="context-menu"
+      :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }"
+      @click.stop
+    >
+      <div v-if="contextMenuMessage && canReply(contextMenuMessage)" class="context-menu-item" @click="setReplyTo(contextMenuMessage)">
+        <el-icon><ChatDotRound /></el-icon>
+        <span>引用</span>
+      </div>
+      <div v-if="contextMenuMessage && canRecall(contextMenuMessage)" class="context-menu-item" @click="recallMessage(contextMenuMessage)">
+        <el-icon><RefreshLeft /></el-icon>
+        <span>撤回</span>
+      </div>
+      <div v-if="contextMenuMessage && canDelete(contextMenuMessage)" class="context-menu-item danger" @click="deleteMessage(contextMenuMessage)">
+        <el-icon><Delete /></el-icon>
+        <span>删除</span>
       </div>
     </div>
 
@@ -627,5 +819,130 @@ onUnmounted(() => {
 
 .hidden-input {
   display: none;
+}
+
+/* 右键菜单 */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  min-width: 120px;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: background 0.2s;
+}
+
+.context-menu-item:hover {
+  background: #f5f5f5;
+}
+
+.context-menu-item.danger {
+  color: #ee0a24;
+}
+
+.context-menu-item.danger:hover {
+  background: #fef0f0;
+}
+
+/* 引用消息预览条 */
+.reply-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #f0f9eb;
+  border-top: 1px solid #e1f3d8;
+}
+
+.reply-bar-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.reply-icon {
+  color: #07c160;
+  font-size: 14px;
+}
+
+.reply-label {
+  color: #666;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.reply-text {
+  color: #333;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.reply-cancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #999;
+  margin-left: 8px;
+}
+
+.reply-cancel:hover {
+  color: #666;
+}
+
+/* 消息内的引用预览 */
+.reply-preview {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.reply-line {
+  width: 3px;
+  background: #07c160;
+  border-radius: 2px;
+}
+
+.reply-content {
+  flex: 1;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 4px;
+  font-size: 12px;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reply-sender {
+  color: #07c160;
+  font-weight: 500;
+}
+
+/* 已删除/撤回消息 */
+.deleted-bubble {
+  background: #f5f5f5 !important;
+  color: #999 !important;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 </style>

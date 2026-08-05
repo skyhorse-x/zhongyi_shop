@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, markRaw } from 'vue'
+import { computed, ref, markRaw, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   ArrowRight,
@@ -14,6 +14,7 @@ import {
   Search,
   Setting,
 } from '@element-plus/icons-vue'
+import { useUnreadCount } from '@/composables/useUnreadCount'
 
 const router = useRouter()
 const route = useRoute()
@@ -88,8 +89,15 @@ const switchTab = (path: string) => {
   router.push(path)
 }
 
-// 未读消息数
-const unreadCount = ref(3)
+// 获取未读消息数（从API获取真实数据）
+const { unreadCount, fetchUnreadCount } = useUnreadCount()
+
+// 进入消息页时刷新未读数量
+watch(() => route.path, (newPath) => {
+  if (newPath.startsWith('/messages')) {
+    fetchUnreadCount()
+  }
+})
 
 // 检测是否为微信内置浏览器
 const isWeChat = computed(() => {

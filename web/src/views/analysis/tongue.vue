@@ -18,7 +18,7 @@ const loading = ref(false)
 const aiText = ref('')
 const analysisTimes = ref(0)
 const gender = ref<number | null>(null)
-const age = ref<number | null>(null)
+const age = ref<number>(18)
 const textExpanded = ref(false) // 症状描述是否展开
 
 // 年龄选项 1-100岁

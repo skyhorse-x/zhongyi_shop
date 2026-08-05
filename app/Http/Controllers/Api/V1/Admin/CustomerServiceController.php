@@ -263,4 +263,136 @@ class CustomerServiceController extends Controller
             'data' => $stats,
         ]);
     }
+
+    /**
+     * 删除消息（软删除，管理员可删除任何消息）
+     */
+    public function deleteMessage(Request $request, $sessionNo, $messageId)
+    {
+        $admin = $request->user();
+        
+        $session = CustomerServiceSession::where('session_no', $sessionNo)->firstOrFail();
+        
+        $message = CustomerServiceMessage::where('id', $messageId)
+            ->where('session_id', $session->id)
+            ->firstOrFail();
+        
+        $message->is_deleted = true;
+        $message->deleted_at = now();
+        $message->deleted_by = $admin->id;
+        $message->save();
+        
+        return response()->json([
+            'code' => 0,
+            'message' => '消息已删除',
+        ]);
+    }
+
+    /**
+     * 撤回消息（管理员可撤回自己发送的消息，2分钟内）
+     */
+    public function recallMessage(Request $request, $sessionNo, $messageId)
+    {
+        $admin = $request->user();
+        
+        $session = CustomerServiceSession::where('session_no', $sessionNo)->firstOrFail();
+        
+        $message = CustomerServiceMessage::where('id', $messageId)
+            ->where('session_id', $session->id)
+            ->firstOrFail();
+        
+        // 只能撤回自己发送的消息
+        if ($message->sender_id !== $admin->id || $message->sender_type !== 'admin') {
+            return response()->json([
+                'code' => 403,
+                'message' => '只能撤回自己发送的消息',
+            ], 403);
+        }
+        
+        // 检查是否在2分钟内
+        $createdAt = $message->created_at;
+        if (now()->diffInMinutes($createdAt) > 2) {
+            return response()->json([
+                'code' => 400,
+                'message' => '消息发送超过2分钟，无法撤回',
+            ], 400);
+        }
+        
+        $message->is_recalled = true;
+        $message->recalled_at = now();
+        $message->save();
+        
+        return response()->json([
+            'code' => 0,
+            'message' => '消息已撤回',
+        ]);
+    }
+
+    /**
+     * 引用消息发送（管理员端）
+     */
+    public function replyMessage(Request $request, $sessionNo)
+    {
+        $request->validate([
+            'content' => 'required|max:5000',
+            'reply_to_id' => 'required|integer',
+        ]);
+        
+        $admin = $request->user();
+        
+        $session = CustomerServiceSession::where('session_no', $sessionNo)
+            ->firstOrFail();
+        
+        if ($session->status == 2) {
+            return response()->json([
+                'code' => 400,
+                'message' => '会话已结束',
+            ], 400);
+        }
+        
+        // 验证引用的消息是否存在
+        $replyToMessage = CustomerServiceMessage::where('id', $request->reply_to_id)
+            ->where('session_id', $session->id)
+            ->firstOrFail();
+        
+        DB::beginTransaction();
+        try {
+            // 创建消息
+            $message = CustomerServiceMessage::create([
+                'session_id' => $session->id,
+                'sender_id' => $admin->id,
+                'sender_type' => 'admin',
+                'content' => $request->input('content'),
+                'msg_type' => 'text',
+                'reply_to_id' => $request->reply_to_id,
+            ]);
+
+            // 更新会话
+            $session->admin_id = $admin->id;
+            $session->message_count += 1;
+            $session->user_unread += 1;
+            $session->last_message_at = now();
+            if ($session->status == 0) {
+                $session->status = 1;
+            }
+            $session->save();
+            
+            DB::commit();
+            
+            // 加载引用消息信息
+            $message->load('replyTo');
+            
+            return response()->json([
+                'code' => 0,
+                'message' => '发送成功',
+                'data' => $message,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'code' => 500,
+                'message' => '发送失败: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

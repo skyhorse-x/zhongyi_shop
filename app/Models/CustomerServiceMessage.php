@@ -27,12 +27,22 @@ class CustomerServiceMessage extends Model
         'link_title',
         'status',
         'read_at',
+        'is_deleted',
+        'deleted_at',
+        'deleted_by',
+        'is_recalled',
+        'recalled_at',
+        'reply_to_id',
     ];
 
     protected $casts = [
         'file_size' => 'integer',
         'read_at'   => 'datetime',
         'is_auto_reply' => 'boolean',
+        'is_deleted' => 'boolean',
+        'deleted_at' => 'datetime',
+        'is_recalled' => 'boolean',
+        'recalled_at' => 'datetime',
     ];
 
     /**
@@ -76,5 +86,29 @@ class CustomerServiceMessage extends Model
     public function isFile(): bool
     {
         return $this->message_type === 'file';
+    }
+
+    /**
+     * 引用的消息
+     */
+    public function replyTo(): BelongsTo
+    {
+        return $this->belongsTo(CustomerServiceMessage::class, 'reply_to_id');
+    }
+
+    /**
+     * 判断是否为已删除
+     */
+    public function isDeleted(): bool
+    {
+        return $this->is_deleted;
+    }
+
+    /**
+     * 判断是否为已撤回
+     */
+    public function isRecalled(): bool
+    {
+        return $this->is_recalled;
     }
 }

@@ -2,7 +2,7 @@
 import { ref, nextTick, onMounted, onUnmounted, defineComponent, h } from 'vue'
 import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
-import { Picture, ArrowLeft, ChatDotRound, User, Document, Money, Setting, Plus, Search, Refresh, MagicStick } from '@element-plus/icons-vue'
+import { Picture, ArrowLeft, ChatDotRound, User, Document, Money, Setting, Plus, Search, Refresh, MagicStick, RefreshLeft, Delete } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import { getAdminToken } from '@/utils/auth'
 import { useNotification } from '@/composables/useNotification'
@@ -49,6 +49,10 @@ interface Message {
   file_name: string
   created_at: string
   read_at: string | null
+  is_deleted?: boolean
+  is_recalled?: boolean
+  reply_to_id?: number | null
+  reply_to?: Message | null
 }
 
 const sessions = ref<Session[]>([])
@@ -66,11 +70,17 @@ const stats = ref({
   online: 0,
 })
 
-const statusFilter = ref('')
+const statusFilter = ref('1') // 默认显示服务中
 const searchKeyword = ref('')
 const lastMessageCount = ref(0)
 const showChat = ref(false)
 const activeTab = ref('chat')
+
+// 消息操作相关
+const replyToMessage = ref<Message | null>(null) // 当前引用的消息
+const contextMenuVisible = ref(false)
+const contextMenuPosition = ref({ x: 0, y: 0 })
+const contextMenuMessage = ref<Message | null>(null)
 
 // 常用话术
 interface Phrase {
@@ -383,6 +393,13 @@ const backToList = () => {
 const sendMessage = async () => {
   const text = inputText.value.trim()
   if (!text || !currentSession.value) return
+
+  // 如果有引用消息，发送引用消息
+  if (replyToMessage.value) {
+    await sendReplyMessage()
+    return
+  }
+
   try {
     const res = await safeFetch(`/api/v1/admin/customer-service/sessions/${currentSession.value.session_no}/messages`, {
       method: 'POST',
@@ -415,6 +432,132 @@ const quickSendPhrase = async (content: string) => {
   }
   inputText.value = content
   await sendMessage()
+}
+
+// ========== 消息操作：删除、撤回、引用 ==========
+
+// 删除消息
+const deleteMessage = async (msg: Message) => {
+  if (!currentSession.value) return
+  try {
+    const res = await safeFetch(`/api/v1/admin/customer-service/sessions/${currentSession.value.session_no}/messages/${msg.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      msg.is_deleted = true
+      ElMessage.success('消息已删除')
+    } else {
+      ElMessage.error(data.message || '删除失败')
+    }
+  } catch {
+    ElMessage.error('删除失败')
+  }
+  contextMenuVisible.value = false
+}
+
+// 撤回消息
+const recallMessage = async (msg: Message) => {
+  if (!currentSession.value) return
+  try {
+    const res = await safeFetch(`/api/v1/admin/customer-service/sessions/${currentSession.value.session_no}/messages/${msg.id}/recall`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      msg.is_recalled = true
+      ElMessage.success('消息已撤回')
+    } else {
+      ElMessage.error(data.message || '撤回失败')
+    }
+  } catch {
+    ElMessage.error('撤回失败')
+  }
+  contextMenuVisible.value = false
+}
+
+// 引用消息
+const setReplyTo = (msg: Message) => {
+  replyToMessage.value = msg
+  contextMenuVisible.value = false
+}
+
+// 取消引用
+const cancelReply = () => {
+  replyToMessage.value = null
+}
+
+// 发送引用消息
+const sendReplyMessage = async () => {
+  const text = inputText.value.trim()
+  if (!text || !currentSession.value || !replyToMessage.value) return
+  try {
+    const res = await safeFetch(`/api/v1/admin/customer-service/sessions/${currentSession.value.session_no}/reply`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        content: text,
+        reply_to_id: replyToMessage.value.id,
+      }),
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      messages.value.push(data.data)
+      inputText.value = ''
+      replyToMessage.value = null
+      await scrollToBottom()
+      loadSessions()
+    } else {
+      ElMessage.error(data.message || '发送失败')
+    }
+  } catch {
+    ElMessage.error('发送失败')
+  }
+}
+
+// 显示右键菜单
+const showContextMenu = (event: MouseEvent, msg: Message) => {
+  event.preventDefault()
+  contextMenuMessage.value = msg
+  contextMenuPosition.value = { x: event.clientX, y: event.clientY }
+  contextMenuVisible.value = true
+}
+
+// 关闭右键菜单
+const closeContextMenu = () => {
+  contextMenuVisible.value = false
+  contextMenuMessage.value = null
+}
+
+// 判断消息是否可以撤回（2分钟内，自己发送的）
+const canRecall = (msg: Message): boolean => {
+  if (msg.sender_type !== 'admin') return false
+  if (msg.is_deleted || msg.is_recalled) return false
+  const createdAt = new Date(msg.created_at)
+  const now = new Date()
+  return (now.getTime() - createdAt.getTime()) < 2 * 60 * 1000
+}
+
+// 判断消息是否可以删除
+const canDelete = (msg: Message): boolean => {
+  return !msg.is_deleted && !msg.is_recalled
+}
+
+// 判断消息是否可以引用
+const canReply = (msg: Message): boolean => {
+  return !msg.is_deleted && !msg.is_recalled
 }
 
 const triggerFileInput = () => {
@@ -820,13 +963,14 @@ onUnmounted(() => {
                     {{ getStatusText(session.status) }}
                   </span>
                   <span class="session-mobile">{{ session.user?.mobile }}</span>
-                  <span v-if="session.admin_unread > 0" class="unread-badge">{{ session.admin_unread }}</span>
+                  <span v-if="session.admin_unread > 0" class="unread-badge pulse">{{ session.admin_unread }}</span>
                 </div>
                 <div class="session-meta">
                   <span class="meta-tag" :class="session.is_actually_online ? 'online' : 'offline'">
                     {{ session.is_actually_online ? '在线' : '离线' }}
                   </span>
                   <span v-if="session.browser_short" class="meta-tag browser">{{ session.browser_short }}</span>
+                  <span v-if="session.admin_unread > 0" class="unread-tip">新消息</span>
                 </div>
               </div>
             </div>
@@ -879,28 +1023,45 @@ onUnmounted(() => {
             </div>
 
             <!-- 消息列表 -->
-            <div ref="messageListRef" class="message-list">
+            <div ref="messageListRef" class="message-list" @click="closeContextMenu">
               <!-- 用户消息在左侧 -->
               <div
                 v-for="msg in messages"
                 :key="msg.id"
                 class="message-item"
                 :class="msg.sender_type === 'user' ? 'msg-left' : 'msg-right'"
+                @contextmenu.prevent="showContextMenu($event, msg)"
               >
                 <div class="message-avatar">
                   {{ msg.sender_type === 'user' ? currentSession.user?.nickname?.[0] || 'U' : '客' }}
                 </div>
                 <div class="message-body">
-                  <div v-if="msg.msg_type === 'text'" class="message-bubble">
-                    {{ msg.content }}
+                  <!-- 引用消息预览 -->
+                  <div v-if="msg.reply_to_id && msg.reply_to" class="reply-preview">
+                    <div class="reply-line"></div>
+                    <div class="reply-content">
+                      <span class="reply-sender">{{ msg.reply_to.sender_type === 'admin' ? '客服' : msg.reply_to.session?.user?.nickname || '用户' }}：</span>
+                      <span class="reply-text">{{ msg.reply_to.content || '[图片]' }}</span>
+                    </div>
                   </div>
-                  <div v-else-if="msg.msg_type === 'image'" class="message-bubble image-bubble">
-                    <img :src="msg.file_url" class="message-image" @click="previewImage(msg.file_url)" />
+                  <!-- 已删除/撤回提示 -->
+                  <div v-if="msg.is_deleted || msg.is_recalled" class="message-bubble deleted-bubble">
+                    <el-icon><Close /></el-icon>
+                    {{ msg.is_recalled ? '消息已撤回' : '消息已删除' }}
                   </div>
+                  <!-- 正常消息内容 -->
+                  <template v-else>
+                    <div v-if="msg.msg_type === 'text'" class="message-bubble">
+                      {{ msg.content }}
+                    </div>
+                    <div v-else-if="msg.msg_type === 'image'" class="message-bubble image-bubble">
+                      <img :src="msg.file_url" class="message-image" @click.stop="previewImage(msg.file_url)" />
+                    </div>
+                  </template>
                   <div class="message-time">
                     {{ formatTime(msg.created_at) }}
                     <!-- 仅管理员自己的消息显示用户是否已读 -->
-                    <span v-if="msg.sender_type === 'admin'" class="read-status" :class="msg.read_at ? 'read' : 'unread'">
+                    <span v-if="msg.sender_type === 'admin' && !msg.is_deleted && !msg.is_recalled" class="read-status" :class="msg.read_at ? 'read' : 'unread'">
                       {{ msg.read_at ? '已读' : '未读' }}
                     </span>
                   </div>
@@ -910,6 +1071,18 @@ onUnmounted(() => {
                 <el-icon><ChatDotRound /></el-icon>
                 <div>暂无消息，开始对话吧</div>
               </div>
+            </div>
+
+            <!-- 引用消息预览条 -->
+            <div v-if="replyToMessage" class="reply-bar">
+              <div class="reply-bar-content">
+                <el-icon class="reply-icon"><ChatDotRound /></el-icon>
+                <span class="reply-label">引用：</span>
+                <span class="reply-text">{{ replyToMessage.content || '[图片]' }}</span>
+              </div>
+              <button class="reply-cancel" @click="cancelReply">
+                <el-icon><Close /></el-icon>
+              </button>
             </div>
 
             <!-- 快速话术区域 -->
@@ -968,6 +1141,27 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 消息右键菜单 -->
+    <div
+      v-if="contextMenuVisible"
+      class="context-menu"
+      :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }"
+      @click.stop
+    >
+      <div v-if="contextMenuMessage && canReply(contextMenuMessage)" class="context-menu-item" @click="setReplyTo(contextMenuMessage)">
+        <el-icon><ChatDotRound /></el-icon>
+        <span>引用</span>
+      </div>
+      <div v-if="contextMenuMessage && canRecall(contextMenuMessage)" class="context-menu-item" @click="recallMessage(contextMenuMessage)">
+        <el-icon><RefreshLeft /></el-icon>
+        <span>撤回</span>
+      </div>
+      <div v-if="contextMenuMessage && canDelete(contextMenuMessage)" class="context-menu-item danger" @click="deleteMessage(contextMenuMessage)">
+        <el-icon><Delete /></el-icon>
+        <span>删除</span>
       </div>
     </div>
 
@@ -1527,6 +1721,28 @@ onUnmounted(() => {
   margin-left: auto;
 }
 
+.unread-badge.pulse {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 108, 108, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(245, 108, 108, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 108, 108, 0);
+  }
+}
+
+.unread-tip {
+  font-size: 11px;
+  color: #f56c6c;
+  margin-left: 6px;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -1700,6 +1916,131 @@ onUnmounted(() => {
 
 .message-body {
   max-width: 60%;
+}
+
+/* 右键菜单 */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  min-width: 120px;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: background 0.2s;
+}
+
+.context-menu-item:hover {
+  background: #f5f5f5;
+}
+
+.context-menu-item.danger {
+  color: #ee0a24;
+}
+
+.context-menu-item.danger:hover {
+  background: #fef0f0;
+}
+
+/* 引用消息预览条 */
+.reply-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #f0f9eb;
+  border-top: 1px solid #e1f3d8;
+}
+
+.reply-bar-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.reply-icon {
+  color: #07c160;
+  font-size: 14px;
+}
+
+.reply-label {
+  color: #666;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.reply-text {
+  color: #333;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.reply-cancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #999;
+  margin-left: 8px;
+}
+
+.reply-cancel:hover {
+  color: #666;
+}
+
+/* 消息内的引用预览 */
+.reply-preview {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.reply-line {
+  width: 3px;
+  background: #07c160;
+  border-radius: 2px;
+}
+
+.reply-content {
+  flex: 1;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 4px;
+  font-size: 12px;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reply-sender {
+  color: #07c160;
+  font-weight: 500;
+}
+
+/* 已删除/撤回消息 */
+.deleted-bubble {
+  background: #f5f5f5 !important;
+  color: #999 !important;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .message-bubble {

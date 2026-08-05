@@ -100,6 +100,11 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::post('sessions/{sessionNo}/admin-mark-read', [V1\CustomerServiceController::class, 'adminMarkRead']);
             Route::post('sessions/{sessionNo}/close', [V1\CustomerServiceController::class, 'closeSession']);
             Route::post('sessions/{sessionNo}/heartbeat', [V1\CustomerServiceController::class, 'heartbeat']);
+            Route::post('sessions/{sessionNo}/mark-offline', [V1\CustomerServiceController::class, 'markOffline']);
+            // 消息操作：删除、撤回、引用
+            Route::delete('sessions/{sessionNo}/messages/{messageId}', [V1\CustomerServiceController::class, 'deleteMessage']);
+            Route::post('sessions/{sessionNo}/messages/{messageId}/recall', [V1\CustomerServiceController::class, 'recallMessage']);
+            Route::post('sessions/{sessionNo}/reply', [V1\CustomerServiceController::class, 'replyMessage']);
         });
         
         // 系统消息（用户端）
@@ -307,6 +312,10 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
                 Route::post('sessions/{sessionNo}/messages', [V1\Admin\CustomerServiceController::class, 'sendMessage']);
                 Route::post('sessions/{sessionNo}/upload-image', [V1\Admin\CustomerServiceController::class, 'uploadImage']);
                 Route::post('sessions/{sessionNo}/close', [V1\Admin\CustomerServiceController::class, 'closeSession']);
+                // 消息操作：删除、撤回、引用
+                Route::delete('sessions/{sessionNo}/messages/{messageId}', [V1\Admin\CustomerServiceController::class, 'deleteMessage']);
+                Route::post('sessions/{sessionNo}/messages/{messageId}/recall', [V1\Admin\CustomerServiceController::class, 'recallMessage']);
+                Route::post('sessions/{sessionNo}/reply', [V1\Admin\CustomerServiceController::class, 'replyMessage']);
                 
                 // 常用话术管理
                 Route::get('phrases', [V1\Admin\CustomerServiceManageController::class, 'phrases']);

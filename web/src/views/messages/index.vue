@@ -1,45 +1,102 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ChatLineRound, Bell } from '@element-plus/icons-vue'
+import { safeFetch } from '@/utils/fetch'
+import { getToken } from '@/utils/auth'
+import { useUnreadCount } from '@/composables/useUnreadCount'
 
 const router = useRouter()
-
-// 客服消息
-const customerServiceMsg = ref({
-  unread: 2,
-  lastMessage: '您好，请问有什么可以帮您？',
-  time: '10:30',
-})
+const { fetchUnreadCount, decrementUnread } = useUnreadCount()
 
 // 系统消息列表
-const systemMessages = ref([
-  {
-    id: 1,
-    title: '系统通知',
-    content: '欢迎使用ai 中医健康助手平台，祝您身体健康！',
-    time: '2026-08-02 09:00',
-    unread: true,
-    type: 'welcome',
-  },
-  {
-    id: 2,
-    title: '功能更新',
-    content: '体质测试功能已上线，快来体验您的中医体质吧！',
-    time: '2026-08-01 14:30',
-    unread: false,
-    type: 'update',
-  },
-  {
-    id: 3,
-    title: '活动通知',
-    content: '新用户注册即送3次免费分析机会，快来体验吧！',
-    time: '2026-07-30 10:00',
-    unread: false,
-    type: 'activity',
-  },
-])
+interface SystemMessage {
+  id: number
+  title: string
+  content: string
+  created_at: string
+  is_read: boolean
+  type: string
+}
+
+const systemMessages = ref<SystemMessage[]>([])
+const loading = ref(false)
+
+// 客服消息未读数
+const customerServiceUnread = ref(0)
+const customerServiceLastMessage = ref('您好，请问有什么可以帮您？')
+const customerServiceTime = ref('')
+
+// 获取系统消息列表
+const loadSystemMessages = async () => {
+  loading.value = true
+  try {
+    const res = await safeFetch('/api/v1/system-messages', {
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      systemMessages.value = data.data.data || []
+    }
+  } catch {
+    ElMessage.error('获取消息失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 获取客服消息未读数
+const loadCustomerServiceUnread = async () => {
+  try {
+    const res = await safeFetch('/api/v1/customer-service/sessions', {
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0 && data.data?.data) {
+      let totalUnread = 0
+      data.data.data.forEach((session: any) => {
+        totalUnread += session.user_unread || 0
+        // 获取最近一条消息
+        if (session.latest_message && !customerServiceLastMessage.value) {
+          customerServiceLastMessage.value = session.latest_message.content || '新消息'
+          customerServiceTime.value = formatTime(session.latest_message.created_at)
+        }
+      })
+      customerServiceUnread.value = totalUnread
+    }
+  } catch {
+    // 获取失败时不更新
+  }
+}
+
+// 格式化时间
+const formatTime = (timeStr: string) => {
+  if (!timeStr) return ''
+  const date = new Date(timeStr)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  // 1分钟内
+  if (diff < 60000) return '刚刚'
+  // 1小时内
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
+  // 今天内
+  if (diff < 86400000 && date.getDate() === now.getDate()) {
+    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+  }
+  // 昨天
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (date.getDate() === yesterday.getDate()) return '昨天'
+  // 其他
+  return `${date.getMonth() + 1}/${date.getDate()}`
+}
 
 // 跳转到客服聊天
 const goToCustomerService = () => {
@@ -47,13 +104,34 @@ const goToCustomerService = () => {
 }
 
 // 查看系统消息详情
-const viewSystemMessage = (msg: typeof systemMessages.value[0]) => {
+const viewSystemMessage = async (msg: SystemMessage) => {
+  if (!msg.is_read) {
+    // 调用标记已读 API
+    try {
+      await safeFetch(`/api/v1/system-messages/${msg.id}/read`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getToken()}`,
+          'Accept': 'application/json',
+        },
+      })
+      msg.is_read = true
+      decrementUnread()
+      fetchUnreadCount() // 刷新未读数量
+    } catch {
+      // 标记失败
+    }
+  }
   ElMessage.info(msg.content)
-  msg.unread = false
 }
 
-// 获取未读消息总数
-const totalUnread = ref(systemMessages.value.filter(m => m.unread).length + customerServiceMsg.value.unread)
+// 获取未读系统消息数
+const systemUnreadCount = computed(() => systemMessages.value.filter(m => !m.is_read).length)
+
+onMounted(() => {
+  loadSystemMessages()
+  loadCustomerServiceUnread()
+})
 </script>
 
 <template>
@@ -69,11 +147,11 @@ const totalUnread = ref(systemMessages.value.filter(m => m.unread).length + cust
         </div>
         <div class="card-center">
           <div class="card-title">在线客服</div>
-          <div class="card-desc">{{ customerServiceMsg.lastMessage }}</div>
+          <div class="card-desc">{{ customerServiceLastMessage }}</div>
         </div>
         <div class="card-right">
-          <div class="time">{{ customerServiceMsg.time }}</div>
-          <el-badge :value="customerServiceMsg.unread" class="unread-badge" v-if="customerServiceMsg.unread > 0" />
+          <div class="time">{{ customerServiceTime }}</div>
+          <el-badge :value="customerServiceUnread" class="unread-badge" v-if="customerServiceUnread > 0" />
         </div>
       </div>
     </div>
@@ -81,7 +159,7 @@ const totalUnread = ref(systemMessages.value.filter(m => m.unread).length + cust
     <!-- 系统消息 -->
     <div class="message-section">
       <div class="section-title">系统消息</div>
-      <div class="system-list">
+      <div class="system-list" v-loading="loading">
         <div
           v-for="msg in systemMessages"
           :key="msg.id"
@@ -96,13 +174,16 @@ const totalUnread = ref(systemMessages.value.filter(m => m.unread).length + cust
           <div class="card-center">
             <div class="card-title">
               {{ msg.title }}
-              <span class="unread-dot" v-if="msg.unread"></span>
+              <span class="unread-dot" v-if="!msg.is_read"></span>
             </div>
             <div class="card-desc">{{ msg.content }}</div>
           </div>
           <div class="card-right">
-            <div class="time">{{ msg.time }}</div>
+            <div class="time">{{ formatTime(msg.created_at) }}</div>
           </div>
+        </div>
+        <div v-if="systemMessages.length === 0 && !loading" class="empty-tip">
+          暂无消息
         </div>
       </div>
     </div>
@@ -214,6 +295,13 @@ const totalUnread = ref(systemMessages.value.filter(m => m.unread).length + cust
 .time {
   font-size: 12px;
   color: #c8c9cc;
+}
+
+.empty-tip {
+  text-align: center;
+  color: #c8c9cc;
+  padding: 24px 0;
+  font-size: 14px;
 }
 
 .unread-badge {
