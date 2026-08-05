@@ -4,7 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 import { getAdminToken, clearAdminToken } from '@/utils/auth'
-import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service, FirstAidKit, Wallet, CreditCard, RefreshLeft, Close, List } from '@element-plus/icons-vue'
+import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service, FirstAidKit, Wallet, CreditCard, RefreshLeft, Close, List, Message } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()

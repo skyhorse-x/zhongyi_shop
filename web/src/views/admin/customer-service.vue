@@ -1040,7 +1040,7 @@ onUnmounted(() => {
                   <div v-if="msg.reply_to_id && msg.reply_to" class="reply-preview">
                     <div class="reply-line"></div>
                     <div class="reply-content">
-                      <span class="reply-sender">{{ msg.reply_to.sender_type === 'admin' ? '客服' : msg.reply_to.session?.user?.nickname || '用户' }}：</span>
+                      <span class="reply-sender">{{ msg.reply_to.sender_type === 'admin' ? '客服' : '用户' }}：</span>
                       <span class="reply-text">{{ msg.reply_to.content || '[图片]' }}</span>
                     </div>
                   </div>
