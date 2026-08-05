@@ -313,6 +313,15 @@ class AiService
             $imageUrls = is_array($imageUrl) ? $imageUrl : [$imageUrl];
             $content = [];
             foreach ($imageUrls as $url) {
+                // 清理 URL：去除首尾空格和特殊字符
+                $url = trim($url, " \t\n\r\0\x0B`\"'");
+                
+                // 验证 URL 格式
+                if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+                    Log::warning('Invalid image URL skipped', ['url' => $url]);
+                    continue;
+                }
+                
                 // 如果是本地URL，转为base64（外部AI服务无法访问内网地址）
                 if ($this->isLocalUrl($url)) {
                     $base64Url = $this->convertImageToBase64($url);
@@ -325,16 +334,38 @@ class AiService
                         ];
                         continue;
                     }
-                    // Base64转换失败，跳过这张图片（不发送给AI）
-                    Log::warning('Skip image due to base64 conversion failure', ['url' => $url]);
-                    continue;
+                    // Base64转换失败，尝试将本地URL转换为生产URL
+                    $productionUrl = $this->convertLocalUrlToProduction($url);
+                    if ($productionUrl !== $url) {
+                        Log::info('Converted local URL to production URL', [
+                            'original' => $url,
+                            'converted' => $productionUrl,
+                        ]);
+                        $url = $productionUrl;
+                        // 继续执行下面的可访问性检查和发送逻辑
+                    } else {
+                        // 无法转换，跳过这张图片
+                        Log::warning('Skip image due to base64 conversion failure and no production URL', ['url' => $url]);
+                        continue;
+                    }
                 }
+                
+                // 检查远程图片URL是否可访问
+                if (!$this->isImageUrlAccessible($url)) {
+                    throw new \Exception("图片URL无法访问（404或其他错误）：{$url}，请检查图片是否存在");
+                }
+                
                 $content[] = [
                     'type' => 'image_url',
                     'image_url' => [
                         'url' => $url,
                     ],
                 ];
+            }
+            
+            // 检查是否有有效的图片
+            if (empty($content)) {
+                throw new \Exception('没有有效的图片可供分析，请检查图片URL是否正确');
             }
             $content[] = [
                 'type' => 'text',
@@ -944,6 +975,58 @@ PROMPT;
         }
         $localHosts = ['localhost', '127.0.0.1', '::1', '0.0.0.0'];
         return in_array($host, $localHosts) || str_starts_with($host, '192.168.') || str_starts_with($host, '10.');
+    }
+
+    /**
+     * 检查远程图片URL是否可访问
+     */
+    protected function isImageUrlAccessible(string $url): bool
+    {
+        try {
+            $response = Http::withOptions(['verify' => false])
+                ->timeout(10)
+                ->head($url);
+            return $response->successful();
+        } catch (\Exception $e) {
+            Log::warning('Image URL accessibility check failed', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * 将本地URL转换为生产URL
+     */
+    protected function convertLocalUrlToProduction(string $url): string
+    {
+        $productionUrl = SystemConfigService::get('app_url_production');
+        if (empty($productionUrl)) {
+            return $url;
+        }
+        
+        $parsedUrl = parse_url($url);
+        $productionParsed = parse_url($productionUrl);
+        
+        if ($parsedUrl && $productionParsed) {
+            // 替换 host 和 port
+            $parsedUrl['host'] = $productionParsed['host'] ?? 'localhost';
+            $parsedUrl['port'] = $productionParsed['port'] ?? null;
+            $parsedUrl['scheme'] = $productionParsed['scheme'] ?? 'http';
+            
+            // 重建 URL
+            $scheme   = isset($parsedUrl['scheme']) ? $parsedUrl['scheme'] . '://' : '';
+            $host     = $parsedUrl['host'] ?? '';
+            $port     = isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '';
+            $path     = $parsedUrl['path'] ?? '';
+            $query    = isset($parsedUrl['query']) ? '?' . $parsedUrl['query'] : '';
+            $fragment = isset($parsedUrl['fragment']) ? '#' . $parsedUrl['fragment'] : '';
+            
+            return $scheme . $host . $port . $path . $query . $fragment;
+        }
+        
+        return $url;
     }
 
     /**
