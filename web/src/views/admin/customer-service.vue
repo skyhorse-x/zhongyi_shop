@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted, defineComponent, h } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 import { Picture, ArrowLeft, ChatDotRound, User, Document, Money, Setting, Plus, Search, Refresh, MagicStick, RefreshLeft, Delete } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
@@ -75,6 +75,7 @@ const searchKeyword = ref('')
 const lastMessageCount = ref(0)
 const showChat = ref(false)
 const activeTab = ref('chat')
+const previousSessionCount = ref(0) // 用于检测新会话
 
 // 消息操作相关
 const replyToMessage = ref<Message | null>(null) // 当前引用的消息
@@ -232,7 +233,28 @@ const loadSessions = async () => {
     })
     const data = await res.json()
     if (data.code === 0) {
-      sessions.value = data.data.data || []
+      const newSessions = data.data.data || []
+      
+      // 检测新会话（状态为0=待接入的新会话）
+      if (previousSessionCount.value > 0 && newSessions.length > previousSessionCount.value) {
+        const newSession = newSessions.find((s: Session) => s.status === 0 && s.admin_unread > 0)
+        if (newSession) {
+          ElNotification({
+            title: '新会话请求',
+            message: `${newSession.user?.nickname || '用户'} 发起了新的咨询`,
+            type: 'warning',
+            duration: 5000,
+            position: 'top-right',
+            onClick: () => {
+              selectSession(newSession)
+              ElNotification.closeAll()
+            },
+          })
+        }
+      }
+      
+      sessions.value = newSessions
+      previousSessionCount.value = newSessions.length
     } else {
       ElMessage.error(data.message || '加载失败')
     }
@@ -261,11 +283,31 @@ const loadMessages = async (sessionNo: string, silent = false) => {
           // 检查是否需要自动回复
           checkAutoReply(lastMsg.content)
           
+          // 显示 Element Plus 通知弹窗
+          const session = sessions.value.find(s => s.session_no === sessionNo)
+          const senderName = session?.user?.nickname || '用户'
+          ElNotification({
+            title: `新消息 - ${senderName}`,
+            message: lastMsg.content.length > 50 ? lastMsg.content.substring(0, 50) + '...' : lastMsg.content,
+            type: 'success',
+            duration: 3000,
+            position: 'top-right',
+            onClick: () => {
+              // 点击通知切换到对应会话
+              if (currentSessionNo.value !== sessionNo) {
+                const targetSession = sessions.value.find(s => s.session_no === sessionNo)
+                if (targetSession) {
+                  selectSession(targetSession)
+                }
+              }
+              ElNotification.closeAll()
+            },
+          })
+          
           // 显示浏览器通知（如果当前不在该会话或页面未聚焦）
           if (currentSessionNo.value !== sessionNo || document.hidden) {
-            const session = sessions.value.find(s => s.session_no === sessionNo)
             showNewMessageNotification({
-              senderName: session?.user?.nickname || '用户',
+              senderName: senderName,
               content: lastMsg.content,
               sessionId: String(session?.id || ''),
               sessionNo: sessionNo,

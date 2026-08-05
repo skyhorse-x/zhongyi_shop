@@ -27,6 +27,8 @@ const notifications = ref<CustomerNotification[]>([])
 const notificationTimers = ref<Map<number, ReturnType<typeof setTimeout>>>(new Map())
 const lastCheckTime = ref<string>(new Date().toISOString())
 const pollingInterval = ref<ReturnType<typeof setInterval> | null>(null)
+const unreadMessageCount = ref(0) // 未读消息总数
+const showNotificationPanel = ref(false) // 通知面板是否显示
 
 // 使用 shallowRef 避免图标组件被 reactive 包裹，消除 Vue 警告
 const menuItems = shallowRef([
@@ -159,10 +161,13 @@ const showNotification = (notification: CustomerNotification) => {
     playNotificationSound()
   }
 
-  // 设置自动关闭定时器（10秒后）
+  // 更新未读消息数
+  unreadMessageCount.value = notifications.value.length
+
+  // 设置自动关闭定时器（30秒后）
   const timer = setTimeout(() => {
     dismissNotification(notification.id)
-  }, 10000)
+  }, 30000)
   notificationTimers.value.set(notification.id, timer)
 }
 
@@ -177,6 +182,15 @@ const dismissNotification = (id: number) => {
     clearTimeout(timer)
     notificationTimers.value.delete(id)
   }
+  unreadMessageCount.value = notifications.value.length
+}
+
+// 清空所有通知
+const clearAllNotifications = () => {
+  notifications.value = []
+  notificationTimers.value.forEach(timer => clearTimeout(timer))
+  notificationTimers.value.clear()
+  unreadMessageCount.value = 0
 }
 
 // 点击通知 - 跳转到客服页面
@@ -296,6 +310,9 @@ onMounted(() => {
 
   // 启动客服消息轮询（每10秒检查一次）
   pollingInterval.value = setInterval(checkNewMessages, 10000)
+  
+  // 添加点击外部监听（用于关闭通知面板）
+  document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
@@ -306,7 +323,17 @@ onUnmounted(() => {
   // 清理通知定时器
   notificationTimers.value.forEach(timer => clearTimeout(timer))
   notificationTimers.value.clear()
+  // 移除点击外部监听
+  document.removeEventListener('click', handleClickOutside)
 })
+
+// 点击外部关闭通知面板
+const handleClickOutside = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  if (!target.closest('.notification-bell') && !target.closest('.notification-panel')) {
+    showNotificationPanel.value = false
+  }
+}
 </script>
 
 <template>
@@ -360,6 +387,38 @@ onUnmounted(() => {
           <span class="topbar-title">{{ route.meta.title }}</span>
         </div>
         <div class="topbar-right">
+          <!-- 客服通知铃铛 -->
+          <div class="notification-bell" @click="showNotificationPanel = !showNotificationPanel">
+            <el-icon :size="20"><Service /></el-icon>
+            <span v-if="unreadMessageCount > 0" class="badge">{{ unreadMessageCount > 99 ? '99+' : unreadMessageCount }}</span>
+          </div>
+          
+          <!-- 通知面板 -->
+          <div v-if="showNotificationPanel" class="notification-panel" @click.stop>
+            <div class="panel-header">
+              <span>客服消息</span>
+              <el-button v-if="notifications.length > 0" link size="small" @click="clearAllNotifications">清空</el-button>
+            </div>
+            <div class="panel-content">
+              <div v-if="notifications.length === 0" class="empty-text">暂无新消息</div>
+              <div
+                v-for="notification in notifications"
+                :key="notification.id"
+                class="panel-item"
+                @click="handleNotificationClick(notification)"
+              >
+                <div class="item-avatar">{{ notification.nickname?.[0] || 'U' }}</div>
+                <div class="item-content">
+                  <div class="item-header">
+                    <span class="item-name">{{ notification.nickname }}</span>
+                    <span class="item-time">{{ formatNotificationTime(notification.created_at) }}</span>
+                  </div>
+                  <div class="item-text">{{ notification.content }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <el-dropdown @command="handleCommand">
             <span class="admin-username">
               管理员
@@ -630,6 +689,159 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+  position: relative;
+}
+
+/* 通知铃铛 */
+.notification-bell {
+  position: relative;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background 0.2s;
+  color: #666;
+}
+
+.notification-bell:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1989fa;
+}
+
+.notification-bell .badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: #f56c6c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: badge-pulse 2s infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* 通知面板 */
+.notification-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 360px;
+  max-height: 480px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: panel-in 0.2s ease;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #ebeef5;
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.panel-content .empty-text {
+  padding: 40px 20px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+}
+
+.panel-item {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.panel-item:hover {
+  background: #f5f7fa;
+}
+
+.panel-item:last-child {
+  border-bottom: none;
+}
+
+.item-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1989fa, #409eff);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.item-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.item-time {
+  font-size: 12px;
+  color: #999;
+}
+
+.item-text {
+  font-size: 13px;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-username {
