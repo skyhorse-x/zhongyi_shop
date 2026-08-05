@@ -461,6 +461,7 @@ onMounted(() => {
 
           <div class="record-section">
             <h4 class="record-title">调用记录</h4>
+            <div class="table-scroll-wrapper">
             <el-table :data="callRecords" border stripe size="small" style="width: 100%">
               <el-table-column prop="created_at" label="时间" width="160" />
               <el-table-column prop="model_name" label="模型" min-width="110" />
@@ -477,6 +478,7 @@ onMounted(() => {
                 </template>
               </el-table-column>
             </el-table>
+            </div>
 
             <div class="pagination-wrapper">
               <el-pagination

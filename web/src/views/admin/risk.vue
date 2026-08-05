@@ -104,6 +104,7 @@ onMounted(load)
       <el-tabs v-model="activeTab">
         <!-- 事件日志 -->
         <el-tab-pane label="事件日志" name="events">
+          <div class="table-scroll-wrapper">
           <el-table :data="events" stripe>
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column label="时间" width="170">
@@ -128,10 +129,12 @@ onMounted(load)
               </template>
             </el-table-column>
           </el-table>
+          </div>
         </el-tab-pane>
 
         <!-- 黑名单 -->
         <el-tab-pane label="黑名单" name="blacklists">
+          <div class="table-scroll-wrapper">
           <el-table :data="blacklists" stripe>
             <el-table-column prop="type" label="类型" width="100" />
             <el-table-column prop="value" label="值" />
@@ -147,10 +150,12 @@ onMounted(load)
               </template>
             </el-table-column>
           </el-table>
+          </div>
         </el-tab-pane>
 
         <!-- 规则 -->
         <el-tab-pane label="规则列表" name="rules">
+          <div class="table-scroll-wrapper">
           <el-table :data="rules" stripe>
             <el-table-column prop="code" label="编码" width="180" />
             <el-table-column prop="name" label="名称" />
@@ -167,6 +172,7 @@ onMounted(load)
               </template>
             </el-table-column>
           </el-table>
+          </div>
         </el-tab-pane>
       </el-tabs>
     </el-card>

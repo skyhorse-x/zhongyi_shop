@@ -142,6 +142,7 @@ final class InviteTracker
 
     /**
      * 记录邀请注册，并做反作弊校验
+     * 如果邀请人还不是推广员，自动创建推广员记录
      *
      * @param User $inviter 邀请人（任意用户）
      * @param User $user 被邀请注册的用户
@@ -151,8 +152,20 @@ final class InviteTracker
     {
         $info = self::parse($request);
 
-        // 查找推广员记录（如果有）
+        // 查找推广员记录（如果有），如果没有则自动创建
         $promoter = Promoter::where('user_id', $inviter->id)->first();
+        if (!$promoter) {
+            $commissionRate = (float) (SystemConfig::getValue('commission_rate', 15));
+            $promoter = Promoter::create([
+                'user_id' => $inviter->id,
+                'invite_code' => self::generatePromoterInviteCode(),
+                'level' => 1,
+                'commission_rate' => $commissionRate,
+                'status' => 1,
+                'activated_at' => now(),
+            ]);
+            $inviter->update(['is_promoter' => 1]);
+        }
 
         // 风险评分
         $riskScore = self::calculateRiskScore($info, $inviter);
@@ -173,7 +186,7 @@ final class InviteTracker
 
         $registration = InviteRegistration::create(array_merge($info, [
             'inviter_user_id' => $inviter->id,
-            'promoter_id'     => $promoter?->id,
+            'promoter_id'     => $promoter->id,
             'user_id'         => $user->id,
             'invite_code'     => $inviter->invite_code,
             'is_fraud'        => $isFraud,
@@ -181,8 +194,8 @@ final class InviteTracker
             'risk_score'      => $riskScore,
         ]));
 
-        // 更新推广员作弊计数（如果有推广员记录）
-        if ($isFraud && $promoter) {
+        // 更新推广员作弊计数
+        if ($isFraud) {
             $promoter->increment('fraud_count');
             if ($promoter->fraud_count >= 10 && !$promoter->is_banned) {
                 $promoter->update(['is_banned' => true, 'banned_at' => now()]);
@@ -190,6 +203,17 @@ final class InviteTracker
         }
 
         return $registration;
+    }
+
+    /**
+     * 生成推广员专用邀请码（8位）
+     */
+    private static function generatePromoterInviteCode(): string
+    {
+        do {
+            $code = strtoupper(\Illuminate\Support\Str::random(8));
+        } while (Promoter::where('invite_code', $code)->exists());
+        return $code;
     }
 
     /**

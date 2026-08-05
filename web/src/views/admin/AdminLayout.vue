@@ -4,7 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 import { getAdminToken, clearAdminToken } from '@/utils/auth'
-import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service, FirstAidKit, Wallet, CreditCard, RefreshLeft, Close } from '@element-plus/icons-vue'
+import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service, FirstAidKit, Wallet, CreditCard, RefreshLeft, Close, List } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -37,6 +37,7 @@ const menuItems = shallowRef([
   { title: '次数包管理', icon: Goods, path: '/admin/packages' },
   { title: '闲鱼商品管理', icon: Goods, path: '/admin/xianyu-products' },
   { title: 'AI管理', icon: Cpu, path: '/admin/ai' },
+  { title: '队列任务管理', icon: List, path: '/admin/queue' },
   { title: '健康管理档案', icon: FirstAidKit, path: '/admin/health-archives' },
   { title: '推广管理', icon: Promotion, path: '/admin/promoters' },
   { title: '提现审核', icon: Money, path: '/admin/withdraws' },

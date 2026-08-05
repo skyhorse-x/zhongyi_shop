@@ -348,6 +348,16 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
                 Route::get('satisfaction',        [V1\Admin\AnalyticsController::class, 'satisfaction']);
             });
 
+            // 队列任务管理
+            Route::prefix('queue')->group(function () {
+                Route::get('statistics', [V1\Admin\QueueController::class, 'statistics']);
+                Route::get('tasks', [V1\Admin\QueueController::class, 'index']);
+                Route::get('tasks/{taskNo}', [V1\Admin\QueueController::class, 'show']);
+                Route::get('failed-jobs', [V1\Admin\QueueController::class, 'failedJobs']);
+                Route::post('retry/{taskNo}', [V1\Admin\QueueController::class, 'retry']);
+                Route::post('retry-all', [V1\Admin\QueueController::class, 'retryAll']);
+            });
+
             // 退款管理
             Route::prefix('refunds')->group(function () {
                 Route::get('/',           [V1\Admin\RefundController::class, 'index']);

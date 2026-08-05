@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 
 import { useUserStore } from '@/stores/user'
 import { sendSmsCode } from '@/api/auth'
+import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
 const route = useRoute()
@@ -12,6 +13,9 @@ const userStore = useUserStore()
 
 // 注册类型: 'account' | 'mobile'
 const registerType = ref<'account' | 'mobile'>('account')
+
+// 是否禁用手机注册
+const mobileAuthDisabled = ref(false)
 
 const form = ref({
   username: '',
@@ -22,11 +26,22 @@ const form = ref({
   invite_code: '',
 })
 
-// 从URL获取邀请码
-onMounted(() => {
+// 从URL获取邀请码 + 获取系统配置
+onMounted(async () => {
   const inviteCode = route.query.code as string
   if (inviteCode) {
     form.value.invite_code = inviteCode
+  }
+
+  // 获取系统配置，判断是否关闭手机注册
+  try {
+    const res = await safeFetch('/api/v1/analysis/config')
+    const data = await res.json()
+    if (data.code === 0) {
+      mobileAuthDisabled.value = data.data.disable_mobile_auth === '1' || data.data.disable_mobile_auth === 1
+    }
+  } catch {
+    // 获取失败时不影响正常使用
   }
 })
 
@@ -158,7 +173,7 @@ onUnmounted(() => {
       <div class="register-subtitle">加入ai 中医健康助手平台</div>
 
       <!-- 注册方式切换 -->
-      <div class="register-type-switch">
+      <div class="register-type-switch" v-if="!mobileAuthDisabled">
         <div
           class="type-tab"
           :class="{ active: isAccountMode }"
@@ -177,7 +192,7 @@ onUnmounted(() => {
 
       <el-form :model="form" label-width="auto" @submit.prevent="handleRegister">
         <!-- 账号注册模式 -->
-        <template v-if="isAccountMode">
+        <template v-if="isAccountMode || mobileAuthDisabled">
           <el-form-item
             label="账号"
             prop="username"
@@ -192,7 +207,7 @@ onUnmounted(() => {
         </template>
 
         <!-- 手机注册模式 -->
-        <template v-if="isMobileMode">
+        <template v-if="isMobileMode && !mobileAuthDisabled">
           <el-form-item
             label="手机号"
             prop="mobile"

@@ -24,7 +24,7 @@ class AnalysisTask extends Model
         'tokens',
         'cost',
         'result',
-        'error_msg',
+        'error_message',
         'is_paid',
         'started_at',
         'completed_at',

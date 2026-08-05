@@ -617,9 +617,12 @@ class PromoterController extends Controller
     {
         $query = InviteRegistration::with(['user', 'inviter']);
 
-        // 筛选特定邀请人
+        // 筛选特定邀请人（支持 inviter_user_id 或 promoter_id）
         if ($request->filled('inviter_user_id')) {
             $query->where('inviter_user_id', $request->input('inviter_user_id'));
+        }
+        if ($request->filled('promoter_id')) {
+            $query->where('promoter_id', $request->input('promoter_id'));
         }
 
         // 筛选

@@ -19,6 +19,18 @@
     min-width: 800px;
   }
 
+  /* 其他常见表格容器同样启用横向滚动 */
+  .table-wrapper,
+  .table-section {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-wrapper .el-table,
+  .table-section .el-table {
+    min-width: 800px;
+  }
+
   .el-table {
     font-size: 12px;
   }
@@ -82,6 +94,20 @@
     margin-right: 8px;
   }
 
+  /* 搜索/重置按钮组占满一行，移动端更易点击 */
+  .search-form .el-form-item:last-child .el-form-item__content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .search-form .el-form-item:last-child .el-form-item__content .el-button {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+  }
+
   /* ============================================
      3. 弹窗/Dialog 适配
      ============================================ */
@@ -95,6 +121,7 @@
     padding: 16px 12px !important;
     max-height: 65vh;
     overflow-y: auto;
+    overflow-x: auto;
   }
 
   .el-dialog__header {

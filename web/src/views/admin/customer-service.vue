@@ -866,12 +866,8 @@ onUnmounted(() => {
                   </div>
                   <div class="message-time">
                     {{ formatTime(msg.created_at) }}
-                    <!-- 管理员消息：显示用户是否已读 -->
+                    <!-- 仅管理员自己的消息显示用户是否已读 -->
                     <span v-if="msg.sender_type === 'admin'" class="read-status" :class="msg.read_at ? 'read' : 'unread'">
-                      {{ msg.read_at ? '已读' : '未读' }}
-                    </span>
-                    <!-- 用户消息：显示管理员是否已读 -->
-                    <span v-else class="read-status" :class="msg.read_at ? 'read' : 'unread'">
                       {{ msg.read_at ? '已读' : '未读' }}
                     </span>
                   </div>

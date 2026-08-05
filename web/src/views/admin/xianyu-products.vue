@@ -237,6 +237,7 @@ onMounted(() => {
     </el-card>
 
     <el-card shadow="never" style="margin-top: 16px">
+      <div class="table-scroll-wrapper">
       <el-table :data="tableData" stripe>
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column label="商品名称" min-width="140">
@@ -288,6 +289,7 @@ onMounted(() => {
           <el-empty description="暂无闲鱼商品，点击右上角新增" />
         </template>
       </el-table>
+      </div>
 
       <div class="pagination">
         <el-pagination

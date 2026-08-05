@@ -342,7 +342,7 @@ onMounted(() => {
 
       <!-- 推广员列表 -->
       <div v-if="activeTab === 'list'">
-        <el-form :model="{ name: searchName, status: searchStatus }" inline>
+        <el-form :model="{ name: searchName, status: searchStatus }" inline class="search-form">
           <el-form-item label="昵称">
             <el-input v-model="searchName" placeholder="请输入昵称" clearable style="width: 200px" />
           </el-form-item>
@@ -362,6 +362,7 @@ onMounted(() => {
           </el-form-item>
         </el-form>
 
+        <div class="table-scroll-wrapper">
         <el-table :data="tableData" border stripe style="width: 100%">
           <el-table-column prop="id" label="ID" width="80" />
           <el-table-column label="昵称" min-width="120">
@@ -413,6 +414,7 @@ onMounted(() => {
             </template>
           </el-table-column>
         </el-table>
+        </div>
 
         <div class="pagination-wrapper">
           <el-pagination
@@ -471,6 +473,7 @@ onMounted(() => {
           </el-form-item>
         </el-form>
 
+        <div class="table-scroll-wrapper">
         <el-table :data="inviteTableData" border stripe style="width: 100%">
           <el-table-column prop="id" label="ID" width="70" />
           <el-table-column label="推广员" min-width="120">
@@ -526,6 +529,7 @@ onMounted(() => {
             </template>
           </el-table-column>
         </el-table>
+        </div>
 
         <div class="pagination-wrapper">
           <el-pagination
@@ -591,6 +595,7 @@ onMounted(() => {
 
         <!-- 最近佣金 -->
         <h4 class="detail-section-title">最近佣金明细</h4>
+        <div class="table-scroll-wrapper">
         <el-table :data="detailData.recent_commissions || []" size="small" border>
           <el-table-column prop="id" label="ID" width="60" />
           <el-table-column prop="order_no" label="订单号" min-width="160" />
@@ -611,6 +616,7 @@ onMounted(() => {
             <span style="color: #c8c9cc">暂无佣金记录</span>
           </template>
         </el-table>
+        </div>
       </template>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>

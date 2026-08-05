@@ -288,6 +288,7 @@ onMounted(() => {
       </el-button>
     </div>
 
+    <div class="table-scroll-wrapper">
     <el-table :data="tableData" border stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="60" align="center" />
       <el-table-column prop="name" label="角色名称" width="150" />
@@ -345,6 +346,7 @@ onMounted(() => {
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <el-pagination
       v-model:current-page="currentPage"

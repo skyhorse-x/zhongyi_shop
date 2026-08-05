@@ -67,6 +67,7 @@ class AnalysisController extends Controller
         $analysisPrice = SystemConfig::getValue('analysis_price', '9.99');
         $wechatService = SystemConfig::getValue('wechat_service', '');
         $siteName = SystemConfig::getValue('site_name', 'AI 中医健康助手');
+        $disableMobileAuth = SystemConfig::getValue('disable_mobile_auth', '0');
 
         return response()->json([
             'code' => 0,
@@ -76,6 +77,7 @@ class AnalysisController extends Controller
                 'analysis_price' => floatval($analysisPrice),
                 'wechat_service' => $wechatService,
                 'site_name' => $siteName,
+                'disable_mobile_auth' => $disableMobileAuth,
             ],
         ]);
     }

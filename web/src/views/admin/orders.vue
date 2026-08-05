@@ -667,5 +667,15 @@ onMounted(() => {
   .search-card .el-form-item__content {
     margin-left: 0 !important;
   }
+
+  /* 订单号过长时截断显示 */
+  .order-no {
+    display: inline-block;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
 }
 </style>

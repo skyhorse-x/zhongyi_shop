@@ -238,6 +238,7 @@ onMounted(() => {
       destroy-on-close
     >
       <div v-loading="logsLoading">
+        <div class="table-scroll-wrapper">
         <el-table :data="logsData" stripe border max-height="500">
           <el-table-column prop="id" label="ID" width="70" align="center" />
           <el-table-column label="类型" width="100">
@@ -276,6 +277,7 @@ onMounted(() => {
             </template>
           </el-table-column>
         </el-table>
+        </div>
 
         <!-- 分页 -->
         <div class="pagination-section">

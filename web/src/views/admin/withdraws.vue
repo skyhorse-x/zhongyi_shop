@@ -186,7 +186,7 @@ onMounted(() => {
     <el-card>
       <template #header><span>提现申请列表</span></template>
 
-      <el-form :model="{ orderNo: searchOrderNo, promoter: searchPromoter, status: searchStatus }" inline>
+        <el-form :model="{ orderNo: searchOrderNo, promoter: searchPromoter, status: searchStatus }" inline class="search-form">
         <el-form-item label="提现单号">
           <el-input v-model="searchOrderNo" placeholder="请输入提现单号" clearable style="width: 180px" />
         </el-form-item>
@@ -209,6 +209,7 @@ onMounted(() => {
         </el-form-item>
       </el-form>
 
+      <div class="table-scroll-wrapper">
       <el-table :data="tableData" border stripe style="width: 100%">
         <el-table-column prop="withdraw_no" label="提现单号" width="180" />
         <el-table-column prop="promoter" label="推广员" min-width="120" />
@@ -252,6 +253,7 @@ onMounted(() => {
           </template>
         </el-table-column>
       </el-table>
+      </div>
 
       <div class="pagination-wrapper">
         <el-pagination

@@ -79,6 +79,7 @@ const formatPct = (v: number) => `${Number(v || 0)}%`
       <el-col :span="12">
         <el-card>
           <template #header>留存分析（最近 7 天）</template>
+          <div class="table-scroll-wrapper">
           <el-table :data="retention" size="small">
             <el-table-column prop="date" label="日期" width="100" />
             <el-table-column prop="registered" label="注册" width="80" />
@@ -89,6 +90,7 @@ const formatPct = (v: number) => `${Number(v || 0)}%`
               <template #default="{ row }">{{ formatPct(row.d7) }}</template>
             </el-table-column>
           </el-table>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -98,6 +100,7 @@ const formatPct = (v: number) => `${Number(v || 0)}%`
       <el-col :span="12">
         <el-card>
           <template #header>收入趋势（30天）</template>
+          <div class="table-scroll-wrapper">
           <el-table :data="revenue" size="small" max-height="300">
             <el-table-column prop="date" label="日期" width="100" />
             <el-table-column label="收入">
@@ -105,6 +108,7 @@ const formatPct = (v: number) => `${Number(v || 0)}%`
             </el-table-column>
             <el-table-column prop="orders" label="订单数" width="80" />
           </el-table>
+          </div>
         </el-card>
       </el-col>
 
@@ -112,6 +116,7 @@ const formatPct = (v: number) => `${Number(v || 0)}%`
       <el-col :span="12">
         <el-card>
           <template #header>推广员 TOP 10</template>
+          <div class="table-scroll-wrapper">
           <el-table :data="topPromoters" size="small" max-height="300">
             <el-table-column label="排名" width="60">
               <template #default="{ $index }">{{ $index + 1 }}</template>
@@ -126,6 +131,7 @@ const formatPct = (v: number) => `${Number(v || 0)}%`
               <template #default="{ row }">{{ formatMoney(row.available_commission) }}</template>
             </el-table-column>
           </el-table>
+          </div>
         </el-card>
       </el-col>
     </el-row>

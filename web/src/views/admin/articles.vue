@@ -206,6 +206,7 @@ onMounted(() => {
       </el-row>
     </el-form>
 
+    <div class="table-scroll-wrapper">
     <el-table :data="tableData" border stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="60" align="center" />
       <el-table-column label="标题" min-width="200">
@@ -247,6 +248,7 @@ onMounted(() => {
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <el-pagination
       v-model:current-page="currentPage"
