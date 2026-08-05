@@ -48,6 +48,8 @@ const menuItems = shallowRef([
   { title: '体质题目', icon: EditPen, path: '/admin/constitution' },
   { title: '管理员管理', icon: UserFilled, path: '/admin/admins' },
   { title: '角色管理', icon: Operation, path: '/admin/roles' },
+  { title: '操作日志', icon: Document, path: '/admin/operation-logs' },
+  { title: '消息推送', icon: Message, path: '/admin/notification-config' },
   { title: '系统设置', icon: Setting, path: '/admin/settings' },
 ])
 

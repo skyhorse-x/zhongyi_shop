@@ -206,6 +206,7 @@ class PromoterController extends Controller
 
         $width = 750;
         $height = 1334;
+        $fontScale = 1.3; // 字体缩放因子，适配不同服务器字体渲染差异
 
         $img = imagecreatetruecolor($width, $height);
 
@@ -239,41 +240,41 @@ class PromoterController extends Controller
 
         // 4. 顶部 LOGO 文字
         if ($hasFont) {
-            imagettftext($img, 56, 0, 60, 130, $white, $fontPath, '中医智能');
-            imagettftext($img, 22, 0, 60, 170, $white, $fontPath, 'AI 中医体质分析平台');
+            imagettftext($img, 56 * $fontScale, 0, 60, 140, $white, $fontPath, '中医智能');
+            imagettftext($img, 24 * $fontScale, 0, 60, 185, $white, $fontPath, 'AI 中医体质分析平台');
         } else {
             imagestring($img, 5, 60, 100, 'TCM AI', $white);
         }
 
         // 5. 副标题
         if ($hasFont) {
-            imagettftext($img, 32, 0, 60, 240, $white, $fontPath, '邀请您一起体验中医智能诊断');
+            imagettftext($img, 36 * $fontScale, 0, 60, 260, $white, $fontPath, '邀请您一起体验中医智能诊断');
         } else {
             imagestring($img, 4, 60, 220, 'Invite you to try TCM AI', $white);
         }
 
         // 6. 主卡片（白色圆角）
         $cardX = 60;
-        $cardY = 320;
+        $cardY = 340;
         $cardW = $width - 120;
         $cardH = 760;
         $this->drawRoundedRect($img, $cardX, $cardY, $cardW, $cardH, 24, $bgCard, $borderGray);
 
         // 7. 卡片标题
         if ($hasFont) {
-            imagettftext($img, 36, 0, $cardX + 40, $cardY + 70, $textDark, $fontPath, '专属邀请');
-            imagettftext($img, 22, 0, $cardX + 40, $cardY + 110, $textLight, $fontPath, '长按或扫描二维码加入');
+            imagettftext($img, 40 * $fontScale, 0, $cardX + 40, $cardY + 80, $textDark, $fontPath, '专属邀请');
+            imagettftext($img, 24 * $fontScale, 0, $cardX + 40, $cardY + 125, $textLight, $fontPath, '长按或扫描二维码加入');
         }
 
         // 8. 邀请人
         if ($hasFont) {
-            imagettftext($img, 24, 0, $cardX + 40, $cardY + 170, $textLight, $fontPath, '邀请人：' . $this->safeText($nickname, 12));
+            imagettftext($img, 26 * $fontScale, 0, $cardX + 40, $cardY + 180, $textLight, $fontPath, '邀请人：' . $this->safeText($nickname, 12));
         }
 
         // 9. 二维码区域
         $qrSize = 380;
         $qrX = $cardX + ($cardW - $qrSize) / 2;
-        $qrY = $cardY + 210;
+        $qrY = $cardY + 220;
         $qrImg = $this->fetchQrCode($shareLink, $qrSize);
         if ($qrImg !== null) {
             imagecopy($img, $qrImg, (int) $qrX, (int) $qrY, 0, 0, $qrSize, $qrSize);
@@ -282,22 +283,22 @@ class PromoterController extends Controller
             // 兜底：绘制提示框
             imagerectangle($img, (int) $qrX, (int) $qrY, (int) ($qrX + $qrSize), (int) ($qrY + $qrSize), $borderGray);
             if ($hasFont) {
-                imagettftext($img, 20, 0, (int) ($qrX + 80), (int) ($qrY + 200), $textLight, $fontPath, '二维码生成中...');
+                imagettftext($img, 22 * $fontScale, 0, (int) ($qrX + 80), (int) ($qrY + 200), $textLight, $fontPath, '二维码生成中...');
             }
         }
 
         // 10. 邀请码（金色突出）
         if ($hasFont) {
-            imagettftext($img, 22, 0, $cardX + 40, $cardY + $cardH - 130, $textLight, $fontPath, '邀请码');
-            imagettftext($img, 56, 0, $cardX + 40, $cardY + $cardH - 65, $gold, $fontPath, $inviteCode);
+            imagettftext($img, 24 * $fontScale, 0, $cardX + 40, $cardY + $cardH - 140, $textLight, $fontPath, '邀请码');
+            imagettftext($img, 56 * $fontScale, 0, $cardX + 40, $cardY + $cardH - 70, $gold, $fontPath, $inviteCode);
         } else {
             imagestring($img, 5, $cardX + 40, $cardY + $cardH - 100, $inviteCode, $gold);
         }
 
         // 11. 底部品牌信息
         if ($hasFont) {
-            imagettftext($img, 22, 0, 60, $height - 140, $white, $fontPath, '扫码 / 长按识别二维码');
-            imagettftext($img, 18, 0, 60, $height - 100, $white, $fontPath, '中医智能 · 让健康更简单');
+            imagettftext($img, 24 * $fontScale, 0, 60, $height - 140, $white, $fontPath, '扫码 / 长按识别二维码');
+            imagettftext($img, 20 * $fontScale, 0, 60, $height - 100, $white, $fontPath, '中医智能 · 让健康更简单');
         }
 
         // 12. 底部装饰条

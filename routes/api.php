@@ -412,6 +412,23 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
                 Route::get('/{id}',                [V1\Admin\AppealController::class, 'show']);
                 Route::post('/{id}/audit',         [V1\Admin\AppealController::class, 'audit']);
             });
+
+            // 操作日志管理
+            Route::prefix('operation-logs')->group(function () {
+                Route::get('/',            [V1\Admin\OperationLogController::class, 'index']);
+                Route::get('/modules',     [V1\Admin\OperationLogController::class, 'modules']);
+                Route::get('/statistics',  [V1\Admin\OperationLogController::class, 'statistics']);
+                Route::get('/{id}',        [V1\Admin\OperationLogController::class, 'show']);
+                Route::delete('/clean',    [V1\Admin\OperationLogController::class, 'clean']);
+            });
+
+            // 消息推送配置
+            Route::prefix('notification-config')->group(function () {
+                Route::get('/',              [V1\Admin\NotificationConfigController::class, 'index']);
+                Route::post('/',             [V1\Admin\NotificationConfigController::class, 'store']);
+                Route::post('/test-sms',     [V1\Admin\NotificationConfigController::class, 'testSms']);
+                Route::post('/test-wechat',  [V1\Admin\NotificationConfigController::class, 'testWechat']);
+            });
         });
     });
 

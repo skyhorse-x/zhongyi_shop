@@ -34,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'super_admin' => \App\Http\Middleware\SuperAdminMiddleware::class,
             'auth.or.admin' => \App\Http\Middleware\AuthenticateOrAdmin::class,
             'throttle.auth'  => \Illuminate\Routing\Middleware\ThrottleRequests::class,
+            'operation.log' => \App\Http\Middleware\AdminOperationLogMiddleware::class,
         ]);
 
         // 全局API请求日志中间件
