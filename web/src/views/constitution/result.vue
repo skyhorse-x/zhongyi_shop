@@ -465,9 +465,13 @@ onMounted(() => {
 
 .score-circle {
   position: relative;
+  width: 100px;
+  height: 100px;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 50%;
-  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .score-text {
@@ -478,11 +482,13 @@ onMounted(() => {
   font-size: 28px;
   font-weight: bold;
   color: #fff;
+  line-height: 1;
 }
 
 .score-label {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.8);
+  margin-top: 4px;
 }
 
 .result-section {

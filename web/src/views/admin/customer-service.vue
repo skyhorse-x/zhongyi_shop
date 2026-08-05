@@ -5,6 +5,7 @@ import { safeFetch } from '@/utils/fetch'
 import { Picture, ArrowLeft, ChatDotRound, User, Document, Money, Setting, Plus, Search, Refresh, MagicStick } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import { getAdminToken } from '@/utils/auth'
+import { useNotification } from '@/composables/useNotification'
 
 interface Session {
   id: number
@@ -171,6 +172,23 @@ const playNotificationSound = () => {
   oscillator.stop(audioContext.currentTime + 0.5)
 }
 
+// 浏览器通知
+const { showNewMessageNotification, requestPermission: requestNotificationPermission } = useNotification()
+
+// 当前会话编号（用于判断是否需要显示通知）
+const currentSessionNo = ref<string | null>(null)
+
+// 点击通知跳转到会话
+const handleNotificationClick = (data: any) => {
+  if (data?.sessionNo) {
+    const session = sessions.value.find(s => s.session_no === data.sessionNo)
+    if (session) {
+      showChat.value = true
+      selectSession(session)
+    }
+  }
+}
+
 const loadStatistics = async () => {
   try {
     const res = await safeFetch('/api/v1/admin/customer-service/statistics', {
@@ -232,6 +250,18 @@ const loadMessages = async (sessionNo: string, silent = false) => {
           playNotificationSound()
           // 检查是否需要自动回复
           checkAutoReply(lastMsg.content)
+          
+          // 显示浏览器通知（如果当前不在该会话或页面未聚焦）
+          if (currentSessionNo.value !== sessionNo || document.hidden) {
+            const session = sessions.value.find(s => s.session_no === sessionNo)
+            showNewMessageNotification({
+              senderName: session?.user?.nickname || '用户',
+              content: lastMsg.content,
+              sessionId: String(session?.id || ''),
+              sessionNo: sessionNo,
+              onClick: handleNotificationClick,
+            })
+          }
         }
       }
       lastMessageCount.value = newMessages.length
@@ -286,6 +316,7 @@ const sendAutoReply = async (content: string) => {
 
 const selectSession = async (session: Session) => {
   currentSession.value = session
+  currentSessionNo.value = session.session_no
   showChat.value = true
   await loadMessages(session.session_no)
   // 标记用户消息为已读
@@ -667,6 +698,8 @@ onMounted(() => {
   messagesInterval = window.setInterval(() => {
     if (currentSession.value) loadMessages(currentSession.value.session_no, true)
   }, 5000)
+  // 请求浏览器通知权限
+  requestNotificationPermission()
 })
 
 onUnmounted(() => {
