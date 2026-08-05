@@ -183,6 +183,7 @@ class UserController extends Controller
                 $typeMap = [
                     'tongue' => \App\Models\SystemConfig::where('key', 'analysis_type_tongue_name')->value('value') ?: '舌象分析',
                     'face' => \App\Models\SystemConfig::where('key', 'analysis_type_face_name')->value('value') ?: '面象分析',
+                    'palm' => \App\Models\SystemConfig::where('key', 'analysis_type_palm_name')->value('value') ?: '手相分析',
                     'constitution' => \App\Models\SystemConfig::where('key', 'analysis_type_constitution_name')->value('value') ?: '体质分析',
                 ];
                 return $typeMap[$task->type] ?? 'AI 分析报告';

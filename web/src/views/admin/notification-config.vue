@@ -1,5 +1,11 @@
 <template>
   <div class="notification-config-container">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2 class="page-title">消息推送</h2>
+      <p class="page-desc">配置短信和微信模板消息推送</p>
+    </div>
+
     <el-tabs v-model="activeTab">
       <!-- 短信配置 -->
       <el-tab-pane label="阿里云短信" name="sms">

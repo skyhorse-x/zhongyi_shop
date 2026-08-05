@@ -1,5 +1,11 @@
 <template>
   <div class="operation-logs-container">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2 class="page-title">操作日志</h2>
+      <p class="page-desc">查看管理员操作记录和审计日志</p>
+    </div>
+
     <!-- 统计卡片 -->
     <div class="stats-cards">
       <div class="stat-card">

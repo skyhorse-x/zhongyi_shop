@@ -2,7 +2,7 @@
   <div class="health-archives">
     <div class="page-header">
       <h2 class="page-title">健康管理档案</h2>
-      <p class="page-desc">用户舌诊、面诊、体质分析记录</p>
+      <p class="page-desc">用户舌诊、面诊、手相、体质分析记录</p>
     </div>
 
     <!-- 统计卡片 -->
@@ -49,6 +49,7 @@
       >
         <el-option label="舌诊分析" value="tongue" />
         <el-option label="面诊分析" value="face" />
+        <el-option label="手相分析" value="palm" />
       </el-select>
       <el-input
         v-model="filter.keyword"
@@ -274,6 +275,7 @@
             <pre v-if="currentDetail.content?.text">{{ currentDetail.content.text }}</pre>
             <pre v-else-if="currentDetail.tongue_analysis">{{ currentDetail.tongue_analysis }}</pre>
             <pre v-else-if="currentDetail.face_analysis">{{ currentDetail.face_analysis }}</pre>
+            <pre v-else-if="currentDetail.palm_analysis">{{ currentDetail.palm_analysis }}</pre>
             <pre v-else-if="currentDetail.task?.result?.content">{{ currentDetail.task.result.content }}</pre>
             <div v-else class="empty-content">暂无分析结果</div>
           </div>
@@ -298,6 +300,7 @@ import { getAdminToken } from '@/utils/auth'
 const typeLabels: Record<string, string> = {
   tongue: '舌诊分析',
   face: '面诊分析',
+  palm: '手相分析',
 }
 
 // 性别标签
@@ -688,6 +691,7 @@ onMounted(() => {
 
 .type-dot.type-tongue { background: #67c23a; }
 .type-dot.type-face { background: #e6a23c; }
+.type-dot.type-palm { background: #409eff; }
 
 /* 筛选栏 */
 .filter-bar {

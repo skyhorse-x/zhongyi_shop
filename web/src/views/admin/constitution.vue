@@ -236,6 +236,12 @@ onMounted(() => {
 
 <template>
   <div class="page-container">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2 class="page-title">体质题目</h2>
+      <p class="page-desc">管理中医体质测试题目和选项</p>
+    </div>
+
     <el-card shadow="never" class="toolbar-card">
       <div class="toolbar">
         <div class="left-info">

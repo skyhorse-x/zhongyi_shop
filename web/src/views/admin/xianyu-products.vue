@@ -209,6 +209,12 @@ onMounted(() => {
 
 <template>
   <div class="page-container">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2 class="page-title">闲鱼商品管理</h2>
+      <p class="page-desc">管理闲鱼充值商品、价格和链接</p>
+    </div>
+
     <el-card shadow="never" class="search-card">
       <div class="toolbar">
         <el-input

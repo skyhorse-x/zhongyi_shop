@@ -67,6 +67,7 @@ class AnalysisController extends Controller
         $analysisPrice = SystemConfig::getValue('analysis_price', '9.99');
         $wechatService = SystemConfig::getValue('wechat_service', '');
         $siteName = SystemConfig::getValue('site_name', 'AI 中医健康助手');
+        $siteUrl = SystemConfig::getValue('site_url', config('app.url'));
         $disableMobileAuth = SystemConfig::getValue('disable_mobile_auth', '0');
 
         return response()->json([
@@ -77,6 +78,7 @@ class AnalysisController extends Controller
                 'analysis_price' => floatval($analysisPrice),
                 'wechat_service' => $wechatService,
                 'site_name' => $siteName,
+                'site_url' => $siteUrl,
                 'disable_mobile_auth' => $disableMobileAuth,
             ],
         ]);
@@ -121,7 +123,7 @@ class AnalysisController extends Controller
     public function submit(Request $request)
     {
         $validated = $request->validate([
-            'type' => 'required|in:tongue,face',
+            'type' => 'required|in:tongue,face,palm',
             'gender' => 'required|in:1,2',
             'age' => 'required|integer|min:1|max:150',
             'image_urls' => 'nullable|array',
@@ -145,7 +147,12 @@ class AnalysisController extends Controller
 
             // 扣除分析次数（事务内行级锁，含流水记录）
             $timesService = app(\App\Services\AnalysisTimesService::class);
-            $analysisType = $validated['type'] === 'tongue' ? '舌诊分析' : '面诊分析';
+            $analysisType = match($validated['type']) {
+                'tongue' => '舌诊分析',
+                'face' => '面诊分析',
+                'palm' => '手相分析',
+                default => 'AI分析',
+            };
             $deducted = $timesService->deductTimes(
                 $request->user(),
                 1,

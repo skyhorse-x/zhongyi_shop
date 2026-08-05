@@ -146,7 +146,7 @@ onMounted(() => {
   <div class="user-balances-page">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h2>用户余额管理</h2>
+      <h2>用户余额</h2>
       <p class="page-desc">查看用户余额、分析次数和变动流水</p>
     </div>
 

@@ -33,7 +33,7 @@ interface ReportSection {
 
 interface AnalysisResult {
   title: string
-  type: 'tongue' | 'face'
+  type: 'tongue' | 'face' | 'palm'
   summary: string
   content: string
   healthScore: number
@@ -96,9 +96,14 @@ const fetchReport = async () => {
     if (data.code === 0) {
       const task = data.data
       const isTongue = task.type === 'tongue'
+      const isPalm = task.type === 'palm'
       analysisMode.value = task.result?.mode || 'image'
+      
+      const typeLabel = isTongue ? '舌诊分析' : (isPalm ? '手相分析' : '面诊分析')
+      const titleLabel = isTongue ? '舌诊分析报告' : (isPalm ? '手相分析报告' : '面诊分析报告')
+      
       result.value = {
-        title: isTongue ? '舌诊分析报告' : '面诊分析报告',
+        title: titleLabel,
         type: task.type,
         summary: task.result?.summary || '分析完成',
         content: task.result?.content || '',
@@ -106,7 +111,7 @@ const fetchReport = async () => {
         mode: task.result?.mode || 'image',
         createdAt: task.created_at || '-',
         details: [
-          { label: '分析类型', value: isTongue ? '舌诊分析' : '面诊分析', icon: Histogram },
+          { label: '分析类型', value: typeLabel, icon: Histogram },
           { label: '分析方式', value: analysisMode.value === 'text' ? '症状描述' : '图像分析', icon: Document },
           { label: '分析编号', value: task.task_no, icon: Promotion },
           { label: '完成时间', value: formatDateTime(task.created_at), icon: Calendar },
@@ -116,16 +121,19 @@ const fetchReport = async () => {
     } else if (data.code === 402) {
       ElMessage.warning(data.message || '请先支付查看报告')
       const isTongue = data.data?.type === 'tongue'
+      const isPalm = data.data?.type === 'palm'
+      const typeLabel = isTongue ? '舌诊分析' : (isPalm ? '手相分析' : '面诊分析')
+      const titleLabel = isTongue ? '舌诊分析报告' : (isPalm ? '手相分析报告' : '面诊分析报告')
       result.value = {
-        title: isTongue ? '舌诊分析报告' : '面诊分析报告',
-        type: isTongue ? 'tongue' : 'face',
+        title: titleLabel,
+        type: isTongue ? 'tongue' : (isPalm ? 'palm' : 'face'),
         summary: data.data?.summary || '分析完成',
         content: '',
         healthScore: 0,
         mode: 'image',
         createdAt: data.data?.created_at || '-',
         details: [
-          { label: '分析类型', value: isTongue ? '舌诊分析' : '面诊分析', icon: Histogram },
+          { label: '分析类型', value: typeLabel, icon: Histogram },
           { label: '分析编号', value: data.data?.task_no || taskNo.value, icon: Promotion },
         ],
         suggestions: ['完整报告需要支付后查看'],

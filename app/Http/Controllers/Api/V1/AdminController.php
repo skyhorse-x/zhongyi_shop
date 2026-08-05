@@ -817,7 +817,7 @@ class AdminController extends Controller
     {
         $data = $request->validate([
             'name' => 'required|string|max:50',
-            'type' => 'required|in:tongue,face,all',
+            'type' => 'required|in:tongue,face,palm,all',
             'times' => 'required|integer|min:1',
             'days' => 'required|integer|min:1',
             'price' => 'required|numeric|min:0',
@@ -839,7 +839,7 @@ class AdminController extends Controller
         $package = ProductPackage::findOrFail($id);
         $data = $request->validate([
             'name' => 'sometimes|string|max:50',
-            'type' => 'sometimes|in:tongue,face,all',
+            'type' => 'sometimes|in:tongue,face,palm,all',
             'times' => 'sometimes|integer|min:1',
             'days' => 'sometimes|integer|min:1',
             'price' => 'sometimes|numeric|min:0',

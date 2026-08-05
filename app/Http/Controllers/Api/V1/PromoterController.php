@@ -129,6 +129,7 @@ class PromoterController extends Controller
         // 海报URL指向后端API动态生成（而非静态文件）
         $shareLink = Site::inviteLink($promoter->invite_code);
         $posterUrl = url('api/v1/promoter/poster-image?code=' . $promoter->invite_code);
+        $siteName = \App\Models\SystemConfig::getValue('site_name', 'AI 中医健康助手');
 
         return response()->json([
             'code' => 0,
@@ -137,6 +138,7 @@ class PromoterController extends Controller
                 'poster_url' => $posterUrl,
                 'share_link' => $shareLink,
                 'invite_code' => $promoter->invite_code,
+                'site_name' => $siteName,
             ],
         ]);
     }
@@ -204,6 +206,9 @@ class PromoterController extends Controller
             throw new \RuntimeException('GD extension is required');
         }
 
+        // 获取站点名称
+        $siteName = \App\Models\SystemConfig::getValue('site_name', 'AI 中医健康助手');
+
         $width = 750;
         $height = 1334;
         $fontScale = 1.3; // 字体缩放因子，适配不同服务器字体渲染差异
@@ -240,10 +245,10 @@ class PromoterController extends Controller
 
         // 4. 顶部 LOGO 文字
         if ($hasFont) {
-            imagettftext($img, 56 * $fontScale, 0, 60, 140, $white, $fontPath, '中医智能');
+            imagettftext($img, 56 * $fontScale, 0, 60, 140, $white, $fontPath, $siteName);
             imagettftext($img, 24 * $fontScale, 0, 60, 185, $white, $fontPath, 'AI 中医体质分析平台');
         } else {
-            imagestring($img, 5, 60, 100, 'TCM AI', $white);
+            imagestring($img, 5, 60, 100, $siteName, $white);
         }
 
         // 5. 副标题
@@ -298,7 +303,7 @@ class PromoterController extends Controller
         // 11. 底部品牌信息
         if ($hasFont) {
             imagettftext($img, 24 * $fontScale, 0, 60, $height - 140, $white, $fontPath, '扫码 / 长按识别二维码');
-            imagettftext($img, 20 * $fontScale, 0, 60, $height - 100, $white, $fontPath, '中医智能 · 让健康更简单');
+            imagettftext($img, 20 * $fontScale, 0, 60, $height - 100, $white, $fontPath, $siteName . ' · 让健康更简单');
         }
 
         // 12. 底部装饰条

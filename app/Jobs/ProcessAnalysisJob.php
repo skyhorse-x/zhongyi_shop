@@ -109,6 +109,11 @@ class ProcessAnalysisJob implements ShouldQueue
                 $reportData['lip_color'] = $this->extractField($content, '唇色');
                 $reportData['eye_analysis'] = $this->extractField($content, '眼部');
                 $reportData['face_analysis'] = $content;
+            } elseif ($task->type === 'palm') {
+                $reportData['life_line'] = $this->extractField($content, '生命线');
+                $reportData['career_line'] = $this->extractField($content, '事业线');
+                $reportData['marriage_line'] = $this->extractField($content, '婚姻线');
+                $reportData['palm_analysis'] = $content;
             }
 
             \App\Models\AnalysisReport::create($reportData);

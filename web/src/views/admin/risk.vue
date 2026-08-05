@@ -71,6 +71,12 @@ onMounted(load)
 
 <template>
   <div class="risk-page">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2 class="page-title">风控管理</h2>
+      <p class="page-desc">风险事件监控、黑名单管理、规则配置</p>
+    </div>
+
     <!-- 顶部统计卡 -->
     <el-row :gutter="16" class="stats-row">
       <el-col :span="4">

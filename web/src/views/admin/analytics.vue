@@ -47,6 +47,12 @@ const formatPct = (v: number) => `${Number(v || 0)}%`
 <template>
   <div class="analytics-page">
     <!-- 核心指标 -->
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2 class="page-title">运营 BI</h2>
+      <p class="page-desc">收入、用户、漏斗、留存等运营数据</p>
+    </div>
+
     <el-row :gutter="16">
       <el-col :span="6"><el-card><div class="metric-label">今日收入</div><div class="metric-value">{{ formatMoney(overview.today_revenue) }}</div></el-card></el-col>
       <el-col :span="6"><el-card><div class="metric-label">今日订单</div><div class="metric-value">{{ overview.today_orders || 0 }}</div></el-card></el-col>

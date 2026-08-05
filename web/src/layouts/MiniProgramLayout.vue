@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, markRaw, watch } from 'vue'
+import { computed, ref, markRaw, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   ArrowRight,
@@ -15,18 +15,49 @@ import {
   Setting,
 } from '@element-plus/icons-vue'
 import { useUnreadCount } from '@/composables/useUnreadCount'
+import { safeFetch } from '@/utils/fetch'
 
 const router = useRouter()
 const route = useRoute()
 
+// 站点名称
+const siteName = ref<string>('AI中医健康管理')
+const siteUrl = ref<string>(window.location.origin)
+
 // 当前页面标题
-const pageTitle = computed(() => route.meta.title as string || 'AI中医健康管理')
+const pageTitle = computed(() => route.meta.title as string || siteName.value)
 
 // 是否显示返回按钮
 const showBack = computed(() => route.path !== '/')
 
 // 胶囊菜单是否展开
 const menuOpen = ref(false)
+
+// 加载站点配置
+const loadSiteConfig = async () => {
+  try {
+    const res = await safeFetch('/api/v1/analysis/config', {
+      headers: {
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      if (data.data?.site_name) {
+        siteName.value = data.data.site_name
+      }
+      if (data.data?.site_url) {
+        siteUrl.value = data.data.site_url
+      }
+    }
+  } catch (e) {
+    // 使用默认标题
+  }
+}
+
+onMounted(() => {
+  loadSiteConfig()
+})
 
 // 返回上一页
 const goBack = () => {

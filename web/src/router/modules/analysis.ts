@@ -17,6 +17,13 @@ const analysisRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/analysis/face.vue'),
     meta: { title: '面诊分析', needAuth: true },
   },
+  // 手相分析
+  {
+    path: '/analysis/palm',
+    name: 'PalmAnalysis',
+    component: () => import('@/views/analysis/palm.vue'),
+    meta: { title: '手相分析', needAuth: true },
+  },
   {
     path: '/analysis/result/:taskNo',
     name: 'AnalysisResult',

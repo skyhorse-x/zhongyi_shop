@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, h, onMounted, defineComponent, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Avatar, User, ChatLineRound, FirstAidKit, Money, Wallet, Star } from '@element-plus/icons-vue'
+import { ArrowRight, Avatar, User, ChatLineRound, FirstAidKit, Money, Wallet, Star, Pointer } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import { safeFetch } from '@/utils/fetch'
 import { getToken } from '@/utils/auth'
@@ -18,6 +18,7 @@ interface FeatureItem {
 const features = ref<FeatureItem[]>(markRaw([
   { icon: FirstAidKit, title: '舌诊分析', desc: 'AI智能舌诊，了解身体状况', path: '/analysis/tongue' },
   { icon: User, title: '面诊分析', desc: '面色面诊，洞察健康密码', path: '/analysis/face' },
+  // { icon: Pointer, title: '手相分析', desc: '生命线、事业线、婚姻线', path: '/analysis/palm' },
   { icon: Star, title: '体质分析', desc: '中医体质辨识，个性化调理', path: '/constitution/test' },
   { icon: ChatLineRound, title: '健康问答', desc: 'AI在线问答，专业指导', path: '/qa/chat' },
 ]))
@@ -29,6 +30,7 @@ const goToFeature = (path: string) => {
 // 当前剩余分析积分（未登录时为 null，不显示）
 const analysisTimes = ref<number | null>(null)
 const siteName = ref<string>('AI 中医健康助手') // 默认标题
+const siteUrl = ref<string>(window.location.origin) // 网站域名
 
 // 图标组件包装器（避免 reactive 警告）
 const IconWrapper = defineComponent({
@@ -70,8 +72,13 @@ const fetchSiteConfig = async () => {
       },
     })
     const data = await res.json()
-    if (data.code === 0 && data.data?.site_name) {
-      siteName.value = data.data.site_name
+    if (data.code === 0) {
+      if (data.data?.site_name) {
+        siteName.value = data.data.site_name
+      }
+      if (data.data?.site_url) {
+        siteUrl.value = data.data.site_url
+      }
     }
   } catch (e) {
     // 使用默认标题

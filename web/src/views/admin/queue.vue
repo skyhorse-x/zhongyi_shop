@@ -311,6 +311,12 @@ onMounted(() => {
 
 <template>
   <div class="queue-page">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2 class="page-title">队列任务管理</h2>
+      <p class="page-desc">查看和管理 AI 分析任务队列</p>
+    </div>
+
     <!-- 统计卡片 -->
     <div class="stats-grid">
       <div class="stat-card stat-card--blue">

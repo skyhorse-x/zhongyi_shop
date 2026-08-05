@@ -896,6 +896,12 @@ onUnmounted(() => {
 
 <template>
   <div class="customer-service-admin">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2 class="page-title">客服管理</h2>
+      <p class="page-desc">管理用户咨询、回复和常用话术</p>
+    </div>
+
     <!-- 标签导航 -->
     <div class="tab-navigation">
       <button
