@@ -134,6 +134,7 @@ class AuthController extends Controller
                     'parent_locked' => (bool) $parentId, // 有邀请人即锁定
                     'parent_locked_at' => $parentId ? now() : null,
                     'invite_code' => $this->generateUniqueInviteCode(),
+                    'register_ip' => $request->ip(),
                 ]);
                 $user->grantInitialAnalysisTimes();
 
@@ -227,6 +228,7 @@ class AuthController extends Controller
 
     /**
      * 根据邀请码获取推荐人ID
+     * 优先查 users 表，再查 promoters 表（推广员邀请码）
      * 防止自我推荐
      */
     private function getParentIdFromCode(?string $inviteCode, ?int $currentUserId = null): ?int
@@ -235,7 +237,16 @@ class AuthController extends Controller
             return null;
         }
 
+        // 1. 先查 users 表的邀请码
         $inviter = User::where('invite_code', $inviteCode)->first();
+
+        // 2. 如果没找到，查 promoters 表的邀请码（推广员邀请码）
+        if (!$inviter) {
+            $promoter = Promoter::where('invite_code', $inviteCode)->first();
+            if ($promoter) {
+                $inviter = User::find($promoter->user_id);
+            }
+        }
 
         if (!$inviter) {
             return null;
