@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Ticket, ChatLineRound, Shop, Star, Trophy } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
 
@@ -99,6 +99,33 @@ const copyWechat = async () => {
   }
 }
 
+// 弹出微信号对话框
+const showWechatDialog = (pkg: Package) => {
+  const wechat = wechatService.value || '请联系管理员配置微信号'
+  const content = `
+    <div style="text-align: center; padding: 10px 0;">
+      <div style="font-size: 16px; color: #333; margin-bottom: 16px;">
+        购买「${pkg.name}」请添加微信客服
+      </div>
+      <div style="background: #f5f5f5; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+        <div style="font-size: 14px; color: #999; margin-bottom: 8px;">微信号</div>
+        <div style="font-size: 24px; font-weight: bold; color: #07c160;">${wechat}</div>
+      </div>
+      <div style="font-size: 14px; color: #666;">
+        请向客服说明要购买的套餐：<b>${pkg.name}</b>
+      </div>
+    </div>
+  `
+  ElMessageBox.alert(content, '加微信购买积分', {
+    confirmButtonText: '复制微信号',
+    dangerouslyUseHTMLString: true,
+    confirmButtonClass: 'el-button--success',
+    callback: () => {
+      copyWechat()
+    },
+  })
+}
+
 onMounted(() => {
   fetchUserInfo()
   fetchPackages()
@@ -168,7 +195,16 @@ onMounted(() => {
             <span v-if="pkg.discount > 0" class="package-discount">-{{ pkg.discount }}%</span>
           </div>
         </div>
-
+        <div class="package-action">
+          <el-button
+            round
+            type="success"
+            size="small"
+            @click="showWechatDialog(pkg)"
+          >
+            加微信购买积分
+          </el-button>
+        </div>
       </div>
 
       <el-empty v-if="!loading && packages.length === 0" description="暂无可购买的套餐，敬请期待" />
@@ -331,6 +367,10 @@ onMounted(() => {
   padding: 1px 6px;
   border-radius: 4px;
   font-weight: 600;
+}
+
+.package-action {
+  flex-shrink: 0;
 }
 
 /* 联系客服卡片 */
