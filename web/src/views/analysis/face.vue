@@ -147,7 +147,7 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div class="face-page" v-loading="loading">
+  <div class="face-page">
     <!-- 基本信息（必填） -->
     <div class="profile-section">
       <div class="ai-text-header">

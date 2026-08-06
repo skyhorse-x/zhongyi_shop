@@ -164,7 +164,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="palm-page" v-loading="loading">
+  <div class="palm-page">
     <!-- 基本信息（必填） -->
     <div class="profile-section">
       <div class="ai-text-header">
