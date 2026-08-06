@@ -102,26 +102,35 @@ const copyWechat = async () => {
 // 弹出微信号对话框
 const showWechatDialog = (pkg: Package) => {
   const wechat = wechatService.value || '请联系管理员配置微信号'
-  const content = `
-    <div style="text-align: center; padding: 10px 0;">
-      <div style="font-size: 16px; color: #333; margin-bottom: 16px;">
-        购买「${pkg.name}」请添加微信客服
+  ElMessageBox({
+    title: '加微信购买积分',
+    message: `
+      <div style="text-align: center; padding: 10px 0;">
+        <div style="font-size: 16px; color: #333; margin-bottom: 16px;">
+          购买「${pkg.name}」请添加微信客服
+        </div>
+        <div style="background: #e8f7ef; border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 1px solid #b7eb8f;">
+          <div style="font-size: 14px; color: #52c41a; margin-bottom: 8px;">微信号</div>
+          <div style="font-size: 28px; font-weight: bold; color: #07c160; letter-spacing: 1px;">${wechat}</div>
+        </div>
+        <div style="font-size: 14px; color: #666; margin-bottom: 8px;">
+          请向客服说明要购买的套餐：<b style="color: #333;">${pkg.name}</b>
+        </div>
+        <div style="font-size: 12px; color: #999;">
+          点击下方按钮复制微信号
+        </div>
       </div>
-      <div style="background: #f5f5f5; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-        <div style="font-size: 14px; color: #999; margin-bottom: 8px;">微信号</div>
-        <div style="font-size: 24px; font-weight: bold; color: #07c160;">${wechat}</div>
-      </div>
-      <div style="font-size: 14px; color: #666;">
-        请向客服说明要购买的套餐：<b>${pkg.name}</b>
-      </div>
-    </div>
-  `
-  ElMessageBox.alert(content, '加微信购买积分', {
-    confirmButtonText: '复制微信号',
+    `,
     dangerouslyUseHTMLString: true,
+    showCancelButton: true,
+    confirmButtonText: '复制微信号',
+    cancelButtonText: '取消',
     confirmButtonClass: 'el-button--success',
-    callback: () => {
-      copyWechat()
+    cancelButtonClass: 'el-button--default',
+    callback: (action: string) => {
+      if (action === 'confirm') {
+        copyWechat()
+      }
     },
   })
 }
