@@ -127,7 +127,7 @@ class AnalysisController extends Controller
     public function submit(Request $request)
     {
         $validated = $request->validate([
-            'type' => 'required|in:tongue,face,palm',
+            'type' => 'required|in:tongue,face,palm,eye',
             'gender' => 'required|in:1,2',
             'age' => 'required|integer|min:1|max:150',
             'image_urls' => 'nullable|array',
@@ -145,31 +145,8 @@ class AnalysisController extends Controller
             ], 400);
         }
 
-        // 按次数计费模式：扣除次数即视为已授权查看报告
-        $isPaid = 1;
-
-        // 扣除分析次数（事务内行级锁，含流水记录）
-        $timesService = app(AnalysisTimesService::class);
-        $analysisType = match($validated['type']) {
-            'tongue' => '舌诊分析',
-            'face' => '面诊分析',
-            'palm' => '手相分析',
-            default => 'AI分析',
-        };
-        $deducted = $timesService->deductTimes(
-            $request->user(),
-            1,
-            'use',
-            "AI{$analysisType}"
-        );
-
-        if (!$deducted) {
-            return response()->json([
-                'code' => 402,
-                'message' => '分析次数不足，请先购买次数包',
-                'error_type' => 'insufficient_times',
-            ], 402);
-        }
+        // 初始状态为未支付，积分将在报告生成后扣除
+        $isPaid = 0;
 
         $imageUrls = $validated['image_urls'] ?? [];
         $task = AnalysisTask::create([
@@ -235,21 +212,6 @@ class AnalysisController extends Controller
                     'error_message' => substr($e->getMessage(), 0, 500),
                 ]);
 
-                // 失败时返还次数
-                try {
-                    app(AnalysisTimesService::class)->refundTimes(
-                        $task->user,
-                        1,
-                        'refund',
-                        "AI分析失败返还：{$e->getMessage()}"
-                    );
-                } catch (\Throwable $refundErr) {
-                    Log::error('退还分析次数失败', [
-                        'task_no' => $task->task_no,
-                        'refund_error' => $refundErr->getMessage(),
-                    ]);
-                }
-
                 $message = $e->getMessage();
                 $isConfigError = str_contains($message, 'API Key')
                     || str_contains($message, 'API key')
@@ -259,7 +221,7 @@ class AnalysisController extends Controller
                     'code' => $isConfigError ? 503 : 500,
                     'message' => $isConfigError
                         ? $message
-                        : '分析失败，已自动返还分析次数，请稍后重试',
+                        : '分析失败，请稍后重试',
                     'error_type' => $isConfigError ? 'ai_not_configured' : 'internal_error',
                     'data' => [
                         'task_no' => $taskNo,
@@ -299,27 +261,12 @@ class AnalysisController extends Controller
                     'error_message' => substr($e->getMessage(), 0, 500),
                 ]);
 
-                // 失败时返还次数
-                try {
-                    app(AnalysisTimesService::class)->refundTimes(
-                        $task->user,
-                        1,
-                        'refund',
-                        "AI分析失败返还：{$e->getMessage()}"
-                    );
-                } catch (\Throwable $refundErr) {
-                    Log::error('退还分析次数失败', [
-                        'task_no' => $task->task_no,
-                        'refund_error' => $refundErr->getMessage(),
-                    ]);
-                }
-
                 // 通知用户
                 try {
                     app(NotificationService::class)->sendSystemMessage(
                         $task->user_id,
                         'AI 分析失败',
-                        "您的分析任务（{$task->task_no}）失败，已自动返还 1 次分析次数。",
+                        "您的分析任务（{$task->task_no}）失败，请稍后重试。",
                         ['type' => 'reminder']
                     );
                 } catch (\Throwable $ne) {}
@@ -347,6 +294,9 @@ class AnalysisController extends Controller
                 ? $aiService->analyzeFace($validated['image_urls'][0] ?? '', (int) $validated['gender'], (int) $validated['age'])
                 : $aiService->analyzeFaceByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
             'palm' => $aiService->analyzeTongueByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
+            'eye' => $hasImages
+                ? $aiService->analyzeTongue($validated['image_urls'] ?? [], (int) $validated['gender'], (int) $validated['age'])
+                : $aiService->analyzeEyeByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
             default => throw new \InvalidArgumentException("未知的分析类型: {$validated['type']}"),
         };
 
@@ -399,6 +349,11 @@ class AnalysisController extends Controller
             $reportData['career_line'] = $this->extractField($content, '事业线');
             $reportData['marriage_line'] = $this->extractField($content, '婚姻线');
             $reportData['palm_analysis'] = $content;
+        } elseif ($task->type === 'eye') {
+            $reportData['eye_color'] = $this->extractField($content, '眼色');
+            $reportData['eye_white'] = $this->extractField($content, '眼白');
+            $reportData['dark_circle'] = $this->extractField($content, '黑眼圈');
+            $reportData['eye_analysis'] = $content;
         }
 
         AnalysisReport::create($reportData);
@@ -530,7 +485,40 @@ class AnalysisController extends Controller
             ], 500);
         }
 
-        // 按次数计费模式：次数已扣除，直接返回完整报告
+        // 报告已完成，扣除积分（仅首次查看时扣除）
+        if ($task->is_paid === 0) {
+            $timesService = app(AnalysisTimesService::class);
+            $analysisType = match($task->type) {
+                'tongue' => '舌诊分析',
+                'face' => '面部分析',
+                'palm' => '手相分析',
+                'eye' => '眼部分析',
+                default => 'AI分析',
+            };
+            
+            $deducted = $timesService->deductTimes(
+                $request->user(),
+                1,
+                'use',
+                "AI{$analysisType}"
+            );
+
+            if (!$deducted) {
+                return response()->json([
+                    'code' => 402,
+                    'message' => '分析次数不足，请先购买次数包',
+                    'error_type' => 'insufficient_times',
+                    'data' => [
+                        'task_no' => $task->task_no,
+                        'status' => 2,
+                    ],
+                ], 402);
+            }
+
+            // 标记为已支付
+            $task->update(['is_paid' => 1]);
+        }
+
         return response()->json([
             'code' => 0,
             'message' => 'success',
@@ -562,6 +550,45 @@ class AnalysisController extends Controller
             'code' => 0,
             'message' => 'success',
             'data' => $tasks,
+        ]);
+    }
+
+    /**
+     * 提交分析反馈（有用/无用）
+     */
+    public function feedback(Request $request, string $taskNo)
+    {
+        $validated = $request->validate([
+            'type' => 'required|in:useful,useless',
+            'rating' => 'nullable|integer|min:1|max:5',
+        ]);
+
+        $task = AnalysisTask::where('task_no', $taskNo)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if (!$task) {
+            return response()->json([
+                'code' => 404,
+                'message' => '分析任务不存在',
+            ], 404);
+        }
+
+        // 保存或更新反馈
+        \App\Models\AnalysisFeedback::updateOrCreate(
+            [
+                'user_id' => $request->user()->id,
+                'task_id' => $task->id,
+            ],
+            [
+                'type' => $validated['type'],
+                'rating' => $validated['rating'] ?? null,
+            ]
+        );
+
+        return response()->json([
+            'code' => 0,
+            'message' => '反馈已提交',
         ]);
     }
 }

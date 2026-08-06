@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
-import { Edit, Refresh, Wallet, Promotion, MoreFilled, View, Close, Lock, Plus, Minus, List, Document, ShoppingBag, Coin, Gift, Timer, Remove } from '@element-plus/icons-vue'
+import { Edit, Refresh, Wallet, Promotion, MoreFilled, View, Close, Lock, Plus, Minus, List, Document, ShoppingBag, Coin, Present, Timer, Remove } from '@element-plus/icons-vue'
 
 const form = ref({
   phone: '',
@@ -675,7 +675,7 @@ const getCreditsIcon = (type: string) => {
     recharge: Plus,
     use: Coin,
     refund: Refresh,
-    reward: Gift,
+    reward: Present,
     admin_deduct: Remove,
     register_grant: ShoppingBag,
     purchase: ShoppingBag,
@@ -859,7 +859,7 @@ const loadLogs = async (row?: any) => {
         </el-table-column>
         <el-table-column prop="registerTime" label="注册时间" min-width="160" class-name="hidden-mobile">
           <template #default="scope">
-            {{ formatTime(scope.row.created_at) }}
+            {{ formatTime(scope.row.registerTime) }}
           </template>
         </el-table-column>
         <el-table-column label="注册IP" width="130" class-name="hidden-mobile">

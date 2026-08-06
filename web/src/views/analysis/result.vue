@@ -6,7 +6,7 @@ import html2canvas from 'html2canvas'
 import { safeFetch } from '@/utils/fetch'
 import {
   Loading, Refresh, Check, Calendar, Document, Histogram,
-  Promotion, Sunny, ChatLineRound, Star, Trophy, Share, Download, Picture, InfoFilled
+  Promotion, Sunny, ChatLineRound, Star, Trophy, Share, Download, Picture, InfoFilled, CircleCheck, CircleClose
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -53,6 +53,11 @@ const polling = ref(false)
 const pollingInterval = ref<ReturnType<typeof setInterval> | null>(null)
 const pollCount = ref(0)
 const maxPollCount = 60 // 最多轮询60次（约3分钟）
+
+// 反馈相关
+const feedbackType = ref<'useful' | 'useless' | null>(null)
+const feedbackLoading = ref(false)
+const showFeedbackSuccess = ref(false)
 
 // 渲染报告数据
 const renderReport = (task: any) => {
@@ -472,6 +477,37 @@ const handleRetry = () => {
   fetchReport()
 }
 
+// 提交反馈
+const submitFeedback = async (type: 'useful' | 'useless') => {
+  if (feedbackLoading.value) return
+  feedbackLoading.value = true
+  try {
+    const res = await safeFetch(`/api/v1/analysis/feedback/${taskNo.value}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ type }),
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      feedbackType.value = type
+      showFeedbackSuccess.value = true
+      setTimeout(() => {
+        showFeedbackSuccess.value = false
+      }, 2000)
+    } else {
+      ElMessage.error(data.message || '反馈提交失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e.message || '反馈提交失败')
+  } finally {
+    feedbackLoading.value = false
+  }
+}
+
 // 分享到社交平台
 const handleShare = async () => {
   downloading.value = true
@@ -850,6 +886,36 @@ onBeforeUnmount(() => {
           <div class="tip-title">温馨提示</div>
           <div class="tip-text">本报告基于舌象图片 AI 分析，仅用于传统健康管理参考，不能替代医生诊断。如有持续不适，请咨询专业医生。</div>
         </div>
+      </div>
+
+      <!-- 反馈区域 -->
+      <div class="feedback-section">
+        <div class="feedback-title">这份报告对您有帮助吗？</div>
+        <div class="feedback-buttons">
+          <el-button
+            :type="feedbackType === 'useful' ? 'success' : 'default'"
+            :icon="CircleCheck"
+            :loading="feedbackLoading"
+            @click="submitFeedback('useful')"
+            class="feedback-btn"
+          >
+            👍 有用
+          </el-button>
+          <el-button
+            :type="feedbackType === 'useless' ? 'danger' : 'default'"
+            :icon="CircleClose"
+            :loading="feedbackLoading"
+            @click="submitFeedback('useless')"
+            class="feedback-btn"
+          >
+            👎 无用
+          </el-button>
+        </div>
+        <transition name="fade">
+          <div v-if="showFeedbackSuccess" class="feedback-success">
+            <el-icon><Check /></el-icon> 感谢您的反馈！
+          </div>
+        </transition>
       </div>
 
       <!-- 操作按钮 -->
@@ -1581,6 +1647,52 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: #8b6914;
   line-height: 1.6;
+}
+
+/* 反馈区域 */
+.feedback-section {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.feedback-title {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 12px;
+}
+
+.feedback-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.feedback-btn {
+  min-width: 100px;
+  height: 38px;
+}
+
+.feedback-success {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #67c23a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 /* 操作按钮 */

@@ -44,6 +44,9 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
     // 次数包列表（公开访问，用于前台充值页展示）
     Route::get('packages', [V1\PackageController::class, 'index']);
 
+    // 首页活动（公开访问，用于首页滚动展示）
+    Route::get('home/activity', [V1\HomeController::class, 'activity']);
+
     // ===== 需要登录的接口 =====
         Route::middleware('auth.or.admin')->group(function () {
 
@@ -75,6 +78,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::get('status/{taskNo}', [V1\AnalysisController::class, 'status']);
             Route::get('report/{taskNo}', [V1\AnalysisController::class, 'report']);
             Route::get('history', [V1\AnalysisController::class, 'history']);
+            Route::post('feedback/{taskNo}', [V1\AnalysisController::class, 'feedback']);
         });
 
         // 体质测试
@@ -428,6 +432,15 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
                 Route::get('/statistics',  [V1\Admin\OperationLogController::class, 'statistics']);
                 Route::get('/{id}',        [V1\Admin\OperationLogController::class, 'show']);
                 Route::delete('/clean',    [V1\Admin\OperationLogController::class, 'clean']);
+            });
+
+            // API请求日志
+            Route::prefix('api-logs')->group(function () {
+                Route::get('/',            [V1\Admin\ApiLogController::class, 'index']);
+                Route::get('/stats',      [V1\Admin\ApiLogController::class, 'stats']);
+                Route::get('/modules',    [V1\Admin\ApiLogController::class, 'modules']);
+                Route::get('/{id}',        [V1\Admin\ApiLogController::class, 'show']);
+                Route::delete('/clean',    [V1\Admin\ApiLogController::class, 'clean']);
             });
 
             // 消息推送配置

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, h, onMounted, defineComponent, markRaw } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ArrowRight, Avatar, User, ChatLineRound, FirstAidKit, Money, Wallet, Star, Pointer } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
+import { ArrowRight, Avatar, User, ChatLineRound, FirstAidKit, Money, Wallet, Star, Pointer, View } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import { safeFetch } from '@/utils/fetch'
 import { getToken } from '@/utils/auth'
@@ -19,12 +20,43 @@ interface FeatureItem {
 const features = ref<FeatureItem[]>(markRaw([
   { icon: FirstAidKit, title: '舌诊分析', desc: 'AI智能舌诊，了解身体状况', path: '/analysis/tongue' },
   { icon: User, title: '面诊分析', desc: '面色面诊，洞察健康密码', path: '/analysis/face' },
-  // { icon: Pointer, title: '手相分析', desc: '生命线、事业线、婚姻线', path: '/analysis/palm' },
+  { icon: Pointer, title: '手相分析', desc: '中医手相诊健康，五脏六腑一目了然', path: '/analysis/palm' },
+  { icon: View, title: '眼部分析', desc: '目诊观健康，肝窍明状态', path: '/analysis/eye' },
   { icon: Star, title: '体质分析', desc: '中医体质辨识，个性化调理', path: '/constitution/test' },
   { icon: ChatLineRound, title: '健康问答', desc: 'AI在线问答，专业指导', path: '/qa/chat' },
 ]))
 
+// 需要消耗积分的分析路径
+const creditRequiredPaths = ['/analysis/tongue', '/analysis/face', '/analysis/palm', '/analysis/eye']
+const creditsPerAnalysis = 1
+
 const goToFeature = (path: string) => {
+  // 检查是否需要消耗积分
+  if (creditRequiredPaths.includes(path)) {
+    // 未登录用户跳转到登录页
+    const token = getToken()
+    if (!token) {
+      router.push('/login')
+      return
+    }
+    
+    // 检查积分是否充足
+    if (analysisTimes.value !== null && analysisTimes.value < creditsPerAnalysis) {
+      ElMessageBox.confirm(
+        `积分不足，本次分析需要 ${creditsPerAnalysis} 积分。快去充值解锁更多分析次数吧！`,
+        '积分不足',
+        {
+          confirmButtonText: '去充值',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
+      ).then(() => {
+        router.push('/recharge')
+      }).catch(() => {})
+      return
+    }
+  }
+  
   router.push(path)
 }
 
@@ -90,6 +122,49 @@ const goRecharge = () => {
   router.push('/recharge')
 }
 
+// 滚动活动数据
+interface ActivityItem {
+  id: number
+  username: string
+  type: string
+  type_name: string
+  health_score: number
+  credits: number
+  created_at: string
+}
+
+const activities = ref<ActivityItem[]>([])
+const activityLoading = ref(false)
+
+// 活动类型图标映射
+const typeIcons: Record<string, Component> = {
+  tongue: FirstAidKit,
+  face: User,
+  palm: Pointer,
+  eye: View,
+  constitution: Star,
+}
+
+const fetchActivities = async () => {
+  activityLoading.value = true
+  try {
+    const res = await safeFetch('/api/v1/home/activity', {
+      headers: {
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      activities.value = data.data
+    }
+  } catch (e) {
+    // 获取失败不显示模拟数据
+    activities.value = []
+  } finally {
+    activityLoading.value = false
+  }
+}
+
 onMounted(() => {
   // 存储邀请码到 localStorage（如果有）
   const inviteCode = route.query.code as string
@@ -101,6 +176,7 @@ onMounted(() => {
   
   fetchAnalysisTimes()
   fetchSiteConfig()
+  fetchActivities()
 })
 </script>
 
@@ -110,6 +186,42 @@ onMounted(() => {
     <div class="banner">
       <div class="banner-title">{{ siteName }}</div>
       <div class="banner-subtitle">智能分析 · 科学养生 · 守护健康</div>
+    </div>
+
+    <!-- 滚动活动播报（仅有数据时显示） -->
+    <div v-if="activities.length > 0" class="activity-feed">
+      <div class="feed-header">
+        <el-icon class="feed-icon"><FirstAidKit /></el-icon>
+        <span class="feed-title">实时动态</span>
+      </div>
+      <div class="feed-list-wrapper">
+        <div class="feed-list" :class="{ 'feed-list--animate': activities.length > 0 }">
+          <div
+            v-for="(item, index) in [...activities, ...activities]"
+            :key="`${item.id}-${index}`"
+            class="feed-item"
+          >
+            <span class="feed-username">{{ item.username }}</span>
+            <span class="feed-action">完成{{ item.type_name }}</span>
+            <span class="feed-credits">消费{{ item.credits }}积分</span>
+            <div class="feed-score-ring">
+              <svg class="score-ring" viewBox="0 0 36 36">
+                <path
+                  class="score-ring-bg"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  class="score-ring-fill"
+                  :stroke-dasharray="`${item.health_score}, 100`"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <span class="score-ring-text">{{ item.health_score }}</span>
+            </div>
+            <span class="feed-time">{{ item.created_at }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 功能入口 -->
@@ -221,6 +333,130 @@ onMounted(() => {
   opacity: 0.9;
   position: relative;
   z-index: 1;
+}
+
+/* 滚动活动播报 */
+.activity-feed {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.feed-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.feed-icon {
+  color: #07c160;
+  font-size: 16px;
+}
+
+.feed-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.feed-list-wrapper {
+  height: 120px;
+  overflow: hidden;
+  position: relative;
+}
+
+.feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.feed-list--animate {
+  animation: feedScroll 20s linear infinite;
+}
+
+@keyframes feedScroll {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+
+.feed-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: #606266;
+  border-bottom: 1px solid #f5f7fa;
+  white-space: nowrap;
+}
+
+.feed-username {
+  font-weight: 500;
+  color: #303133;
+  min-width: 40px;
+}
+
+.feed-action {
+  color: #909399;
+  flex: 1;
+}
+
+.feed-credits {
+  color: #f56c6c;
+  font-size: 11px;
+  background: #fef0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.feed-score-ring {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.score-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.score-ring-bg {
+  fill: none;
+  stroke: #ebeef5;
+  stroke-width: 3;
+}
+
+.score-ring-fill {
+  fill: none;
+  stroke: #07c160;
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.5s ease;
+}
+
+.score-ring-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: #07c160;
+}
+
+.feed-time {
+  color: #c0c4cc;
+  font-size: 11px;
 }
 
 /* 功能入口网格 */

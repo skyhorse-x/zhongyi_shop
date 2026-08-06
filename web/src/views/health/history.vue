@@ -9,7 +9,7 @@ const router = useRouter()
 
 interface AnalysisRecord {
   task_no: string
-  type: 'face' | 'tongue' | 'constitution'
+  type: 'face' | 'tongue' | 'constitution' | 'palm' | 'eye'
   type_name: string
   created_at: string
   summary: string
@@ -41,6 +41,8 @@ const fetchHistory = async () => {
         const result = r.result || {}
         const typeName = r.type === 'face' ? '面诊分析'
           : r.type === 'tongue' ? '舌诊分析'
+          : r.type === 'palm' ? '手相分析'
+          : r.type === 'eye' ? '眼部分析'
           : r.type === 'constitution' ? '体质测试' : '分析'
         return {
           task_no: r.task_no,

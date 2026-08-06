@@ -2,7 +2,7 @@
   <div class="health-archives">
     <div class="page-header">
       <h2 class="page-title">健康管理档案</h2>
-      <p class="page-desc">用户舌诊、面诊、手相、体质分析记录</p>
+      <p class="page-desc">用户舌诊、面诊、手相、眼部分析、体质分析记录</p>
     </div>
 
     <!-- 统计卡片 -->
@@ -301,6 +301,7 @@ const typeLabels: Record<string, string> = {
   tongue: '舌诊分析',
   face: '面诊分析',
   palm: '手相分析',
+  eye: '眼部分析',
 }
 
 // 性别标签

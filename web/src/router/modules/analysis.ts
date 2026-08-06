@@ -17,12 +17,19 @@ const analysisRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/analysis/face.vue'),
     meta: { title: '面诊分析', needAuth: true },
   },
-  // 手相分析
+  // 健康分析
   {
     path: '/analysis/palm',
     name: 'PalmAnalysis',
     component: () => import('@/views/analysis/palm.vue'),
     meta: { title: '手相分析', needAuth: true },
+  },
+  // 眼部分析
+  {
+    path: '/analysis/eye',
+    name: 'EyeAnalysis',
+    component: () => import('@/views/analysis/eye.vue'),
+    meta: { title: '眼部分析', needAuth: true },
   },
   {
     path: '/analysis/result/:taskNo',
