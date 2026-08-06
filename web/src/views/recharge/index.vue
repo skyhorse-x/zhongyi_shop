@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Ticket, ChatLineRound, Shop, Star, Trophy } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
+import { getToken } from '@/utils/auth'
 
 const router = useRouter()
 
