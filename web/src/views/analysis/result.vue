@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import html2canvas from 'html2canvas'
@@ -14,9 +14,6 @@ const router = useRouter()
 
 const taskNo = ref('')
 const loading = ref(true)
-const taskStatus = ref(0)
-const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
-const pollCount = ref(0)
 const analysisMode = ref<'image' | 'text'>('image')
 
 interface SectionItem {
@@ -50,39 +47,6 @@ const exportRef = ref<HTMLElement | null>(null)
 const downloading = ref(false)
 
 import { getToken } from '@/utils/auth'
-
-const fetchStatus = async () => {
-  try {
-    pollCount.value++
-    const res = await safeFetch(`/api/v1/analysis/status/${taskNo.value}`, {
-      headers: {
-        'Authorization': `Bearer ${getToken()}`,
-        'Accept': 'application/json',
-      },
-    })
-    const data = await res.json()
-    if (data.code === 0) {
-      taskStatus.value = data.data.status
-      if (taskStatus.value === 2) {
-        clearInterval(pollTimer.value!)
-        await fetchReport()
-      } else if (taskStatus.value === 3) {
-        clearInterval(pollTimer.value!)
-        loading.value = false
-        ElMessage.error('分析失败，请重试')
-      } else if (pollCount.value > 40) {
-        // 超过 2 分钟（40次 * 3秒）仍在处理，提示用户稍后查看
-        clearInterval(pollTimer.value!)
-        loading.value = false
-        ElMessage.warning('分析时间较长，请稍后在"我的历史"中查看结果')
-      }
-    }
-  } catch (e: any) {
-    clearInterval(pollTimer.value!)
-    ElMessage.error(e.message || '查询状态失败')
-    loading.value = false
-  }
-}
 
 const fetchReport = async () => {
   try {
@@ -438,17 +402,10 @@ const scoreDashArray = computed(() => {
   return { circumference, offset }
 })
 
-const startPolling = () => {
-  pollTimer.value = setInterval(() => {
-    fetchStatus()
-  }, 3000)
-}
-
 const handleRetry = () => {
   loading.value = true
-  taskStatus.value = 0
   result.value = null
-  startPolling()
+  fetchReport()
 }
 
 // 分享到社交平台
@@ -627,20 +584,46 @@ onMounted(() => {
     router.replace('/')
     return
   }
-  startPolling()
-  fetchStatus()
-})
 
-onUnmounted(() => {
-  if (pollTimer.value) {
-    clearInterval(pollTimer.value)
+  // 检查是否有从上一页传递过来的结果数据
+  const navigation = window.history.state
+  if (navigation?.analysisResult) {
+    // 直接使用传递过来的结果，无需请求
+    const data = navigation.analysisResult
+    const isTongue = data.type === 'tongue'
+    const isPalm = data.type === 'palm'
+    analysisMode.value = data.result?.mode || 'image'
+    
+    const typeLabel = isTongue ? '舌诊分析' : (isPalm ? '手相分析' : '面诊分析')
+    const titleLabel = isTongue ? '舌诊分析报告' : (isPalm ? '手相分析报告' : '面诊分析报告')
+    
+    result.value = {
+      title: titleLabel,
+      type: data.type,
+      summary: data.result?.summary || '分析完成',
+      content: data.result?.content || '',
+      health_score: data.health_score || 85,
+      mode: data.result?.mode || 'image',
+      created_at: data.created_at || '-',
+      details: [
+        { label: '分析类型', value: typeLabel, icon: Histogram },
+        { label: '分析方式', value: analysisMode.value === 'text' ? '症状描述' : '图像分析', icon: Document },
+        { label: '分析编号', value: data.task_no, icon: Promotion },
+        { label: '完成时间', value: formatDateTime(data.created_at), icon: Calendar },
+      ],
+      suggestions: parseSuggestions(data.result?.content || ''),
+    }
+    loading.value = false
+  } else {
+    // 没有数据（可能是刷新页面），直接获取报告
+    fetchReport()
   }
 })
 </script>
 
 <template>
   <div class="result-page">
-    <!-- 加载状态 -->
+    <!-- 加载状态（仅在刷新页面时显示） -->
     <div v-if="loading" class="loading-container">
       <div class="loading-animation">
         <div class="pulse-circle"></div>
@@ -649,11 +632,9 @@ onUnmounted(() => {
         <el-icon class="loading-icon" :size="40"><Loading /></el-icon>
       </div>
       <div class="loading-text">
-        <template v-if="taskStatus === 0">AI 分析中，请稍候...</template>
-        <template v-else-if="taskStatus === 1">AI 分析中，请稍候...</template>
-        <template v-else>加载中...</template>
+        加载中...
       </div>
-      <div class="loading-tip">正在为您生成分析报告</div>
+      <div class="loading-tip">正在获取分析报告</div>
     </div>
 
     <!-- 结果内容 -->

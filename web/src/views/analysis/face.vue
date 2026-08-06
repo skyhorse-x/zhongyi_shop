@@ -71,8 +71,8 @@ const uploadImage = async (blob: Blob, name: string): Promise<string> => {
   throw new Error(data.message || '图片上传失败')
 }
 
-// 提交分析任务
-const submitAnalysis = async (imageUrl: string, type: 'tongue' | 'face', text: string, gender: number, age: number) => {
+// 提交分析任务（直接返回完整结果）
+const submitAnalysisDirect = async (imageUrls: string[], type: 'tongue' | 'face' | 'palm', text: string, gender: number, age: number) => {
   const res = await safeFetch('/api/v1/analysis/submit', {
     method: 'POST',
     headers: {
@@ -82,7 +82,7 @@ const submitAnalysis = async (imageUrl: string, type: 'tongue' | 'face', text: s
     },
     body: JSON.stringify({
       type: type,
-      image_url: imageUrl,
+      image_urls: imageUrls,
       text: text,
       gender: gender,
       age: age,
@@ -90,14 +90,14 @@ const submitAnalysis = async (imageUrl: string, type: 'tongue' | 'face', text: s
   })
   const data = await res.json()
   if (data.code === 0) {
-    return data.data.task_no
+    return data.data
   }
   throw new Error(data.message || '提交失败')
 }
 
 const handleSubmit = async () => {
-  if (!imageUrl.value) {
-    ElMessage.warning('请上传一张面部照片')
+  if (!imageUrl.value && !aiText.value.trim()) {
+    ElMessage.warning('请上传一张面部照片或输入症状描述')
     return
   }
   if (!gender.value) {
@@ -111,18 +111,22 @@ const handleSubmit = async () => {
   loading.value = true
   try {
     // 1. 上传图片（如果有）
-    let uploadedUrl = ''
+    let uploadedUrls: string[] = []
     if (imageUrl.value) {
       const response = await fetch(imageUrl.value)
       const blob = await response.blob()
-      uploadedUrl = await uploadImage(blob, fileName.value || 'face.jpg')
+      const url = await uploadImage(blob, fileName.value || 'face.jpg')
+      uploadedUrls = [url]
     }
 
-    // 2. 提交分析任务
-    const taskNo = await submitAnalysis(uploadedUrl, 'face', aiText.value, gender.value, age.value)
+    // 2. 提交分析任务（直接返回完整结果）
+    const result = await submitAnalysisDirect(uploadedUrls, 'face', aiText.value, gender.value, age.value)
 
-    // 直接跳转到分析结果页面
-    router.push(`/analysis/result/${taskNo}`)
+    // 直接跳转到分析结果页面（携带结果数据）
+    router.push({
+      path: `/analysis/result/${result.task_no}`,
+      state: { analysisResult: result }
+    })
   } catch (e: any) {
     const msg = e.message || '提交失败'
     if (msg.includes('次数不足') || msg.includes('先购买')) {

@@ -86,8 +86,8 @@ const uploadSingleImage = async (file: File): Promise<string> => {
   throw new Error(data.message || '图片上传失败')
 }
 
-// 提交分析任务
-const submitAnalysis = async (imageUrls: string[], type: 'tongue' | 'face', text: string, gender: number, age: number) => {
+// 提交分析任务（直接返回完整结果）
+const submitAnalysisDirect = async (imageUrls: string[], type: 'tongue' | 'face' | 'palm', text: string, gender: number, age: number) => {
   const res = await safeFetch('/api/v1/analysis/submit', {
     method: 'POST',
     headers: {
@@ -105,14 +105,15 @@ const submitAnalysis = async (imageUrls: string[], type: 'tongue' | 'face', text
   })
   const data = await res.json()
   if (data.code === 0) {
-    return data.data.task_no
+    // 直接返回完整结果
+    return data.data
   }
   throw new Error(data.message || '提交失败')
 }
 
 const handleSubmit = async () => {
-  if (imageList.value.length === 0) {
-    ElMessage.warning('请至少上传一张舌头照片')
+  if (imageList.value.length === 0 && !aiText.value.trim()) {
+    ElMessage.warning('请至少上传一张舌头照片或输入症状描述')
     return
   }
   if (!gender.value) {
@@ -132,11 +133,14 @@ const handleSubmit = async () => {
       uploadedUrls = await Promise.all(uploadPromises)
     }
 
-    // 2. 提交分析任务
-    const taskNo = await submitAnalysis(uploadedUrls, 'tongue', aiText.value, gender.value, age.value)
+    // 2. 提交分析任务（直接返回完整结果）
+    const result = await submitAnalysisDirect(uploadedUrls, 'tongue', aiText.value, gender.value, age.value)
 
-    // 直接跳转到分析结果页面
-    router.push(`/analysis/result/${taskNo}`)
+    // 直接跳转到分析结果页面（携带结果数据）
+    router.push({
+      path: `/analysis/result/${result.task_no}`,
+      state: { analysisResult: result }
+    })
   } catch (e: any) {
     const msg = e.message || '提交失败'
     if (msg.includes('次数不足') || msg.includes('先购买')) {
