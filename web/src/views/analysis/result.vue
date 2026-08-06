@@ -602,9 +602,9 @@ onMounted(() => {
       type: data.type,
       summary: data.result?.summary || '分析完成',
       content: data.result?.content || '',
-      health_score: data.health_score || 85,
+      healthScore: data.health_score || 85,
       mode: data.result?.mode || 'image',
-      created_at: data.created_at || '-',
+      createdAt: data.created_at || '-',
       details: [
         { label: '分析类型', value: typeLabel, icon: Histogram },
         { label: '分析方式', value: analysisMode.value === 'text' ? '症状描述' : '图像分析', icon: Document },
