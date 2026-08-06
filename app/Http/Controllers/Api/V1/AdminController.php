@@ -787,7 +787,7 @@ class AdminController extends Controller
             // LLM配置
             'llm_provider', 'llm_api_url', 'llm_api_key', 'llm_model',
             'llm_temperature', 'llm_max_tokens', 'llm_timeout',
-            'disable_mobile_auth',
+            'disable_mobile_auth', 'show_xianyu_recharge',
         ];
 
         $data = $request->only($allowedKeys);

@@ -22,6 +22,7 @@ const products = ref<XianyuProduct[]>([])
 const analysisTimes = ref(0)
 const systemLink = ref('')
 const wechatService = ref('') // 微信客服
+const showXianyuRecharge = ref(true) // 是否显示闲鱼充值部分
 
 // 获取当前剩余分析次数
 const fetchUserInfo = async () => {
@@ -41,6 +42,23 @@ const fetchUserInfo = async () => {
     }
   } catch (e) {
     console.error('获取用户信息失败:', e)
+  }
+}
+
+// 获取是否显示闲鱼充值部分
+const fetchXianyuConfig = async () => {
+  try {
+    const res = await safeFetch('/api/v1/analysis/config', {
+      headers: { 'Accept': 'application/json' },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      // 如果配置了 show_xianyu_recharge，使用配置值；否则默认显示
+      const val = data.data?.show_xianyu_recharge
+      showXianyuRecharge.value = val === undefined || val === null ? true : val === '1' || val === 1 || val === true
+    }
+  } catch (e) {
+    console.error('获取闲鱼充值配置失败:', e)
   }
 }
 
@@ -125,9 +143,13 @@ const copyWechat = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchUserInfo()
-  fetchProducts()
+  await fetchXianyuConfig()
+  // 只有在显示闲鱼充值时才获取商品列表
+  if (showXianyuRecharge.value) {
+    fetchProducts()
+  }
   fetchWechatService()
 })
 </script>
@@ -148,48 +170,50 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 充值商品列表 -->
-    <div class="section-title">
-      <el-icon><Shop /></el-icon>
-      <span>选择充值档位</span>
-    </div>
+    <!-- 充值商品列表（根据后台开关显示/隐藏） -->
+    <template v-if="showXianyuRecharge">
+      <div class="section-title">
+        <el-icon><Shop /></el-icon>
+        <span>选择充值档位</span>
+      </div>
 
-    <div v-loading="loading" class="product-list">
-      <div v-for="item in products" :key="item.id" class="product-card">
-        <div class="product-info">
-          <div class="product-title">{{ item.title }}</div>
-          <div class="product-desc">{{ item.description || '闲鱼拍下付款后，联系客服审核到账' }}</div>
-          <div class="product-meta">
-            <span class="product-price">¥{{ Number(item.amount).toFixed(2) }}</span>
-            <span v-if="item.times > 0" class="product-times">赠送 {{ item.times }} 次</span>
+      <div v-loading="loading" class="product-list">
+        <div v-for="item in products" :key="item.id" class="product-card">
+          <div class="product-info">
+            <div class="product-title">{{ item.title }}</div>
+            <div class="product-desc">{{ item.description || '闲鱼拍下付款后，联系客服审核到账' }}</div>
+            <div class="product-meta">
+              <span class="product-price">¥{{ Number(item.amount).toFixed(2) }}</span>
+              <span v-if="item.times > 0" class="product-times">赠送 {{ item.times }} 次</span>
+            </div>
+          </div>
+          <div class="product-action">
+            <el-button
+              round
+              type="primary"
+              size="small"
+              @click="goBuy(item)"
+            >
+              去闲鱼购买
+            </el-button>
           </div>
         </div>
-        <div class="product-action">
-          <el-button
-            round
-            type="primary"
-            size="small"
-            @click="goBuy(item)"
-          >
-            去闲鱼购买
-          </el-button>
+
+        <el-empty v-if="!loading && products.length === 0 && !systemLink" description="暂无可充值的商品，敬请期待" />
+
+        <!-- 后台配置链接兜底入口（商品列表为空时展示） -->
+        <div v-if="products.length === 0 && systemLink" class="system-link-card" @click="goSystemLink">
+          <div class="system-link-icon">
+            <el-icon :size="28"><Shop /></el-icon>
+          </div>
+          <div class="system-link-info">
+            <div class="system-link-title">闲鱼充值</div>
+            <div class="system-link-desc">前往闲鱼购买并完成付款</div>
+          </div>
+          <el-button round type="primary" size="small">去闲鱼购买</el-button>
         </div>
       </div>
-
-      <el-empty v-if="!loading && products.length === 0 && !systemLink" description="暂无可充值的商品，敬请期待" />
-
-      <!-- 后台配置链接兜底入口（商品列表为空时展示） -->
-      <div v-if="products.length === 0 && systemLink" class="system-link-card" @click="goSystemLink">
-        <div class="system-link-icon">
-          <el-icon :size="28"><Shop /></el-icon>
-        </div>
-        <div class="system-link-info">
-          <div class="system-link-title">闲鱼充值</div>
-          <div class="system-link-desc">前往闲鱼购买并完成付款</div>
-        </div>
-        <el-button round type="primary" size="small">去闲鱼购买</el-button>
-      </div>
-    </div>
+    </template>
 
     <!-- 微信客服 -->
     <div class="contact-card">
@@ -211,8 +235,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 购买流程说明 -->
-    <div class="help-card">
+    <!-- 购买流程说明（仅在显示闲鱼充值时展示） -->
+    <div v-if="showXianyuRecharge" class="help-card">
       <div class="help-title">
         <el-icon><ChatLineRound /></el-icon>
         <span>购买流程</span>

@@ -13,6 +13,7 @@ const form = ref({
   adminEmail: '',
   wechatService: '', // 微信客服
   disableMobileAuth: '0', // 关闭手机注册和登录
+  showXianyuRecharge: '1', // 显示闲鱼充值部分
   // 费用设置
   analysisMode: 'paid',
   analysisPrice: 9.99,
@@ -164,6 +165,7 @@ const loadConfigs = async () => {
             admin_email: 'adminEmail',
             wechat_service: 'wechatService',
             disable_mobile_auth: 'disableMobileAuth',
+            show_xianyu_recharge: 'showXianyuRecharge',
             analysis_mode: 'analysisMode',
             analysis_price: 'analysisPrice',
             ai_cost_per_time: 'aiCostPerTime',
@@ -225,6 +227,7 @@ const handleSave = async () => {
       admin_email: form.value.adminEmail,
       wechat_service: form.value.wechatService,
       disable_mobile_auth: form.value.disableMobileAuth,
+      show_xianyu_recharge: form.value.showXianyuRecharge,
       analysis_mode: form.value.analysisMode,
       analysis_price: form.value.analysisPrice,
       ai_cost_per_time: form.value.aiCostPerTime,
@@ -348,6 +351,17 @@ onMounted(() => {
               inactive-text="已开启"
             />
             <span class="form-tip">关闭后，用户将无法通过手机号注册和登录，仅允许账号密码登录</span>
+          </el-form-item>
+          <el-form-item label="闲鱼充值">
+            <el-switch
+              v-model="form.showXianyuRecharge"
+              active-value="1"
+              inactive-value="0"
+              inline-prompt
+              active-text="显示"
+              inactive-text="隐藏"
+            />
+            <span class="form-tip">关闭后，充值页面将隐藏闲鱼充值部分，仅保留微信客服联系方式</span>
           </el-form-item>
         </el-form>
       </el-tab-pane>

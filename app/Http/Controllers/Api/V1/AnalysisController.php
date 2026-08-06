@@ -71,6 +71,7 @@ class AnalysisController extends Controller
         $siteName = SystemConfig::getValue('site_name', 'AI 中医健康助手');
         $siteUrl = SystemConfig::getValue('site_url', config('app.url'));
         $disableMobileAuth = SystemConfig::getValue('disable_mobile_auth', '0');
+        $showXianyuRecharge = SystemConfig::getValue('show_xianyu_recharge', '1');
 
         return response()->json([
             'code' => 0,
@@ -82,6 +83,7 @@ class AnalysisController extends Controller
                 'site_name' => $siteName,
                 'site_url' => $siteUrl,
                 'disable_mobile_auth' => $disableMobileAuth,
+                'show_xianyu_recharge' => $showXianyuRecharge,
             ],
         ]);
     }
