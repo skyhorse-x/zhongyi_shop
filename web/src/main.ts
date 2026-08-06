@@ -64,6 +64,9 @@ if (import.meta.env.DEV) {
   }
 }
 
+// 设置页面标题
+document.title = import.meta.env.VITE_APP_TITLE || 'AI中医健康管理平台'
+
 const app = createApp(App)
 
 app.use(createPinia())
