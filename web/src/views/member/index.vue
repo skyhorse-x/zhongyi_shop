@@ -166,7 +166,7 @@ onMounted(async () => {
             邀请了
             <span class="highlight-num">{{ item.invite_count }}</span>
             人，返利
-            <span class="highlight-money">¥{{ item.commission.toFixed(2) }}</span>
+            <span class="highlight-money">¥{{ Number(item.commission ?? 0).toFixed(2) }}</span>
             <span class="marquee-divider">|</span>
           </span>
           <!-- 无缝滚动复制一份 -->
@@ -175,7 +175,7 @@ onMounted(async () => {
             邀请了
             <span class="highlight-num">{{ item.invite_count }}</span>
             人，返利
-            <span class="highlight-money">¥{{ item.commission.toFixed(2) }}</span>
+            <span class="highlight-money">¥{{ Number(item.commission ?? 0).toFixed(2) }}</span>
             <span class="marquee-divider">|</span>
           </span>
         </div>
