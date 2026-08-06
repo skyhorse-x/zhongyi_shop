@@ -41,6 +41,9 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
     // 分析配置（公开访问，用于前台获取微信客服等配置）
     Route::get('analysis/config', [V1\AnalysisController::class, 'getConfig']);
 
+    // 次数包列表（公开访问，用于前台充值页展示）
+    Route::get('packages', [V1\PackageController::class, 'index']);
+
     // ===== 需要登录的接口 =====
         Route::middleware('auth.or.admin')->group(function () {
 
@@ -138,11 +141,8 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
         // 客服评价
         Route::post('customer-service/sessions/{sessionNo}/rate', [V1\CustomerServiceRatingController::class, 'store']);
 
-        // 次数包
-        Route::prefix('packages')->group(function () {
-            Route::get('/', [V1\PackageController::class, 'index']);
-            Route::post('buy', [V1\PackageController::class, 'buy']);
-        });
+        // 次数包（buy 需要登录）
+        Route::post('packages/buy', [V1\PackageController::class, 'buy']);
 
         // 健康档案
         Route::prefix('health')->group(function () {
@@ -360,11 +360,17 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             // 队列任务管理
             Route::prefix('queue')->group(function () {
                 Route::get('statistics', [V1\Admin\QueueController::class, 'statistics']);
+                Route::get('monitor', [V1\Admin\QueueController::class, 'monitor']);
+                Route::get('health', [V1\Admin\QueueController::class, 'health']);
                 Route::get('tasks', [V1\Admin\QueueController::class, 'index']);
                 Route::get('tasks/{taskNo}', [V1\Admin\QueueController::class, 'show']);
                 Route::get('failed-jobs', [V1\Admin\QueueController::class, 'failedJobs']);
                 Route::post('retry/{taskNo}', [V1\Admin\QueueController::class, 'retry']);
                 Route::post('retry-all', [V1\Admin\QueueController::class, 'retryAll']);
+                Route::post('retry-failed', [V1\Admin\QueueController::class, 'batchRetryFailed']);
+                Route::post('start-workers', [V1\Admin\QueueController::class, 'startWorkers']);
+                Route::post('stop-workers', [V1\Admin\QueueController::class, 'stopWorkers']);
+                Route::post('cleanup', [V1\Admin\QueueController::class, 'cleanup']);
             });
 
             // 退款管理
