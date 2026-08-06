@@ -1121,8 +1121,9 @@ const loadLogs = async (row?: any) => {
     <el-dialog
       v-model="adjustCreditsDialogVisible"
       :title="adjustCreditsForm.type === 'recharge' ? '积分充值' : '积分扣减'"
-      width="480px"
+      :width="isMobile ? '95%' : '480px'"
       :close-on-click-modal="false"
+      class="credits-dialog"
     >
       <el-alert
         :title="`用户「${adjustCreditsForm.user?.username}」当前积分：${adjustCreditsForm.user?.analysis_times || 0}`"
@@ -1131,7 +1132,7 @@ const loadLogs = async (row?: any) => {
         show-icon
         style="margin-bottom: 16px"
       />
-      <el-form label-width="80px">
+      <el-form :label-width="isMobile ? '60px' : '80px'">
         <el-form-item label="操作类型">
           <el-radio-group v-model="adjustCreditsForm.type">
             <el-radio value="recharge">充值（增加）</el-radio>
@@ -1149,15 +1150,16 @@ const loadLogs = async (row?: any) => {
           />
         </el-form-item>
         <el-form-item label="快捷">
-          <el-button
-            v-for="p in presetCreditsAmounts"
-            :key="p"
-            size="small"
-            @click="adjustCreditsForm.amount = p"
-            style="margin-right: 6px; margin-bottom: 4px"
-          >
-            {{ p }} 积分
-          </el-button>
+          <div class="preset-buttons">
+            <el-button
+              v-for="p in presetCreditsAmounts"
+              :key="p"
+              size="small"
+              @click="adjustCreditsForm.amount = p"
+            >
+              {{ p }} 积分
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item label="备注">
           <el-input
@@ -1595,6 +1597,26 @@ const loadLogs = async (row?: any) => {
 
   .logs-stat-value {
     font-size: 16px;
+  }
+
+  .preset-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .preset-buttons .el-button {
+    margin: 0 !important;
+  }
+
+  .credits-dialog .el-form-item {
+    margin-bottom: 12px;
+  }
+
+  .credits-dialog .el-radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 
   /* 用户信息单元格 */
