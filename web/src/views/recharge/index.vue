@@ -2,9 +2,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Money, Ticket, Wallet, ChatLineRound, Link, Shop, Star, Trophy } from '@element-plus/icons-vue'
+import { Ticket, ChatLineRound, Shop, Star, Trophy } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
-import { getToken } from '@/utils/auth'
 
 const router = useRouter()
 
@@ -80,40 +79,6 @@ const fetchPackages = async () => {
     ElMessage.error(e?.message || '网络错误')
   } finally {
     loading.value = false
-  }
-}
-
-// 购买套餐
-const buyPackage = async (pkg: Package) => {
-  const token = getToken()
-  if (!token) {
-    ElMessage.warning('请先登录')
-    return
-  }
-  
-  try {
-    const res = await safeFetch('/api/v1/packages/buy', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        package_id: pkg.id,
-        pay_type: 'wechat',
-      }),
-    })
-    const data = await res.json()
-    if (data.code === 0) {
-      ElMessage.success(data.message || '购买成功')
-      // 刷新用户信息
-      fetchUserInfo()
-    } else {
-      ElMessage.error(data.message || '购买失败')
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.message || '网络错误')
   }
 }
 
@@ -203,16 +168,7 @@ onMounted(() => {
             <span v-if="pkg.discount > 0" class="package-discount">-{{ pkg.discount }}%</span>
           </div>
         </div>
-        <div class="package-action">
-          <el-button
-            round
-            type="primary"
-            size="small"
-            @click="buyPackage(pkg)"
-          >
-            立即购买
-          </el-button>
-        </div>
+
       </div>
 
       <el-empty v-if="!loading && packages.length === 0" description="暂无可购买的套餐，敬请期待" />
@@ -375,10 +331,6 @@ onMounted(() => {
   padding: 1px 6px;
   border-radius: 4px;
   font-weight: 600;
-}
-
-.package-action {
-  flex-shrink: 0;
 }
 
 /* 联系客服卡片 */
