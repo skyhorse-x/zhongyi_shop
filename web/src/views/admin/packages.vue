@@ -211,8 +211,8 @@ onMounted(() => {
   <div class="page-container">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h2 class="page-title">次数包管理</h2>
-      <p class="page-desc">管理 AI 分析次数套餐、价格和有效期</p>
+      <h2 class="page-title">套餐管理</h2>
+      <p class="page-desc">管理 AI 分析套餐、价格和有效期</p>
     </div>
 
     <el-card shadow="never" class="search-card">

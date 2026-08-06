@@ -28,7 +28,19 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const isTyping = ref(false)
 const typingTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const heartbeatInterval = ref<ReturnType<typeof setInterval> | null>(null)
+const messagePollingInterval = ref<ReturnType<typeof setInterval> | null>(null)
+const lastMessageId = ref(0) // 最后一条消息ID，用于增量获取
 const isLeaving = ref(false) // 标记是否正在离开页面
+const sessionStatus = ref(0) // 会话状态：0等待中 1服务中 2已结束
+const showRatingDialog = ref(false) // 显示评价对话框
+const hasRated = ref(false) // 是否已评价
+const ratingForm = ref({
+  score: 5,
+  attitude: 'good',
+  solved: 'yes',
+  comment: '',
+  tags: [] as string[]
+})
 
 // 消息操作相关
 const replyToMessage = ref<ChatMessage | null>(null)
@@ -53,6 +65,8 @@ const getOrCreateSession = async () => {
     const data = await res.json()
     if (data.code === 0) {
       sessionNo.value = data.data.session_no
+      sessionStatus.value = data.data.status || 0
+      hasRated.value = data.data.rated || false
       // 加载历史消息
       loadMessages()
     } else {
@@ -76,10 +90,60 @@ const loadMessages = async () => {
     const data = await res.json()
     if (data.code === 0) {
       messages.value = data.data.data || []
+      // 更新最后消息ID
+      if (messages.value.length > 0) {
+        lastMessageId.value = messages.value[messages.value.length - 1].id
+      }
       await scrollToBottom()
       // 加载消息后标记为已读
       markAsRead()
     }
+  } catch (e) {
+    // 忽略错误
+  }
+}
+
+// 轮询新消息（增量获取）
+const pollNewMessages = async () => {
+  if (!sessionNo.value || sessionStatus.value === 2) return
+  try {
+    const res = await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/messages?after_id=${lastMessageId.value}`, {
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0 && data.data && data.data.length > 0) {
+      const newMessages = data.data
+      // 添加新消息
+      for (const msg of newMessages) {
+        // 避免重复添加
+        if (!messages.value.find(m => m.id === msg.id)) {
+          messages.value.push(msg)
+        }
+      }
+      // 更新最后消息ID
+      if (newMessages.length > 0) {
+        lastMessageId.value = newMessages[newMessages.length - 1].id
+      }
+      // 有新消息时滚动到底部并标记已读
+      await scrollToBottom()
+      markAsRead()
+      // 播放提示音（可选）
+      playNotificationSound()
+    }
+  } catch (e) {
+    // 忽略错误
+  }
+}
+
+// 播放新消息提示音
+const playNotificationSound = () => {
+  try {
+    const audio = new Audio('/notification.mp3')
+    audio.volume = 0.3
+    audio.play().catch(() => {})
   } catch (e) {
     // 忽略错误
   }
@@ -113,8 +177,14 @@ const sendMessage = async () => {
     const data = await res.json()
     if (data.code === 0) {
       messages.value.push(data.data)
+      // 更新最后消息ID
+      if (data.data.id > lastMessageId.value) {
+        lastMessageId.value = data.data.id
+      }
       inputText.value = ''
       await scrollToBottom()
+      // 发送后立即轮询一次，快速获取回复
+      setTimeout(() => pollNewMessages(), 500)
     } else {
       ElMessage.error(data.message || '发送失败')
     }
@@ -220,7 +290,7 @@ const sendHeartbeat = async () => {
   }
 }
 
-// 用户离开页面时标记为离线（不关闭会话，保留对话记录）
+// 用户离开页面时自动关闭会话
 const markOfflineOnLeave = async () => {
   if (!sessionNo.value || isLeaving.value) return
   isLeaving.value = true
@@ -231,23 +301,37 @@ const markOfflineOnLeave = async () => {
     heartbeatInterval.value = null
   }
 
-  // 使用 sendBeacon 确保请求在页面关闭时也能发送
-  const url = `${window.location.origin}/api/v1/customer-service/sessions/${sessionNo.value}/mark-offline`
+  // 使用 sendBeacon API 确保请求在页面关闭时也能发送
+  const closeUrl = `${window.location.origin}/api/v1/customer-service/sessions/${sessionNo.value}/close`
+  const offlineUrl = `${window.location.origin}/api/v1/customer-service/sessions/${sessionNo.value}/mark-offline`
   const token = getToken()
 
   if (navigator.sendBeacon) {
     // 使用 sendBeacon API（适合页面关闭场景）
-    const blob = new Blob([JSON.stringify({})], { type: 'application/json' })
-    navigator.sendBeacon(url, blob)
+    // 先关闭会话
+    const closeBlob = new Blob([JSON.stringify({})], { type: 'application/json' })
+    navigator.sendBeacon(closeUrl, closeBlob)
+    // 再标记离线
+    const offlineBlob = new Blob([JSON.stringify({})], { type: 'application/json' })
+    navigator.sendBeacon(offlineUrl, offlineBlob)
   } else {
     // 降级使用同步 XMLHttpRequest
     try {
-      const xhr = new XMLHttpRequest()
-      xhr.open('POST', url, false) // 同步请求
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-      xhr.setRequestHeader('Accept', 'application/json')
-      xhr.setRequestHeader('Content-Type', 'application/json')
-      xhr.send(JSON.stringify({}))
+      // 关闭会话
+      const closeXhr = new XMLHttpRequest()
+      closeXhr.open('POST', closeUrl, false) // 同步请求
+      closeXhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      closeXhr.setRequestHeader('Accept', 'application/json')
+      closeXhr.setRequestHeader('Content-Type', 'application/json')
+      closeXhr.send(JSON.stringify({}))
+
+      // 标记离线
+      const offlineXhr = new XMLHttpRequest()
+      offlineXhr.open('POST', offlineUrl, false) // 同步请求
+      offlineXhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      offlineXhr.setRequestHeader('Accept', 'application/json')
+      offlineXhr.setRequestHeader('Content-Type', 'application/json')
+      offlineXhr.send(JSON.stringify({}))
     } catch (e) {
       // 忽略错误
     }
@@ -397,9 +481,111 @@ const formatTime = (timestamp: string): string => {
   return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 
+// ========== 评价相关 ==========
+
+// 结束会话
+const closeSession = async () => {
+  if (!sessionNo.value) return
+  try {
+    const res = await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/close`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      sessionStatus.value = 2
+      // 显示评价对话框
+      if (!hasRated.value) {
+        showRatingDialog.value = true
+      }
+    } else {
+      ElMessage.error(data.message || '结束会话失败')
+    }
+  } catch {
+    ElMessage.error('结束会话失败')
+  }
+}
+
+// 提交评价
+const submitRating = async () => {
+  if (!sessionNo.value) return
+  try {
+    const res = await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/rate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(ratingForm.value),
+    })
+    const data = await res.json()
+    if (data.code === 0) {
+      hasRated.value = true
+      showRatingDialog.value = false
+      ElMessage.success('感谢您的评价！')
+    } else {
+      ElMessage.error(data.message || '评价失败')
+    }
+  } catch {
+    ElMessage.error('评价失败')
+  }
+}
+
+// 评价标签选项
+const ratingTags = ['响应及时', '态度友好', '解答专业', '问题解决', '沟通顺畅', '服务周到']
+
+// 切换标签选中状态
+const toggleTag = (tag: string) => {
+  const index = ratingForm.value.tags.indexOf(tag)
+  if (index === -1) {
+    ratingForm.value.tags.push(tag)
+  } else {
+    ratingForm.value.tags.splice(index, 1)
+  }
+}
+
 // 预览图片
 const previewImage = (url: string) => {
   window.open(url, '_blank')
+}
+
+// 不活跃计时器（5分钟无操作自动关闭会话）
+const inactivityTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const INACTIVITY_TIMEOUT = 5 * 60 * 1000 // 5分钟
+
+// 重置不活跃计时器
+const resetInactivityTimer = () => {
+  if (inactivityTimer.value) {
+    clearTimeout(inactivityTimer.value)
+  }
+  inactivityTimer.value = setTimeout(() => {
+    // 5分钟无操作，自动关闭会话
+    if (sessionStatus.value < 2) {
+      closeSessionOnInactive()
+    }
+  }, INACTIVITY_TIMEOUT)
+}
+
+// 不活跃时自动关闭会话
+const closeSessionOnInactive = async () => {
+  if (!sessionNo.value || sessionStatus.value >= 2) return
+  try {
+    await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/close`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    sessionStatus.value = 2
+    // 不自动显示评价对话框，等用户下次访问时再评价
+  } catch {
+    // 忽略错误
+  }
 }
 
 onMounted(() => {
@@ -410,8 +596,22 @@ onMounted(() => {
     sendHeartbeat()
   }, 30000)
 
+  // 启动消息轮询（每3秒检查一次新消息）
+  messagePollingInterval.value = setInterval(() => {
+    pollNewMessages()
+  }, 3000)
+
   // 监听页面关闭/刷新事件
   window.addEventListener('beforeunload', markOfflineOnLeave)
+
+  // 监听用户活动，重置不活跃计时器
+  window.addEventListener('mousemove', resetInactivityTimer)
+  window.addEventListener('keydown', resetInactivityTimer)
+  window.addEventListener('click', resetInactivityTimer)
+  window.addEventListener('scroll', resetInactivityTimer)
+
+  // 启动不活跃计时器
+  resetInactivityTimer()
 })
 
 onUnmounted(() => {
@@ -421,11 +621,27 @@ onUnmounted(() => {
     heartbeatInterval.value = null
   }
 
+  // 清理消息轮询定时器
+  if (messagePollingInterval.value) {
+    clearInterval(messagePollingInterval.value)
+    messagePollingInterval.value = null
+  }
+
+  // 清理不活跃计时器
+  if (inactivityTimer.value) {
+    clearTimeout(inactivityTimer.value)
+    inactivityTimer.value = null
+  }
+
   // 如果用户离开页面（非 beforeunload 触发），标记离线
   markOfflineOnLeave()
 
   // 移除事件监听
   window.removeEventListener('beforeunload', markOfflineOnLeave)
+  window.removeEventListener('mousemove', resetInactivityTimer)
+  window.removeEventListener('keydown', resetInactivityTimer)
+  window.removeEventListener('click', resetInactivityTimer)
+  window.removeEventListener('scroll', resetInactivityTimer)
 })
 </script>
 
@@ -565,6 +781,138 @@ onUnmounted(() => {
         @change="handleFileChange"
       />
     </div>
+
+    <!-- 会话状态提示 -->
+    <div class="session-status-bar" v-if="sessionStatus < 2">
+      <span class="status-text">💡 关闭页面后将自动结束会话并邀请您评价</span>
+    </div>
+
+    <!-- 已结束会话提示 -->
+    <div class="session-ended-tip" v-if="sessionStatus === 2">
+      <span v-if="!hasRated">会话已结束，请评价本次服务</span>
+      <span v-else>会话已结束，感谢您的评价</span>
+      <button v-if="!hasRated" class="rate-btn" @click="showRatingDialog = true">
+        立即评价
+      </button>
+    </div>
+
+    <!-- 评价对话框 -->
+    <el-dialog
+      v-model="showRatingDialog"
+      title="评价本次服务"
+      width="90%"
+      :close-on-click-modal="false"
+      class="rating-dialog"
+    >
+      <div class="rating-content">
+        <!-- 服务评分 -->
+        <div class="rating-item">
+          <div class="rating-label">服务评分</div>
+          <div class="rating-stars">
+            <span
+              v-for="star in 5"
+              :key="star"
+              class="star"
+              :class="{ active: star <= ratingForm.score }"
+              @click="ratingForm.score = star"
+            >
+              ★
+            </span>
+          </div>
+        </div>
+
+        <!-- 服务态度 -->
+        <div class="rating-item">
+          <div class="rating-label">服务态度</div>
+          <div class="rating-options">
+            <button
+              class="option-btn"
+              :class="{ active: ratingForm.attitude === 'good' }"
+              @click="ratingForm.attitude = 'good'"
+            >
+              满意
+            </button>
+            <button
+              class="option-btn"
+              :class="{ active: ratingForm.attitude === 'normal' }"
+              @click="ratingForm.attitude = 'normal'"
+            >
+              一般
+            </button>
+            <button
+              class="option-btn"
+              :class="{ active: ratingForm.attitude === 'bad' }"
+              @click="ratingForm.attitude = 'bad'"
+            >
+              不满意
+            </button>
+          </div>
+        </div>
+
+        <!-- 问题解决 -->
+        <div class="rating-item">
+          <div class="rating-label">问题是否解决</div>
+          <div class="rating-options">
+            <button
+              class="option-btn"
+              :class="{ active: ratingForm.solved === 'yes' }"
+              @click="ratingForm.solved = 'yes'"
+            >
+              已解决
+            </button>
+            <button
+              class="option-btn"
+              :class="{ active: ratingForm.solved === 'partial' }"
+              @click="ratingForm.solved = 'partial'"
+            >
+              部分解决
+            </button>
+            <button
+              class="option-btn"
+              :class="{ active: ratingForm.solved === 'no' }"
+              @click="ratingForm.solved = 'no'"
+            >
+              未解决
+            </button>
+          </div>
+        </div>
+
+        <!-- 服务标签 -->
+        <div class="rating-item">
+          <div class="rating-label">服务亮点（可多选）</div>
+          <div class="rating-tags">
+            <button
+              v-for="tag in ratingTags"
+              :key="tag"
+              class="tag-btn"
+              :class="{ active: ratingForm.tags.includes(tag) }"
+              @click="toggleTag(tag)"
+            >
+              {{ tag }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 评价内容 -->
+        <div class="rating-item">
+          <div class="rating-label">评价内容（选填）</div>
+          <textarea
+            v-model="ratingForm.comment"
+            class="rating-textarea"
+            placeholder="请输入您的评价内容..."
+            maxlength="500"
+            rows="3"
+          ></textarea>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <button class="cancel-btn" @click="showRatingDialog = false">稍后评价</button>
+          <button class="submit-btn" @click="submitRating">提交评价</button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -658,6 +1006,46 @@ onUnmounted(() => {
 .welcome-desc {
   font-size: 14px;
   color: #969799;
+}
+
+/* 会话状态提示栏 */
+.session-status-bar {
+  padding: 10px 16px;
+  background: #f0f9eb;
+  border-top: 1px solid #e1f3d8;
+  text-align: center;
+}
+
+.status-text {
+  font-size: 13px;
+  color: #67c23a;
+}
+
+/* 会话结束提示 */
+.session-ended-tip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fffbe6;
+  border-top: 1px solid #ffe58f;
+  font-size: 14px;
+  color: #d48806;
+}
+
+.rate-btn {
+  padding: 6px 16px;
+  background: #faad14;
+  border: none;
+  border-radius: 16px;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.rate-btn:hover {
+  background: #d48806;
 }
 
 /* 消息列表 */
@@ -944,5 +1332,151 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* 评价对话框 */
+.rating-content {
+  padding: 10px 0;
+}
+
+.rating-item {
+  margin-bottom: 20px;
+}
+
+.rating-label {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+/* 星级评分 */
+.rating-stars {
+  display: flex;
+  gap: 8px;
+}
+
+.star {
+  font-size: 32px;
+  color: #ddd;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.star.active {
+  color: #faad14;
+}
+
+.star:hover {
+  color: #ffc53d;
+}
+
+/* 选项按钮 */
+.rating-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.option-btn {
+  padding: 8px 20px;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  background: #fff;
+  color: #666;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.option-btn:hover {
+  border-color: #07c160;
+  color: #07c160;
+}
+
+.option-btn.active {
+  background: #07c160;
+  border-color: #07c160;
+  color: #fff;
+}
+
+/* 标签 */
+.rating-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tag-btn {
+  padding: 6px 14px;
+  border: 1px solid #ddd;
+  border-radius: 16px;
+  background: #fff;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tag-btn:hover {
+  border-color: #07c160;
+  color: #07c160;
+}
+
+.tag-btn.active {
+  background: #e8f7ef;
+  border-color: #07c160;
+  color: #07c160;
+}
+
+/* 评价文本框 */
+.rating-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.rating-textarea:focus {
+  border-color: #07c160;
+}
+
+/* 对话框底部 */
+.dialog-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancel-btn {
+  padding: 10px 24px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #666;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cancel-btn:hover {
+  background: #f5f5f5;
+}
+
+.submit-btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  background: #07c160;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.submit-btn:hover {
+  background: #06ad56;
 }
 </style>

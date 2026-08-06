@@ -98,7 +98,7 @@ const handleShare = () => {
 // 底部导航项
 const tabItems = [
   { icon: HomeFilled, label: '首页', path: '/' },
-  { icon: Document, label: '订单', path: '/member/orders' },
+  { icon: Share, label: '邀请', path: '/promoter' },
   { icon: ChatLineRound, label: '问答', path: '/qa/chat' },
   { icon: Bell, label: '消息', path: '/messages' },
   { icon: User, label: '我的', path: '/member' },
@@ -108,7 +108,7 @@ const tabItems = [
 const activeTab = computed(() => {
   const path = route.path
   if (path === '/') return '/'
-  if (path.startsWith('/member/orders')) return '/member/orders'
+  if (path.startsWith('/promoter')) return '/promoter'
   if (path.startsWith('/qa')) return '/qa/chat'
   if (path.startsWith('/messages')) return '/messages'
   if (path.startsWith('/member')) return '/member'

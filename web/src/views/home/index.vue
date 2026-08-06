@@ -33,10 +33,20 @@ const creditsPerAnalysis = 1
 const goToFeature = (path: string) => {
   // 检查是否需要消耗积分
   if (creditRequiredPaths.includes(path)) {
-    // 未登录用户跳转到登录页
+    // 未登录用户提示登录
     const token = getToken()
     if (!token) {
-      router.push('/login')
+      ElMessageBox.confirm(
+        '请先登录后再使用分析功能',
+        '需要登录',
+        {
+          confirmButtonText: '去登录',
+          cancelButtonText: '取消',
+          type: 'info',
+        }
+      ).then(() => {
+        router.push('/login')
+      }).catch(() => {})
       return
     }
     

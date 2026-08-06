@@ -178,7 +178,7 @@ final class InviteTracker
             $reasons = [];
             if (self::isBotUa($info['user_agent'])) $reasons[] = '机器人 UA';
             if ($info['ip'] === $inviter->last_login_ip) $reasons[] = '邀请人自身 IP 注册';
-            if (self::isDuplicateIpToday($info['ip'], $promoter->invite_code)) {
+            if (self::isDuplicateIpToday($info['ip'], $inviter->invite_code)) {
                 $reasons[] = '同 IP 多次注册';
             }
             $fraudReason = implode('、', $reasons) ?: '风险分过高';
@@ -188,7 +188,7 @@ final class InviteTracker
             'inviter_user_id' => $inviter->id,
             'promoter_id'     => $promoter->id,
             'user_id'         => $user->id,
-            'invite_code'     => $promoter->invite_code,
+            'invite_code'     => $inviter->invite_code,
             'is_fraud'        => $isFraud,
             'fraud_reason'    => $fraudReason,
             'risk_score'      => $riskScore,

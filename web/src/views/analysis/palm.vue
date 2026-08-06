@@ -110,7 +110,16 @@ const submitAnalysisDirect = async (imageUrls: string[], type: 'tongue' | 'face'
   throw new Error(data.message || '提交失败')
 }
 
+// 积分消耗配置
+const creditsPerAnalysis = 1
+
 const handleSubmit = async () => {
+  // 检查积分是否充足
+  if (analysisTimes.value < creditsPerAnalysis) {
+    showInsufficientCreditsDialog()
+    return
+  }
+
   if (imageList.value.length === 0 && !aiText.value.trim()) {
     ElMessage.warning('请至少上传一张手掌照片或输入描述')
     return
@@ -142,19 +151,28 @@ const handleSubmit = async () => {
   } catch (e: any) {
     const msg = e.message || '提交失败'
     if (msg.includes('次数不足') || msg.includes('积分不足') || msg.includes('先购买')) {
-      ElMessageBox.confirm(msg, '提示', {
-        confirmButtonText: '去购买',
-        cancelButtonText: '取消',
-        type: 'warning',
-      }).then(() => {
-        router.push('/packages')
-      }).catch(() => {})
+      showInsufficientCreditsDialog()
     } else {
       ElMessage.error(msg)
     }
   } finally {
     loading.value = false
   }
+}
+
+// 显示积分不足弹窗
+const showInsufficientCreditsDialog = () => {
+  ElMessageBox.alert(
+    `本次分析需要 ${creditsPerAnalysis} 积分，您的积分不足，请充值后解锁。`,
+    '积分不足，无法解锁',
+    {
+      confirmButtonText: '去充值',
+      type: 'warning',
+      center: true,
+    }
+  ).then(() => {
+    router.push('/recharge')
+  }).catch(() => {})
 }
 
 onMounted(() => {
@@ -278,22 +296,42 @@ onMounted(() => {
       </el-alert>
     </div>
 
+    <!-- 积分不足遮罩 -->
+    <div v-if="analysisTimes < creditsPerAnalysis" class="locked-overlay">
+      <div class="locked-content">
+        <div class="locked-icon">🔒</div>
+        <div class="locked-title">积分不足，无法解锁</div>
+        <div class="locked-desc">
+          本次分析需要 {{ creditsPerAnalysis }} 积分<br/>
+          请充值后解锁
+        </div>
+        <el-button
+          round
+          type="primary"
+          @click="router.push('/recharge')"
+          class="unlock-btn"
+        >
+          去充值解锁
+        </el-button>
+      </div>
+    </div>
+
     <div class="actions">
       <el-button
         round
         type="primary"
         :loading="loading"
-        :disabled="analysisTimes <= 0"
+        :disabled="analysisTimes < creditsPerAnalysis"
         @click="handleSubmit"
         style="width: 100%"
       >
-        开始分析
+        {{ analysisTimes >= creditsPerAnalysis ? '开始分析' : '积分不足，无法解锁' }}
       </el-button>
-      <div v-if="analysisTimes > 0" class="free-tip">
+      <div v-if="analysisTimes >= creditsPerAnalysis" class="free-tip">
         剩余 {{ analysisTimes }} 积分
       </div>
-      <div v-else class="free-tip">
-        分析积分不足，请先购买套餐
+      <div v-else class="free-tip locked">
+        本次分析需要 {{ creditsPerAnalysis }} 积分，<span class="recharge-link" @click="router.push('/recharge')">去充值解锁 →</span>
       </div>
     </div>
   </div>
@@ -509,6 +547,54 @@ onMounted(() => {
   font-size: 12px;
   color: #67c23a;
   text-align: center;
+}
+
+.free-tip.locked {
+  color: #f56c6c;
+}
+
+.recharge-link {
+  color: #60a5fa;
+  cursor: pointer;
+  font-weight: 500;
+  text-decoration: underline;
+}
+
+.recharge-link:hover {
+  color: #3b82f6;
+}
+
+/* 积分不足遮罩 */
+.locked-overlay {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 16px;
+  padding: 32px 24px;
+  margin: 24px 0;
+  text-align: center;
+  border: 2px dashed #dcdee0;
+}
+
+.locked-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.locked-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #323233;
+  margin-bottom: 12px;
+}
+
+.locked-desc {
+  font-size: 14px;
+  color: #969799;
+  line-height: 1.8;
+  margin-bottom: 24px;
+}
+
+.unlock-btn {
+  padding: 10px 32px;
 }
 
 /* 免责声明 */

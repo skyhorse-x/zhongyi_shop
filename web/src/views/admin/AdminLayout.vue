@@ -36,7 +36,7 @@ const menuItems = shallowRef([
   { title: '客服管理', icon: Service, path: '/admin/customer-service', badge: () => activeCount.value },
   { title: '用户管理', icon: UserFilled, path: '/admin/users' },
   { title: '订单管理', icon: Tickets, path: '/admin/orders' },
-  { title: '次数包管理', icon: Goods, path: '/admin/packages' },
+  { title: '套餐管理', icon: Goods, path: '/admin/packages' },
   { title: '闲鱼商品管理', icon: Goods, path: '/admin/xianyu-products' },
   { title: 'AI管理', icon: Cpu, path: '/admin/ai' },
   { title: '队列任务管理', icon: List, path: '/admin/queue' },

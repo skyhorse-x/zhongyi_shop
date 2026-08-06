@@ -25,6 +25,9 @@ class CustomerServiceSession extends Model
         'admin_unread',
         'last_message_at',
         'closed_at',
+        'rated',
+        'satisfaction_score',
+        'staff_id',
     ];
 
     protected $casts = [
@@ -37,6 +40,8 @@ class CustomerServiceSession extends Model
         'last_active_at' => 'datetime',
         'last_message_at' => 'datetime',
         'closed_at' => 'datetime',
+        'rated' => 'boolean',
+        'satisfaction_score' => 'integer',
     ];
 
     /**

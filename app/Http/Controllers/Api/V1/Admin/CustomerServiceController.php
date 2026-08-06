@@ -72,32 +72,41 @@ class CustomerServiceController extends Controller
     }
 
     /**
-     * 获取消息列表（客服端）
+     * 获取消息列表（客服端，支持增量获取）
      */
     public function messages(Request $request, string $sessionNo)
     {
         $session = CustomerServiceSession::where('session_no', $sessionNo)
             ->firstOrFail();
 
-        $messages = CustomerServiceMessage::where('session_id', $session->id)
-            ->orderBy('created_at', 'asc')
-            ->paginate(50);
+        $query = CustomerServiceMessage::where('session_id', $session->id)
+            ->orderBy('created_at', 'asc');
 
-        // 清除客服未读
-        $session->admin_unread = 0;
-        $session->save();
+        // 增量获取：只获取 after_id 之后的消息
+        if ($request->has('after_id') && $request->input('after_id') > 0) {
+            $afterId = (int) $request->input('after_id');
+            $query->where('id', '>', $afterId);
+            $messages = $query->get();
+        } else {
+            $messages = $query->paginate(50);
 
-        // 标记用户发送的消息为已读
-        CustomerServiceMessage::where('session_id', $session->id)
-            ->where('sender_type', 'user')
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
+            // 清除客服未读
+            $session->admin_unread = 0;
+            $session->save();
+
+            // 标记用户发送的消息为已读
+            CustomerServiceMessage::where('session_id', $session->id)
+                ->where('sender_type', 'user')
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
+        }
 
         return response()->json([
             'code' => 0,
             'message' => 'success',
             'data' => $messages,
         ]);
+    }
     }
 
     /**
