@@ -84,7 +84,7 @@ const fetchPackages = async () => {
 
 // 复制客服微信号
 const copyWechat = async () => {
-  const text = wechatService.value || '暂无客服信息'
+  const text = wechatService.value || '暂未配置'
   try {
     await navigator.clipboard.writeText(text)
     ElMessage.success('微信号已复制')
@@ -101,7 +101,7 @@ const copyWechat = async () => {
 
 // 弹出微信号对话框
 const showWechatDialog = (pkg: Package) => {
-  const wechat = wechatService.value || '请联系管理员配置微信号'
+  const wechat = wechatService.value || '暂未配置'
   ElMessageBox({
     title: '加微信购买积分',
     message: `
