@@ -42,4 +42,34 @@ class UserAnalysisLog extends Model
     {
         return $this->belongsTo(\App\Models\Admin::class, 'operator_id');
     }
+
+    /** 类型文案映射（用户友好名称） */
+    public function getTypeNameAttribute(): string
+    {
+        return match ($this->type) {
+            'recharge'     => '官方充值',
+            'use'          => '分析消费',
+            'refund'       => '退款返还',
+            'reward'       => '系统奖励',
+            'admin_deduct' => '系统扣减',
+            'register_grant' => '注册赠送',
+            'purchase'     => '购买',
+            default        => $this->type,
+        };
+    }
+
+    /** 后台显示用的类型文案（管理员可见） */
+    public function getAdminTypeNameAttribute(): string
+    {
+        return match ($this->type) {
+            'recharge'     => '后台充值',
+            'use'          => '分析消费',
+            'refund'       => '退款返还',
+            'reward'       => '系统奖励',
+            'admin_deduct' => '后台扣减',
+            'register_grant' => '注册赠送',
+            'purchase'     => '购买',
+            default        => $this->type,
+        };
+    }
 }

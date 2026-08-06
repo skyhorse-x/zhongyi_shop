@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
-import { Edit, Refresh, Wallet, Promotion, MoreFilled, View, Close, Lock, Plus, Minus, List } from '@element-plus/icons-vue'
+import { Edit, Refresh, Wallet, Promotion, MoreFilled, View, Close, Lock, Plus, Minus, List, Document, ShoppingBag, Coin, Gift, Timer, Remove } from '@element-plus/icons-vue'
 
 const form = ref({
   phone: '',
@@ -15,6 +15,8 @@ const pageSize = ref(10)
 const total = ref(0)
 const currentPage = ref(1)
 const loading = ref(false)
+const sortField = ref('id')
+const sortOrder = ref('desc')
 
 import { getAdminToken } from '@/utils/auth'
 
@@ -131,7 +133,11 @@ const loadUsers = async () => {
     })
     if (form.value.phone) params.append('phone', form.value.phone)
     if (form.value.username) params.append('username', form.value.username)
-    if (form.value.status) params.append('status', form.value.status)
+    if (form.value.status !== '' && form.value.status !== null && form.value.status !== undefined) {
+      params.append('status', form.value.status)
+    }
+    params.append('sort_field', sortField.value)
+    params.append('sort_order', sortOrder.value)
 
     const res = await safeFetch(`/api/v1/admin/users?${params}`, {
       headers: {
@@ -173,6 +179,13 @@ const loadUsers = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
+  sortField.value = prop
+  sortOrder.value = order === 'ascending' ? 'asc' : 'desc'
+  currentPage.value = 1
+  loadUsers()
 }
 
 const genderText = (g: any) => {
@@ -616,11 +629,11 @@ const checkMobile = () => {
 
 const logTypeName = (t: string) =>
   ({
-    recharge: '后台充值',
+    recharge: '官方充值',
     consume: '消费扣减',
     refund: '退款返还',
     reward: '系统奖励',
-    admin_deduct: '后台扣减',
+    admin_deduct: '系统扣减',
   }[t] || t)
 
 // ===== 积分流水弹窗 =====
@@ -635,14 +648,40 @@ const creditsLogsUser = ref<any>(null)
 
 const creditsLogTypeName = (t: string) =>
   ({
-    recharge: '后台充值',
+    recharge: '官方充值',
     use: '分析消费',
     refund: '退款返还',
     reward: '系统奖励',
-    admin_deduct: '后台扣减',
+    admin_deduct: '系统扣减',
     register_grant: '注册赠送',
     purchase: '购买',
   }[t] || t)
+
+const getCreditsDotClass = (type: string) => {
+  const map: Record<string, string> = {
+    recharge: 'dot-green',
+    use: 'dot-orange',
+    refund: 'dot-blue',
+    reward: 'dot-purple',
+    admin_deduct: 'dot-red',
+    register_grant: 'dot-cyan',
+    purchase: 'dot-green',
+  }
+  return map[type] || 'dot-gray'
+}
+
+const getCreditsIcon = (type: string) => {
+  const map: Record<string, any> = {
+    recharge: Plus,
+    use: Coin,
+    refund: Refresh,
+    reward: Gift,
+    admin_deduct: Remove,
+    register_grant: ShoppingBag,
+    purchase: ShoppingBag,
+  }
+  return map[type] || Coin
+}
 
 const openCreditsLogs = async (row: any) => {
   creditsLogsDialogVisible.value = true
@@ -775,8 +814,8 @@ const loadLogs = async (row?: any) => {
     </el-form>
 
     <div class="table-scroll-wrapper">
-      <el-table :data="tableData" border stripe>
-        <el-table-column prop="id" label="ID" width="50" align="center" />
+      <el-table :data="tableData" border stripe @sort-change="handleSortChange">
+        <el-table-column prop="id" label="ID" width="80" align="center" sortable="custom" />
         <el-table-column label="用户信息" min-width="140">
           <template #default="scope">
             <div class="user-info-cell">
@@ -1309,11 +1348,11 @@ const loadLogs = async (row?: any) => {
           style="width: 160px"
           @change="() => { logsPage = 1; loadLogs() }"
         >
-          <el-option label="后台充值" value="recharge" />
+          <el-option label="官方充值" value="recharge" />
           <el-option label="消费扣减" value="consume" />
           <el-option label="退款返还" value="refund" />
           <el-option label="系统奖励" value="reward" />
-          <el-option label="后台扣减" value="admin_deduct" />
+          <el-option label="系统扣减" value="admin_deduct" />
         </el-select>
       </div>
 
@@ -1373,67 +1412,71 @@ const loadLogs = async (row?: any) => {
     <el-dialog
       v-model="creditsLogsDialogVisible"
       :title="`用户「${creditsLogsUser?.username}」积分流水`"
-      width="780px"
+      :width="isMobile ? '95%' : '680px'"
       :close-on-click-modal="false"
+      class="credits-logs-dialog"
     >
-      <div class="logs-header">
-        <div class="logs-stat">
-          <span class="logs-stat-label">当前积分：</span>
-          <span class="logs-stat-value" style="color: #67c23a;">{{ creditsLogsUser?.analysis_times || 0 }}</span>
+      <div class="credits-logs-header">
+        <div class="credits-logs-stat">
+          <div class="credits-stat-icon">
+            <el-icon :size="24"><Coin /></el-icon>
+          </div>
+          <div class="credits-stat-info">
+            <span class="credits-logs-stat-label">当前积分</span>
+            <span class="credits-logs-stat-value">{{ creditsLogsUser?.analysis_times || 0 }}</span>
+          </div>
         </div>
         <el-select
           v-model="creditsLogsFilterType"
           placeholder="全部类型"
           clearable
           size="small"
-          style="width: 160px"
+          style="width: 140px"
           @change="() => { creditsLogsPage = 1; loadCreditsLogs() }"
         >
-          <el-option label="后台充值" value="recharge" />
           <el-option label="分析消费" value="use" />
           <el-option label="退款返还" value="refund" />
           <el-option label="系统奖励" value="reward" />
-          <el-option label="后台扣减" value="admin_deduct" />
           <el-option label="注册赠送" value="register_grant" />
           <el-option label="购买" value="purchase" />
+          <el-option label="官方充值" value="recharge" />
+          <el-option label="系统扣减" value="admin_deduct" />
         </el-select>
       </div>
 
-      <el-table :data="creditsLogsList" border stripe max-height="420">
-        <el-table-column prop="id" label="ID" width="60" align="center" />
-        <el-table-column label="类型" width="100" align="center">
-          <template #default="scope">
-            <el-tag
-              :type="['recharge','refund','reward','register_grant','purchase'].includes(scope.row.type) ? 'success' : 'danger'"
-              size="small"
-            >
-              {{ creditsLogTypeName(scope.row.type) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="变动积分" width="110" align="right">
-          <template #default="scope">
-            <span
-              :style="{
-                color: Number(scope.row.change) > 0 ? '#67c23a' : '#f56c6c',
-                fontWeight: 600
-              }"
-            >
-              {{ Number(scope.row.change) > 0 ? '+' : '' }}{{ scope.row.change }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="变动前" width="80" align="right">
-          <template #default="scope">{{ scope.row.before }}</template>
-        </el-table-column>
-        <el-table-column label="变动后" width="80" align="right">
-          <template #default="scope">{{ scope.row.after }}</template>
-        </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
-        <el-table-column label="时间" width="150" align="center">
-          <template #default="scope">{{ formatTime(scope.row.created_at) }}</template>
-        </el-table-column>
-      </el-table>
+      <!-- 时间线样式流水列表 -->
+      <div v-loading="creditsLogsLoading" class="credits-timeline">
+        <div v-if="creditsLogsList.length === 0 && !creditsLogsLoading" class="credits-empty">
+          <el-icon :size="48" color="#ccc"><Document /></el-icon>
+          <p>暂无积分流水记录</p>
+        </div>
+        
+        <div
+          v-for="(item, index) in creditsLogsList"
+          :key="item.id"
+          class="timeline-item"
+        >
+          <div class="timeline-dot" :class="getCreditsDotClass(item.type)">
+            <el-icon :size="14"><component :is="getCreditsIcon(item.type)" /></el-icon>
+          </div>
+          <div class="timeline-content">
+            <div class="timeline-header">
+              <span class="timeline-type">{{ creditsLogTypeName(item.type) }}</span>
+              <span
+                class="timeline-change"
+                :class="Number(item.change) > 0 ? 'positive' : 'negative'"
+              >
+                {{ Number(item.change) > 0 ? '+' : '' }}{{ item.change }}
+              </span>
+            </div>
+            <div class="timeline-remark">{{ item.mark || item.remark || '-' }}</div>
+            <div class="timeline-footer">
+              <span class="timeline-balance">余额：{{ item.before }} → {{ item.after }}</span>
+              <span class="timeline-time">{{ formatTime(item.created_at) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <el-pagination
         v-if="creditsLogsTotal > creditsLogsPageSize"
@@ -1443,7 +1486,7 @@ const loadLogs = async (row?: any) => {
         layout="prev, pager, next, total"
         background
         @current-change="() => loadCreditsLogs()"
-        style="margin-top: 12px; justify-content: flex-end"
+        style="margin-top: 16px; justify-content: flex-end"
       />
 
       <template #footer>
@@ -1527,6 +1570,201 @@ const loadLogs = async (row?: any) => {
   font-size: 12px;
   color: #909399;
   margin-top: 2px;
+}
+
+/* 积分流水弹窗样式 */
+.credits-logs-dialog .credits-logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px 16px;
+  border-bottom: 1px solid #ebeef5;
+  margin-bottom: 16px;
+}
+
+.credits-logs-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.credits-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.3);
+}
+
+.credits-stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.credits-logs-stat-label {
+  font-size: 13px;
+  color: #909399;
+  line-height: 1.2;
+}
+
+.credits-logs-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #67c23a;
+  line-height: 1.2;
+}
+
+.credits-timeline {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 0 8px;
+}
+
+.credits-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+  color: #999;
+}
+
+.credits-empty p {
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid #f5f5f5;
+  position: relative;
+  transition: background-color 0.2s;
+}
+
+.timeline-item:hover {
+  background-color: #fafafa;
+  margin: 0 -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 8px;
+}
+
+.timeline-item:last-child {
+  border-bottom: none;
+}
+
+.timeline-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.dot-green { background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%); }
+.dot-orange { background: linear-gradient(135deg, #e6a23c 0%, #f0c78a 100%); }
+.dot-blue { background: linear-gradient(135deg, #409eff 0%, #79bbff 100%); }
+.dot-purple { background: linear-gradient(135deg, #9c27b0 0%, #c689d4 100%); }
+.dot-red { background: linear-gradient(135deg, #f56c6c 0%, #f89898 100%); }
+.dot-cyan { background: linear-gradient(135deg, #13c2c2 0%, #5cdbd3 100%); }
+.dot-gray { background: linear-gradient(135deg, #909399 0%, #b1b3b8 100%); }
+
+.timeline-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.timeline-type {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.timeline-change {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+.timeline-change.positive {
+  color: #67c23a;
+}
+
+.timeline-change.negative {
+  color: #f56c6c;
+}
+
+.timeline-remark {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.timeline-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #909399;
+}
+
+.timeline-balance {
+  font-weight: 500;
+}
+
+/* 手机端积分流水适配 */
+@media (max-width: 768px) {
+  .credits-logs-stat-value {
+    font-size: 22px;
+  }
+  
+  .credits-stat-icon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .credits-stat-icon .el-icon {
+    font-size: 20px;
+  }
+  
+  .timeline-dot {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .timeline-type {
+    font-size: 13px;
+  }
+  
+  .timeline-change {
+    font-size: 16px;
+  }
+  
+  .timeline-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
 }
 
 /* 手机端适配 */

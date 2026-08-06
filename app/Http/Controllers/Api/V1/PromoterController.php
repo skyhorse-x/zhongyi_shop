@@ -621,7 +621,7 @@ class PromoterController extends Controller
      */
     public function adminInviteRecords(Request $request)
     {
-        $query = InviteRegistration::with(['user', 'inviter']);
+        $query = InviteRegistration::with(['user', 'promoter.user']);
 
         // 筛选特定邀请人（支持 inviter_user_id 或 promoter_id）
         if ($request->filled('inviter_user_id')) {

@@ -16,8 +16,7 @@ class OperationLogController extends Controller
     public function __construct(
         private readonly AdminOperationLogService $logService
     ) {
-        $this->middleware('auth:sanctum');
-        $this->middleware('admin');
+        // 路由已使用 admin 中间件，无需重复添加
     }
 
     /**

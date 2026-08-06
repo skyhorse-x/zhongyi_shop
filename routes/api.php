@@ -184,6 +184,8 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
 
         // ===== 管理后台（需管理员登录） =====
         Route::middleware('admin')->prefix('admin')->group(function () {
+            // 操作日志中间件（记录敏感操作）
+            Route::middleware('operation.log')->group(function () {
             Route::get('dashboard', [V1\AdminController::class, 'dashboard']);
 
             // 系统配置
@@ -435,6 +437,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
                 Route::post('/test-sms',     [V1\Admin\NotificationConfigController::class, 'testSms']);
                 Route::post('/test-wechat',  [V1\Admin\NotificationConfigController::class, 'testWechat']);
             });
+        });
         });
     });
 

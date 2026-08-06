@@ -148,9 +148,32 @@ class AdminController extends Controller
     public function users(Request $request)
     {
         $query = User::query();
-        if ($request->phone) $query->where('mobile', 'like', "%{$request->phone}%");
-        if ($request->nickname) $query->where('nickname', 'like', "%{$request->nickname}%");
-        return response()->json(['code' => 0, 'data' => $query->orderByDesc('id')->paginate($request->per_page ?? 10)]);
+        
+        // 搜索过滤
+        if ($request->filled('phone')) {
+            $query->where('mobile', 'like', "%{$request->phone}%");
+        }
+        if ($request->filled('username')) {
+            $query->where(function ($q) use ($request) {
+                $q->where('username', 'like', "%{$request->username}%")
+                  ->orWhere('name', 'like', "%{$request->username}%");
+            });
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+        
+        // 排序支持
+        $sortField = $request->get('sort_field', 'id');
+        $sortOrder = $request->get('sort_order', 'desc');
+        $allowedSorts = ['id', 'created_at', 'analysis_times', 'balance'];
+        if (in_array($sortField, $allowedSorts)) {
+            $query->orderBy($sortField, $sortOrder === 'asc' ? 'asc' : 'desc');
+        } else {
+            $query->orderByDesc('id');
+        }
+        
+        return response()->json(['code' => 0, 'data' => $query->paginate($request->per_page ?? 10)]);
     }
 
     /**

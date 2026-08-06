@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, h, onMounted, defineComponent, markRaw } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ArrowRight, Avatar, User, ChatLineRound, FirstAidKit, Money, Wallet, Star, Pointer } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import { safeFetch } from '@/utils/fetch'
 import { getToken } from '@/utils/auth'
 
 const router = useRouter()
+const route = useRoute()
 
 interface FeatureItem {
   icon: Component
@@ -90,6 +91,14 @@ const goRecharge = () => {
 }
 
 onMounted(() => {
+  // 存储邀请码到 localStorage（如果有）
+  const inviteCode = route.query.code as string
+  if (inviteCode) {
+    localStorage.setItem('invite_code', inviteCode)
+    // 清除 URL 中的 code 参数，避免重复存储
+    router.replace({ query: {} })
+  }
+  
   fetchAnalysisTimes()
   fetchSiteConfig()
 })

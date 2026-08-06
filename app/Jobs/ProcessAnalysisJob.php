@@ -54,7 +54,7 @@ class ProcessAnalysisJob implements ShouldQueue
         }
 
         try {
-            $task->update(['status' => 1]); // 处理中
+            $task->update(['status' => 1, 'started_at' => now()]); // 处理中
 
             $hasImages = !empty($task->image_url);
 

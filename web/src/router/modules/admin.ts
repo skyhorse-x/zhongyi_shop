@@ -28,6 +28,7 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'constitution',    name: 'AdminConstitution',    component: () => import('@/views/admin/constitution.vue'),    meta: { title: '体质题目' } },
       { path: 'ai',              name: 'AdminAi',              component: () => import('@/views/admin/ai.vue'),              meta: { title: 'AI管理' } },
       { path: 'queue',           name: 'AdminQueue',           component: () => import('@/views/admin/queue.vue'),           meta: { title: '队列任务管理' } },
+      { path: 'queue-monitor',   name: 'AdminQueueMonitor',   component: () => import('@/views/admin/queue-monitor.vue'),   meta: { title: '队列监控' } },
       { path: 'promoters',       name: 'AdminPromoters',       component: () => import('@/views/admin/promoters.vue'),       meta: { title: '推广管理' } },
       { path: 'withdraws',       name: 'AdminWithdraws',       component: () => import('@/views/admin/withdraws.vue'),       meta: { title: '提现审核' } },
       { path: 'user-balances',   name: 'AdminUserBalances',    component: () => import('@/views/admin/user-balances.vue'),   meta: { title: '用户余额' } },

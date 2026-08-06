@@ -28,9 +28,12 @@ const form = ref({
 
 // 从URL获取邀请码 + 获取系统配置
 onMounted(async () => {
-  const inviteCode = route.query.code as string
+  // 优先从URL获取邀请码，否则从localStorage获取
+  const inviteCode = route.query.code as string || localStorage.getItem('invite_code')
   if (inviteCode) {
     form.value.invite_code = inviteCode
+    // 使用后清除localStorage中的邀请码
+    localStorage.removeItem('invite_code')
   }
 
   // 获取系统配置，判断是否关闭手机注册
