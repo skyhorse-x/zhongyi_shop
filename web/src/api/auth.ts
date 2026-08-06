@@ -33,7 +33,7 @@ export const updateUserInfo = (data: any) => {
 
 // 退出登录
 export const logout = () => {
-  return request.post('/auth/logout')
+  return request.post('/user/logout')
 }
 
 // 微信登录
