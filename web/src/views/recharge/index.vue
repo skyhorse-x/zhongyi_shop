@@ -164,7 +164,7 @@ onMounted(() => {
         <span>微信客服</span>
       </div>
       <div class="contact-body">
-        <div class="contact-tip">购买遇到问题或需要其他充值方式，请添加客服微信：</div>
+        <div class="contact-tip">余额充值和积分购买，请加微信：</div>
         <div v-if="wechatService" class="wechat-id">
           <el-icon><ChatLineRound /></el-icon>
           <span>{{ wechatService }}</span>
@@ -177,10 +177,10 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 选择充值档位 -->
+    <!-- 选择套餐 -->
     <div class="section-title">
       <el-icon><Shop /></el-icon>
-      <span>选择充值档位</span>
+      <span>积分购买</span>
     </div>
 
     <div v-loading="loading" class="package-list">
