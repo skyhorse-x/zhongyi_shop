@@ -132,13 +132,12 @@ const handleSubmit = async () => {
       uploadedUrls = await Promise.all(uploadPromises)
     }
 
-    // 2. 提交分析任务（直接返回完整结果）
+    // 2. 提交分析任务（立即返回任务号，后台异步处理）
     const result = await submitAnalysisDirect(uploadedUrls, 'palm', aiText.value, gender.value, age.value)
 
-    // 直接跳转到分析结果页面（携带结果数据）
+    // 立即跳转到分析结果页面（结果页面会轮询获取结果）
     router.push({
       path: `/analysis/result/${result.task_no}`,
-      state: { analysisResult: result }
     })
   } catch (e: any) {
     const msg = e.message || '提交失败'

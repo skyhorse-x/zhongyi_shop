@@ -86,8 +86,8 @@ const uploadSingleImage = async (file: File): Promise<string> => {
   throw new Error(data.message || '图片上传失败')
 }
 
-// 提交分析任务（直接返回完整结果）
-const submitAnalysisDirect = async (imageUrls: string[], type: 'tongue' | 'face' | 'palm', text: string, gender: number, age: number) => {
+// 提交分析任务（立即返回任务号，后台异步处理）
+const submitAnalysisAsync = async (imageUrls: string[], type: 'tongue' | 'face' | 'palm', text: string, gender: number, age: number) => {
   const res = await safeFetch('/api/v1/analysis/submit', {
     method: 'POST',
     headers: {
@@ -105,7 +105,7 @@ const submitAnalysisDirect = async (imageUrls: string[], type: 'tongue' | 'face'
   })
   const data = await res.json()
   if (data.code === 0) {
-    // 直接返回完整结果
+    // 立即返回任务号
     return data.data
   }
   throw new Error(data.message || '提交失败')
@@ -133,13 +133,12 @@ const handleSubmit = async () => {
       uploadedUrls = await Promise.all(uploadPromises)
     }
 
-    // 2. 提交分析任务（直接返回完整结果）
-    const result = await submitAnalysisDirect(uploadedUrls, 'tongue', aiText.value, gender.value, age.value)
+    // 2. 提交分析任务（立即返回任务号，后台异步处理）
+    const result = await submitAnalysisAsync(uploadedUrls, 'tongue', aiText.value, gender.value, age.value)
 
-    // 直接跳转到分析结果页面（携带结果数据）
+    // 立即跳转到分析结果页面（结果页面会轮询获取结果）
     router.push({
       path: `/analysis/result/${result.task_no}`,
-      state: { analysisResult: result }
     })
   } catch (e: any) {
     const msg = e.message || '提交失败'

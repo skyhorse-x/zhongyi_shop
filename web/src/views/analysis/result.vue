@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import html2canvas from 'html2canvas'
@@ -48,6 +48,39 @@ const downloading = ref(false)
 
 import { getToken } from '@/utils/auth'
 
+// 轮询相关
+const polling = ref(false)
+const pollingInterval = ref<ReturnType<typeof setInterval> | null>(null)
+const pollCount = ref(0)
+const maxPollCount = 60 // 最多轮询60次（约3分钟）
+
+// 渲染报告数据
+const renderReport = (task: any) => {
+  const isTongue = task.type === 'tongue'
+  const isPalm = task.type === 'palm'
+  analysisMode.value = task.result?.mode || 'image'
+
+  const typeLabel = isTongue ? '舌诊分析' : (isPalm ? '手相分析' : '面诊分析')
+  const titleLabel = isTongue ? '舌诊分析报告' : (isPalm ? '手相分析报告' : '面诊分析报告')
+
+  result.value = {
+    title: titleLabel,
+    type: task.type,
+    summary: task.result?.summary || '分析完成',
+    content: task.result?.content || '',
+    healthScore: task.health_score || 85,
+    mode: task.result?.mode || 'image',
+    createdAt: task.created_at || '-',
+    details: [
+      { label: '分析类型', value: typeLabel, icon: Histogram },
+      { label: '分析方式', value: analysisMode.value === 'text' ? '症状描述' : '图像分析', icon: Document },
+      { label: '分析编号', value: task.task_no, icon: Promotion },
+      { label: '完成时间', value: formatDateTime(task.created_at), icon: Calendar },
+    ],
+    suggestions: parseSuggestions(task.result?.content || ''),
+  }
+}
+
 const fetchReport = async () => {
   try {
     const res = await safeFetch(`/api/v1/analysis/report/${taskNo.value}`, {
@@ -58,57 +91,88 @@ const fetchReport = async () => {
     })
     const data = await res.json()
     if (data.code === 0) {
-      const task = data.data
-      const isTongue = task.type === 'tongue'
-      const isPalm = task.type === 'palm'
-      analysisMode.value = task.result?.mode || 'image'
-      
-      const typeLabel = isTongue ? '舌诊分析' : (isPalm ? '手相分析' : '面诊分析')
-      const titleLabel = isTongue ? '舌诊分析报告' : (isPalm ? '手相分析报告' : '面诊分析报告')
-      
-      result.value = {
-        title: titleLabel,
-        type: task.type,
-        summary: task.result?.summary || '分析完成',
-        content: task.result?.content || '',
-        healthScore: task.health_score || 85,
-        mode: task.result?.mode || 'image',
-        createdAt: task.created_at || '-',
-        details: [
-          { label: '分析类型', value: typeLabel, icon: Histogram },
-          { label: '分析方式', value: analysisMode.value === 'text' ? '症状描述' : '图像分析', icon: Document },
-          { label: '分析编号', value: task.task_no, icon: Promotion },
-          { label: '完成时间', value: formatDateTime(task.created_at), icon: Calendar },
-        ],
-        suggestions: parseSuggestions(task.result?.content || ''),
+      // 分析完成
+      renderReport(data.data)
+      stopPolling()
+      loading.value = false
+    } else if (data.code === 1) {
+      // 任务处理中，保持加载状态并开始轮询
+      loading.value = true
+      if (!polling.value) {
+        startPolling()
       }
     } else if (data.code === 402) {
       ElMessage.warning(data.message || '请先支付查看报告')
-      const isTongue = data.data?.type === 'tongue'
-      const isPalm = data.data?.type === 'palm'
-      const typeLabel = isTongue ? '舌诊分析' : (isPalm ? '手相分析' : '面诊分析')
-      const titleLabel = isTongue ? '舌诊分析报告' : (isPalm ? '手相分析报告' : '面诊分析报告')
-      result.value = {
-        title: titleLabel,
-        type: isTongue ? 'tongue' : (isPalm ? 'palm' : 'face'),
-        summary: data.data?.summary || '分析完成',
-        content: '',
-        healthScore: 0,
-        mode: 'image',
-        createdAt: data.data?.created_at || '-',
-        details: [
-          { label: '分析类型', value: typeLabel, icon: Histogram },
-          { label: '分析编号', value: data.data?.task_no || taskNo.value, icon: Promotion },
-        ],
-        suggestions: ['完整报告需要支付后查看'],
-      }
+      stopPolling()
+      loading.value = false
     } else {
       ElMessage.error(data.message || '获取报告失败')
+      stopPolling()
+      loading.value = false
     }
   } catch (e: any) {
     ElMessage.error(e.message || '获取报告失败')
-  } finally {
+    stopPolling()
     loading.value = false
+  }
+}
+
+// 开始轮询
+const startPolling = () => {
+  if (polling.value) return
+  polling.value = true
+  pollCount.value = 0
+
+  pollingInterval.value = setInterval(async () => {
+    pollCount.value++
+
+    // 超过最大轮询次数，停止
+    if (pollCount.value > maxPollCount) {
+      stopPolling()
+      loading.value = false
+      ElMessage.error('分析超时，请稍后重试')
+      return
+    }
+
+    try {
+      const res = await safeFetch(`/api/v1/analysis/report/${taskNo.value}`, {
+        headers: {
+          'Authorization': `Bearer ${getToken()}`,
+          'Accept': 'application/json',
+        },
+      })
+      const data = await res.json()
+
+      if (data.code === 0) {
+        // 分析完成
+        renderReport(data.data)
+        stopPolling()
+        loading.value = false
+      } else if (data.code === 402) {
+        stopPolling()
+        loading.value = false
+        ElMessage.warning(data.message || '请先支付查看报告')
+      } else if (data.code === 500 || data.code === 3) {
+        // 分析失败
+        stopPolling()
+        loading.value = false
+        ElMessage.error(data.message || '分析失败，请稍后重试')
+      }
+      // code === 1 继续轮询
+    } catch (e: any) {
+      stopPolling()
+      loading.value = false
+      ElMessage.error('网络错误，请检查网络连接')
+    }
+  }, 3000) // 每3秒轮询一次
+}
+
+// 停止轮询
+const stopPolling = () => {
+  polling.value = false
+  if (pollingInterval.value) {
+    clearInterval(pollingInterval.value)
+    pollingInterval.value = null
   }
 }
 
@@ -585,45 +649,19 @@ onMounted(() => {
     return
   }
 
-  // 检查是否有从上一页传递过来的结果数据
-  const navigation = window.history.state
-  if (navigation?.analysisResult) {
-    // 直接使用传递过来的结果，无需请求
-    const data = navigation.analysisResult
-    const isTongue = data.type === 'tongue'
-    const isPalm = data.type === 'palm'
-    analysisMode.value = data.result?.mode || 'image'
-    
-    const typeLabel = isTongue ? '舌诊分析' : (isPalm ? '手相分析' : '面诊分析')
-    const titleLabel = isTongue ? '舌诊分析报告' : (isPalm ? '手相分析报告' : '面诊分析报告')
-    
-    result.value = {
-      title: titleLabel,
-      type: data.type,
-      summary: data.result?.summary || '分析完成',
-      content: data.result?.content || '',
-      healthScore: data.health_score || 85,
-      mode: data.result?.mode || 'image',
-      createdAt: data.created_at || '-',
-      details: [
-        { label: '分析类型', value: typeLabel, icon: Histogram },
-        { label: '分析方式', value: analysisMode.value === 'text' ? '症状描述' : '图像分析', icon: Document },
-        { label: '分析编号', value: data.task_no, icon: Promotion },
-        { label: '完成时间', value: formatDateTime(data.created_at), icon: Calendar },
-      ],
-      suggestions: parseSuggestions(data.result?.content || ''),
-    }
-    loading.value = false
-  } else {
-    // 没有数据（可能是刷新页面），直接获取报告
-    fetchReport()
-  }
+  // 获取报告（若分析未完成会自动轮询）
+  fetchReport()
+})
+
+// 组件卸载时停止轮询
+onBeforeUnmount(() => {
+  stopPolling()
 })
 </script>
 
 <template>
   <div class="result-page">
-    <!-- 加载状态（仅在刷新页面时显示） -->
+    <!-- 加载状态（AI 分析等待状态） -->
     <div v-if="loading" class="loading-container">
       <div class="loading-animation">
         <div class="pulse-circle"></div>
@@ -632,9 +670,9 @@ onMounted(() => {
         <el-icon class="loading-icon" :size="40"><Loading /></el-icon>
       </div>
       <div class="loading-text">
-        加载中...
+        AI 分析中，请稍候...
       </div>
-      <div class="loading-tip">正在获取分析报告</div>
+      <div class="loading-tip">正在分析您的健康报告，通常需要 5-30 秒</div>
     </div>
 
     <!-- 结果内容 -->

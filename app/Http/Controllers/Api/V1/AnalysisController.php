@@ -122,7 +122,7 @@ class AnalysisController extends Controller
     }
 
     /**
-     * 提交分析任务（直接调用豆包API，同步返回结果）
+     * 提交分析任务（立即返回任务号，后台异步处理AI分析）
      */
     public function submit(Request $request)
     {
@@ -182,159 +182,231 @@ class AnalysisController extends Controller
             'image_urls' => $imageUrls ?: null,
             'text' => $validated['text'] ?? null,
             'image_md5' => $hasImages ? md5(implode(',', $imageUrls)) : null,
-            'status' => 1, // 直接设为处理中
+            'status' => 1, // 处理中
             'is_paid' => $isPaid,
             'started_at' => now(),
         ]);
 
-        try {
-            // ========== 直接调用豆包API（同步） ==========
-            $aiService = app(AiService::class);
+        // 立即返回任务号，后台异步处理AI分析
+        $taskNo = $task->task_no;
+        $taskId = $task->id;
 
-            $result = match ($validated['type']) {
-                'tongue' => $hasImages
-                    ? $aiService->analyzeTongue($imageUrls, (int) $validated['gender'], (int) $validated['age'])
-                    : $aiService->analyzeTongueByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
-                'face' => $hasImages
-                    ? $aiService->analyzeFace($imageUrls[0] ?? '', (int) $validated['gender'], (int) $validated['age'])
-                    : $aiService->analyzeFaceByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
-                'palm' => $aiService->analyzeTongueByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']), // 手相暂用文本分析
-                default => throw new \InvalidArgumentException("未知的分析类型: {$validated['type']}"),
-            };
-
-            // 计算健康评分
-            $content = $result['content'] ?? '';
-            $healthScore = $this->calculateHealthScore($content);
-            $summary = $this->extractSummary($content);
-
-            // 更新任务为已完成
-            $task->update([
-                'status' => 2, // 已完成
-                'result' => [
-                    'content' => $content,
-                    'summary' => $summary,
-                    'health_score' => $healthScore,
-                    'model' => $result['model'] ?? '',
-                    'usage' => $result['usage'] ?? [],
-                    'mode' => $hasImages ? 'image' : 'text',
-                ],
-                'completed_at' => now(),
-            ]);
-
-            // 创建健康档案报告
-            $reportData = [
-                'task_id' => $task->id,
-                'user_id' => $task->user_id,
-                'type' => $task->type,
-                'gender' => $task->gender,
-                'age' => $task->age,
-                'health_score' => $healthScore,
-                'summary' => $summary,
-                'content' => ['text' => $content],
-                'is_paid' => $task->is_paid ?? false,
-            ];
-
-            // 根据类型提取特定的分析字段
-            if ($task->type === 'tongue') {
-                $reportData['tongue_color'] = $this->extractField($content, '舌色');
-                $reportData['tongue_shape'] = $this->extractField($content, '舌形');
-                $reportData['tongue_coating'] = $this->extractField($content, '舌苔');
-                $reportData['sublingual_vein'] = $this->extractField($content, '舌下');
-                $reportData['tongue_analysis'] = $content;
-            } elseif ($task->type === 'face') {
-                $reportData['face_color'] = $this->extractField($content, '面色');
-                $reportData['lip_color'] = $this->extractField($content, '唇色');
-                $reportData['eye_analysis'] = $this->extractField($content, '眼部');
-                $reportData['face_analysis'] = $content;
-            } elseif ($task->type === 'palm') {
-                $reportData['life_line'] = $this->extractField($content, '生命线');
-                $reportData['career_line'] = $this->extractField($content, '事业线');
-                $reportData['marriage_line'] = $this->extractField($content, '婚姻线');
-                $reportData['palm_analysis'] = $content;
-            }
-
-            AnalysisReport::create($reportData);
-
-            Log::info('Analysis task completed (direct API call)', [
-                'task_no' => $task->task_no,
-                'type' => $task->type,
-                'mode' => $hasImages ? 'image' : 'text',
-            ]);
-
-            // ========== 直接返回完整结果给前端 ==========
-            return response()->json([
+        // 使用 fastcgi_finish_request 实现异步处理
+        if (function_exists('fastcgi_finish_request')) {
+            // 立即返回响应给前端
+            $response = response()->json([
                 'code' => 0,
-                'message' => '分析完成',
+                'message' => '分析任务已提交',
                 'data' => [
-                    'task_no' => $task->task_no,
-                    'status' => 2, // 已完成
+                    'task_no' => $taskNo,
+                    'status' => 1, // 处理中
                     'type' => $task->type,
-                    'health_score' => $healthScore,
-                    'summary' => $summary,
-                    'result' => $task->result,
                     'created_at' => $task->created_at,
                 ],
             ]);
-        } catch (\Exception $e) {
-            // 更新任务状态为失败
-            $task->update([
-                'status' => 3,
-                'error_message' => substr($e->getMessage(), 0, 500),
-            ]);
 
-            // 失败时返还次数
+            // 发送响应并关闭连接
+            $response->send();
+            fastcgi_finish_request();
+
+            // 后台继续处理AI分析
+            $this->processAnalysisAsync($taskId, $validated, $hasImages, $hasText);
+        } else {
+            // 非 FastCGI 环境（如 artisan serve），同步处理但快速返回
             try {
-                app(AnalysisTimesService::class)->refundTimes(
-                    $task->user,
-                    1,
-                    'refund',
-                    "AI分析失败返还：{$e->getMessage()}"
-                );
-                Log::info('Analysis times refunded due to failure', [
-                    'task_no' => $task->task_no,
-                    'user_id' => $task->user_id,
+                $result = $this->processAnalysisSync($task, $validated, $hasImages, $hasText);
+                return response()->json([
+                    'code' => 0,
+                    'message' => '分析完成',
+                    'data' => [
+                        'task_no' => $taskNo,
+                        'status' => 2, // 已完成
+                        'type' => $task->type,
+                        'health_score' => $result['health_score'],
+                        'summary' => $result['summary'],
+                        'result' => $task->result,
+                        'created_at' => $task->created_at,
+                    ],
                 ]);
-            } catch (\Throwable $refundErr) {
-                Log::error('退还分析次数失败', [
-                    'task_no' => $task->task_no,
-                    'refund_error' => $refundErr->getMessage(),
+            } catch (\Exception $e) {
+                // 更新任务状态为失败
+                $task->update([
+                    'status' => 3,
+                    'error_message' => substr($e->getMessage(), 0, 500),
                 ]);
+
+                // 失败时返还次数
+                try {
+                    app(AnalysisTimesService::class)->refundTimes(
+                        $task->user,
+                        1,
+                        'refund',
+                        "AI分析失败返还：{$e->getMessage()}"
+                    );
+                } catch (\Throwable $refundErr) {
+                    Log::error('退还分析次数失败', [
+                        'task_no' => $task->task_no,
+                        'refund_error' => $refundErr->getMessage(),
+                    ]);
+                }
+
+                $message = $e->getMessage();
+                $isConfigError = str_contains($message, 'API Key')
+                    || str_contains($message, 'API key')
+                    || str_contains($message, '未配置');
+
+                return response()->json([
+                    'code' => $isConfigError ? 503 : 500,
+                    'message' => $isConfigError
+                        ? $message
+                        : '分析失败，已自动返还分析次数，请稍后重试',
+                    'error_type' => $isConfigError ? 'ai_not_configured' : 'internal_error',
+                    'data' => [
+                        'task_no' => $taskNo,
+                        'status' => 3, // 失败
+                    ],
+                ], $isConfigError ? 503 : 500);
+            }
+        }
+
+        // FastCGI 环境下已经返回了响应，这里不会执行到
+        exit;
+    }
+
+    /**
+     * 异步处理AI分析（FastCGI 环境）
+     */
+    private function processAnalysisAsync(int $taskId, array $validated, bool $hasImages, bool $hasText): void
+    {
+        try {
+            $task = AnalysisTask::find($taskId);
+            if (!$task) {
+                Log::error('Task not found for async processing', ['task_id' => $taskId]);
+                return;
             }
 
-            // 通知用户
-            try {
-                app(NotificationService::class)->sendSystemMessage(
-                    $task->user_id,
-                    'AI 分析失败',
-                    "您的分析任务（{$task->task_no}）失败，已自动返还 1 次分析次数。",
-                    ['type' => 'reminder']
-                );
-            } catch (\Throwable $ne) {}
+            $result = $this->processAnalysisSync($task, $validated, $hasImages, $hasText);
 
-            Log::error('Analysis task failed (direct API call)', [
+            Log::info('Async analysis completed', [
                 'task_no' => $task->task_no,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'type' => $task->type,
             ]);
+        } catch (\Exception $e) {
+            $task = AnalysisTask::find($taskId);
+            if ($task) {
+                $task->update([
+                    'status' => 3,
+                    'error_message' => substr($e->getMessage(), 0, 500),
+                ]);
 
-            // 把"缺 API Key"等可操作错误以更友好的方式透出
-            $message = $e->getMessage();
-            $isConfigError = str_contains($message, 'API Key')
-                || str_contains($message, 'API key')
-                || str_contains($message, '未配置');
+                // 失败时返还次数
+                try {
+                    app(AnalysisTimesService::class)->refundTimes(
+                        $task->user,
+                        1,
+                        'refund',
+                        "AI分析失败返还：{$e->getMessage()}"
+                    );
+                } catch (\Throwable $refundErr) {
+                    Log::error('退还分析次数失败', [
+                        'task_no' => $task->task_no,
+                        'refund_error' => $refundErr->getMessage(),
+                    ]);
+                }
 
-            return response()->json([
-                'code' => $isConfigError ? 503 : 500,
-                'message' => $isConfigError
-                    ? $message  // 配置类问题：透出真实提示，便于排查
-                    : '分析失败，已自动返还分析次数，请稍后重试',
-                'error_type' => $isConfigError ? 'ai_not_configured' : 'internal_error',
-                'data' => [
-                    'task_no' => $task->task_no,
-                    'status' => 3, // 失败
-                ],
-            ], $isConfigError ? 503 : 500);
+                // 通知用户
+                try {
+                    app(NotificationService::class)->sendSystemMessage(
+                        $task->user_id,
+                        'AI 分析失败',
+                        "您的分析任务（{$task->task_no}）失败，已自动返还 1 次分析次数。",
+                        ['type' => 'reminder']
+                    );
+                } catch (\Throwable $ne) {}
+            }
+
+            Log::error('Async analysis failed', [
+                'task_id' => $taskId,
+                'error' => $e->getMessage(),
+            ]);
         }
+    }
+
+    /**
+     * 同步处理AI分析
+     */
+    private function processAnalysisSync($task, array $validated, bool $hasImages, bool $hasText): array
+    {
+        $aiService = app(AiService::class);
+
+        $result = match ($validated['type']) {
+            'tongue' => $hasImages
+                ? $aiService->analyzeTongue($validated['image_urls'] ?? [], (int) $validated['gender'], (int) $validated['age'])
+                : $aiService->analyzeTongueByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
+            'face' => $hasImages
+                ? $aiService->analyzeFace($validated['image_urls'][0] ?? '', (int) $validated['gender'], (int) $validated['age'])
+                : $aiService->analyzeFaceByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
+            'palm' => $aiService->analyzeTongueByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
+            default => throw new \InvalidArgumentException("未知的分析类型: {$validated['type']}"),
+        };
+
+        // 计算健康评分
+        $content = $result['content'] ?? '';
+        $healthScore = $this->calculateHealthScore($content);
+        $summary = $this->extractSummary($content);
+
+        // 更新任务为已完成
+        $task->update([
+            'status' => 2, // 已完成
+            'result' => [
+                'content' => $content,
+                'summary' => $summary,
+                'health_score' => $healthScore,
+                'model' => $result['model'] ?? '',
+                'usage' => $result['usage'] ?? [],
+                'mode' => $hasImages ? 'image' : 'text',
+            ],
+            'completed_at' => now(),
+        ]);
+
+        // 创建健康档案报告
+        $reportData = [
+            'task_id' => $task->id,
+            'user_id' => $task->user_id,
+            'type' => $task->type,
+            'gender' => $task->gender,
+            'age' => $task->age,
+            'health_score' => $healthScore,
+            'summary' => $summary,
+            'content' => ['text' => $content],
+            'is_paid' => $task->is_paid ?? false,
+        ];
+
+        // 根据类型提取特定的分析字段
+        if ($task->type === 'tongue') {
+            $reportData['tongue_color'] = $this->extractField($content, '舌色');
+            $reportData['tongue_shape'] = $this->extractField($content, '舌形');
+            $reportData['tongue_coating'] = $this->extractField($content, '舌苔');
+            $reportData['sublingual_vein'] = $this->extractField($content, '舌下');
+            $reportData['tongue_analysis'] = $content;
+        } elseif ($task->type === 'face') {
+            $reportData['face_color'] = $this->extractField($content, '面色');
+            $reportData['lip_color'] = $this->extractField($content, '唇色');
+            $reportData['eye_analysis'] = $this->extractField($content, '眼部');
+            $reportData['face_analysis'] = $content;
+        } elseif ($task->type === 'palm') {
+            $reportData['life_line'] = $this->extractField($content, '生命线');
+            $reportData['career_line'] = $this->extractField($content, '事业线');
+            $reportData['marriage_line'] = $this->extractField($content, '婚姻线');
+            $reportData['palm_analysis'] = $content;
+        }
+
+        AnalysisReport::create($reportData);
+
+        return [
+            'health_score' => $healthScore,
+            'summary' => $summary,
+        ];
     }
 
     /**
@@ -430,6 +502,32 @@ class AnalysisController extends Controller
                 'code' => 404,
                 'message' => '任务不存在',
             ], 404);
+        }
+
+        // 任务仍在处理中：返回 code=1，前端继续轮询
+        if ($task->status === 1) {
+            return response()->json([
+                'code' => 1,
+                'message' => '分析中，请稍候',
+                'data' => [
+                    'task_no' => $task->task_no,
+                    'status' => 1,
+                    'type' => $task->type,
+                    'created_at' => $task->created_at,
+                ],
+            ]);
+        }
+
+        // 任务失败
+        if ($task->status === 3) {
+            return response()->json([
+                'code' => 500,
+                'message' => $task->error_message ?: '分析失败，请稍后重试',
+                'data' => [
+                    'task_no' => $task->task_no,
+                    'status' => 3,
+                ],
+            ], 500);
         }
 
         // 按次数计费模式：次数已扣除，直接返回完整报告
