@@ -1571,8 +1571,22 @@ const loadLogs = async (row?: any) => {
   }
 
   .el-dialog {
-    width: 95% !important;
-    max-width: none !important;
+    width: 90% !important;
+    max-width: 400px !important;
+    margin: 0 auto !important;
+  }
+
+  .el-dialog__body {
+    padding: 12px !important;
+    overflow-x: hidden;
+  }
+
+  .el-dialog__header {
+    padding: 12px 12px 8px !important;
+  }
+
+  .el-dialog__footer {
+    padding: 8px 12px 12px !important;
   }
 
   .el-row {
@@ -1616,7 +1630,21 @@ const loadLogs = async (row?: any) => {
   .credits-dialog .el-radio-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .credits-dialog .el-input-number {
+    width: 100% !important;
+  }
+
+  .credits-dialog .el-textarea {
+    font-size: 12px;
+  }
+
+  .credits-dialog .el-button {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
   }
 
   /* 用户信息单元格 */
