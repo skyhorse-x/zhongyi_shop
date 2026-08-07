@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { CameraFilled, ChatLineRound, Delete, User, ArrowDown } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
 import InsufficientCredits from '@/components/analysis/InsufficientCredits.vue'
@@ -140,28 +140,8 @@ const submitAnalysisAsync = async (imageUrls: string[], type: 'tongue' | 'face' 
   throw new Error(data.message || '提交失败')
 }
 
-// 显示积分不足弹窗
-const showInsufficientCreditsDialog = () => {
-  ElMessageBox.alert(
-    `本次分析需要 ${creditsPerAnalysis} 积分，您的积分不足，请充值后解锁。`,
-    '积分不足，无法解锁',
-    {
-      confirmButtonText: '去充值',
-      type: 'warning',
-      center: true,
-    }
-  ).then(() => {
-    router.push('/recharge')
-  }).catch(() => {})
-}
 
 const handleSubmit = async () => {
-  // 检查积分是否充足（双重验证）
-  if (analysisTimes.value !== null && analysisTimes.value < creditsPerAnalysis) {
-    showInsufficientCreditsDialog()
-    return
-  }
-
   if (imageList.value.length === 0) {
     ElMessage.warning('请至少上传一张舌头照片')
     return
@@ -190,12 +170,7 @@ const handleSubmit = async () => {
       analysisTimes.value -= creditsPerAnalysis
     }
   } catch (e: any) {
-    const msg = e.message || '提交失败'
-    if (msg.includes('次数不足') || msg.includes('积分不足') || msg.includes('先购买')) {
-      showInsufficientCreditsDialog()
-    } else {
-      ElMessage.error(msg)
-    }
+    ElMessage.error(e.message || '提交失败')
   } finally {
     loading.value = false
   }
