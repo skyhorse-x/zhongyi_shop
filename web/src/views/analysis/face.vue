@@ -9,6 +9,7 @@ import InsufficientCredits from '@/components/analysis/InsufficientCredits.vue'
 const router = useRouter()
 const imageUrl = ref('')
 const fileName = ref('')
+const imageFile = ref<File | null>(null)
 const loading = ref(false)
 const aiText = ref('')
 const analysisTimes = ref<number | null>(null)
@@ -24,6 +25,7 @@ const backToForm = () => {
   showResult.value = false
   analysisResult.value = null
   imageUrl.value = ''
+  imageFile.value = null
   aiText.value = ''
 }
 
@@ -78,6 +80,7 @@ onMounted(() => {
 const handleFileChange = (uploadFile: any) => {
   if (uploadFile.raw) {
     fileName.value = uploadFile.raw.name
+    imageFile.value = uploadFile.raw
     imageUrl.value = URL.createObjectURL(uploadFile.raw)
   }
 }
@@ -147,7 +150,7 @@ const handleSubmit = async () => {
     return
   }
 
-  if (!imageUrl.value) {
+  if (!imageFile.value) {
     ElMessage.warning('请上传一张面部照片')
     return
   }
@@ -162,10 +165,8 @@ const handleSubmit = async () => {
   loading.value = true
   try {
     let uploadedUrls: string[] = []
-    if (imageUrl.value) {
-      const response = await fetch(imageUrl.value)
-      const blob = await response.blob()
-      const url = await uploadImage(blob, fileName.value || 'face.jpg')
+    if (imageFile.value) {
+      const url = await uploadImage(imageFile.value, fileName.value || 'face.jpg')
       uploadedUrls = [url]
     }
 
