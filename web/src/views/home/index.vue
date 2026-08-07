@@ -49,22 +49,6 @@ const goToFeature = (path: string) => {
       }).catch(() => {})
       return
     }
-    
-    // 检查积分是否充足
-    if (analysisTimes.value !== null && analysisTimes.value < creditsPerAnalysis) {
-      ElMessageBox.confirm(
-        `积分不足，本次分析需要 ${creditsPerAnalysis} 积分。快去充值解锁更多分析次数吧！`,
-        '积分不足',
-        {
-          confirmButtonText: '去充值',
-          cancelButtonText: '取消',
-          type: 'warning',
-        }
-      ).then(() => {
-        router.push('/recharge')
-      }).catch(() => {})
-      return
-    }
   }
   
   router.push(path)
