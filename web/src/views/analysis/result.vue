@@ -1215,7 +1215,7 @@ onBeforeUnmount(() => {
   gap: 4px;
   font-size: 12px;
   color: #969799;
-  margin-top: 8px;
+  margin-top: 16px;
 }
 
 .header-actions {
