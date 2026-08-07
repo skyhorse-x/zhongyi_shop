@@ -214,7 +214,7 @@ onMounted(() => {
     </div>
 
     <!-- 积分充足 - 只显示表单 -->
-    <div v-if="creditsLoaded && hasEnoughCredits()">
+    <div v-else>
       <!-- 基本信息（必填） -->
       <div class="profile-section">
         <div class="ai-text-header">
