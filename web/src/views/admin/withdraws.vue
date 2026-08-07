@@ -215,7 +215,7 @@ onMounted(() => {
         <el-table-column prop="promoter" label="推广员" min-width="120" />
         <el-table-column prop="amount" label="提现金额" width="120" align="right">
           <template #default="{ row }">
-            <span style="font-weight: 600; color: #f56c6c;">¥{{ row.amount.toFixed(2) }}</span>
+            <span style="font-weight: 600; color: #f56c6c;">¥{{ Number(row.amount || 0).toFixed(2) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="pay_type" label="提现方式" width="100" align="center" />
@@ -274,7 +274,7 @@ onMounted(() => {
           <el-descriptions-item label="提现单号" label-align="center">{{ detailData.withdraw_no }}</el-descriptions-item>
           <el-descriptions-item label="推广员" label-align="center">{{ detailData.promoter }}</el-descriptions-item>
           <el-descriptions-item label="提现金额" label-align="center">
-            <span style="font-weight: 600; color: #f56c6c;">¥{{ detailData.amount.toFixed(2) }}</span>
+            <span style="font-weight: 600; color: #f56c6c;">¥{{ Number(detailData.amount || 0).toFixed(2) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="提现方式" label-align="center">{{ detailData.pay_type }}</el-descriptions-item>
           <el-descriptions-item label="收款账号" label-align="center">{{ detailData.pay_account }}</el-descriptions-item>

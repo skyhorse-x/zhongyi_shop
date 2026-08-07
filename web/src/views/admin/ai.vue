@@ -107,9 +107,9 @@ const loadStats = async () => {
 
       callStats.value = {
         todayCalls,
-        todayCost: parseFloat(todayCost.toFixed(2)) || 0,
+        todayCost: parseFloat((todayCost || 0).toFixed(2)) || 0,
         monthCalls,
-        monthCost: parseFloat(monthCost.toFixed(2)) || 0,
+        monthCost: parseFloat((monthCost || 0).toFixed(2)) || 0,
       }
     }
   } catch (e) {
@@ -160,7 +160,7 @@ onMounted(() => {
         <div class="stat-label">今日调用次数</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value stat-cost">¥{{ callStats.todayCost.toFixed(2) }}</div>
+        <div class="stat-value stat-cost">¥{{ Number(callStats.todayCost || 0).toFixed(2) }}</div>
         <div class="stat-label">今日费用</div>
       </div>
       <div class="stat-card">
@@ -168,7 +168,7 @@ onMounted(() => {
         <div class="stat-label">本月调用次数</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value stat-cost">¥{{ callStats.monthCost.toFixed(2) }}</div>
+        <div class="stat-value stat-cost">¥{{ Number(callStats.monthCost || 0).toFixed(2) }}</div>
         <div class="stat-label">本月费用</div>
       </div>
     </div>

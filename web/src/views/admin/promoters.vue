@@ -67,8 +67,8 @@ const stats = computed(() => {
   return {
     totalCount,
     todayNew,
-    totalCommission: parseFloat(totalCommission.toFixed(2)),
-    pendingWithdraw: parseFloat(pendingWithdraw.toFixed(2)),
+    totalCommission: parseFloat((totalCommission || 0).toFixed(2)) || 0,
+    pendingWithdraw: parseFloat((pendingWithdraw || 0).toFixed(2)) || 0,
   }
 })
 
@@ -322,10 +322,10 @@ onMounted(() => {
           <span class="stat-number stat-green">{{ stats.todayNew }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="累计佣金" label-align="center">
-          <span class="stat-number">¥{{ stats.totalCommission.toFixed(2) }}</span>
+          <span class="stat-number">¥{{ Number(stats.totalCommission || 0).toFixed(2) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="待审核提现" label-align="center">
-          <span class="stat-number stat-orange">¥{{ stats.pendingWithdraw.toFixed(2) }}</span>
+          <span class="stat-number stat-orange">¥{{ Number(stats.pendingWithdraw || 0).toFixed(2) }}</span>
         </el-descriptions-item>
       </el-descriptions>
     </el-card>

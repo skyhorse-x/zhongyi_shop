@@ -204,7 +204,7 @@ onMounted(() => {
           </div>
           <div class="stat-info">
             <div class="stat-label">已支付金额</div>
-            <div class="stat-value">¥{{ stats.totalAmount.toFixed(2) }}</div>
+            <div class="stat-value">¥{{ Number(stats.totalAmount || 0).toFixed(2) }}</div>
           </div>
         </div>
       </div>
@@ -264,7 +264,7 @@ onMounted(() => {
         <el-table-column prop="productName" label="商品名称" min-width="180" show-overflow-tooltip />
         <el-table-column label="金额" width="120" align="center">
           <template #default="scope">
-            <span class="amount">¥{{ scope.row.amount.toFixed(2) }}</span>
+            <span class="amount">¥{{ Number(scope.row.amount || 0).toFixed(2) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="payMethod" label="支付方式" width="110" align="center">
@@ -340,7 +340,7 @@ onMounted(() => {
         <el-descriptions-item label="用户手机号">{{ detailData.phone }}</el-descriptions-item>
         <el-descriptions-item label="商品名称" :span="2">{{ detailData.productName }}</el-descriptions-item>
         <el-descriptions-item label="金额">
-          <span class="amount">¥{{ detailData.amount.toFixed(2) }}</span>
+          <span class="amount">¥{{ Number(detailData.amount || 0).toFixed(2) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="支付方式">{{ detailData.payMethod }}</el-descriptions-item>
         <el-descriptions-item label="订单状态">
