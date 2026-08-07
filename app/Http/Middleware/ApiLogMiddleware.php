@@ -147,16 +147,24 @@ class ApiLogMiddleware
      */
     private function getUserInfo(Request $request): array
     {
-        // 检查是否为管理员
-        if (Auth::guard('admin')->check()) {
-            $admin = Auth::guard('admin')->user();
-            return ['id' => $admin?->id, 'type' => 'admin'];
+        try {
+            // 检查是否为管理员
+            if (Auth::guard('admin')->check()) {
+                $admin = Auth::guard('admin')->user();
+                return ['id' => $admin?->id, 'type' => 'admin'];
+            }
+        } catch (\Exception $e) {
+            // admin guard 不存在时忽略
         }
 
-        // 检查是否为普通用户
-        if (Auth::check()) {
-            $user = Auth::user();
-            return ['id' => $user?->id, 'type' => 'user'];
+        try {
+            // 检查是否为普通用户
+            if (Auth::check()) {
+                $user = Auth::user();
+                return ['id' => $user?->id, 'type' => 'user'];
+            }
+        } catch (\Exception $e) {
+            // guard 不存在时忽略
         }
 
         return ['id' => null, 'type' => null];
