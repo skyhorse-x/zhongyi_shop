@@ -462,7 +462,7 @@ onMounted(() => {
   font-size: 14px;
   color: #969799;
   margin-bottom: 16px;
-  text-align: center;
+  text-align: left;
 }
 
 .optional-tag {
