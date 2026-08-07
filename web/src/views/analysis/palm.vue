@@ -211,13 +211,8 @@ onMounted(() => {
 
 <template>
   <div class="palm-page">
-    <!-- 加载中 -->
-    <div v-if="!creditsLoaded" class="loading-state">
-      <el-skeleton :rows="6" animated />
-    </div>
-
     <!-- 分析结果 -->
-    <div v-else-if="showResult && analysisResult" class="result-section">
+    <div v-if="showResult && analysisResult" class="result-section">
       <div class="result-header">
         <h2 class="result-title">手相分析报告</h2>
         <el-button type="primary" @click="backToForm">再次分析</el-button>
@@ -376,10 +371,8 @@ onMounted(() => {
 <style scoped>
 .palm-page {
   padding: 16px;
-}
-
-.loading-state {
-  padding: 32px 0;
+  background: #fff;
+  min-height: 100vh;
 }
 
 .locked-state {
