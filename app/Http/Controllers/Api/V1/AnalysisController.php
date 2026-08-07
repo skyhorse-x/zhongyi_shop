@@ -293,9 +293,11 @@ class AnalysisController extends Controller
             'face' => $hasImages
                 ? $aiService->analyzeFace($validated['image_urls'][0] ?? '', (int) $validated['gender'], (int) $validated['age'])
                 : $aiService->analyzeFaceByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
-            'palm' => $aiService->analyzeTongueByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
+            'palm' => $hasImages
+                ? $aiService->analyzePalm($validated['image_urls'] ?? [], (int) $validated['gender'], (int) $validated['age'])
+                : $aiService->analyzePalmByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
             'eye' => $hasImages
-                ? $aiService->analyzeTongue($validated['image_urls'] ?? [], (int) $validated['gender'], (int) $validated['age'])
+                ? $aiService->analyzeEye($validated['image_urls'] ?? [], (int) $validated['gender'], (int) $validated['age'])
                 : $aiService->analyzeEyeByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
             default => throw new \InvalidArgumentException("未知的分析类型: {$validated['type']}"),
         };

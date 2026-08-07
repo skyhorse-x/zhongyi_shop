@@ -1209,6 +1209,99 @@ PROMPT;
     }
 
     /**
+     * 手相分析（基于图片）
+     *
+     * @param array $imageUrls 手掌图片URL列表
+     * @param int $gender 性别:1男 2女
+     * @param int $age 年龄
+     * @return array
+     * @throws \Exception
+     */
+    public function analyzePalm(array $imageUrls, int $gender = 0, int $age = 0): array
+    {
+        Log::info('Starting palm analysis', ['image_urls' => $imageUrls]);
+
+        $prompt = $this->getPalmAnalysisPrompt($gender, $age);
+
+        try {
+            $result = $this->callVisionApi($imageUrls, $prompt, 'palm');
+
+            Log::info('Palm analysis completed', [
+                'result_length' => strlen($result['content'] ?? ''),
+            ]);
+
+            return $result;
+        } catch (\Exception $e) {
+            Log::error('Palm analysis failed', [
+                'error' => $e->getMessage(),
+                'image_urls' => $imageUrls,
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * 手相分析（基于文字描述，无图片）
+     *
+     * @param string $text 用户文字描述
+     * @param int $gender 性别:1男 2女
+     * @param int $age 年龄
+     * @return array
+     * @throws \Exception
+     */
+    public function analyzePalmByText(string $text, int $gender = 0, int $age = 0): array
+    {
+        Log::info('Starting palm analysis by text', ['text_length' => strlen($text)]);
+
+        try {
+            $result = $this->callTextApi($text, 'palm', $gender, $age);
+
+            Log::info('Palm text analysis completed', [
+                'result_length' => strlen($result['content'] ?? ''),
+            ]);
+
+            return $result;
+        } catch (\Exception $e) {
+            Log::error('Palm text analysis failed', [
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * 眼部分析（基于图片）
+     *
+     * @param array $imageUrls 眼部图片URL列表
+     * @param int $gender 性别:1男 2女
+     * @param int $age 年龄
+     * @return array
+     * @throws \Exception
+     */
+    public function analyzeEye(array $imageUrls, int $gender = 0, int $age = 0): array
+    {
+        Log::info('Starting eye analysis', ['image_urls' => $imageUrls]);
+
+        $prompt = $this->getEyeAnalysisPrompt($gender, $age);
+
+        try {
+            $result = $this->callVisionApi($imageUrls, $prompt, 'eye');
+
+            Log::info('Eye analysis completed', [
+                'result_length' => strlen($result['content'] ?? ''),
+            ]);
+
+            return $result;
+        } catch (\Exception $e) {
+            Log::error('Eye analysis failed', [
+                'error' => $e->getMessage(),
+                'image_urls' => $imageUrls,
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
      * 眼部分析（基于文字描述）
      *
      * @param string $text 用户描述的眼部症状
@@ -1341,6 +1434,227 @@ PROMPT;
 - 情志调节（避免肝火上炎）：
 - 穴位保健（眼周穴位按摩）：
 - 中药调理参考（需在医师指导下使用）：
+
+---
+
+## 温馨提示
+- 目诊属于中医传统诊断方法，不具备现代医学验证依据
+- 如有明显眼部不适、视力下降、眼红眼痛等症状，请及时就医
+- 建议以保健调理心态参考，不宜过分依赖
+
+## 参考来源
+【中医经典参考】
+列出本报告中参考的中医古籍或经典理论（2-3条），格式：
+- 《书名》：相关理论简述
+PROMPT;
+    }
+
+    /**
+     * 获取手相分析提示词（基于图片）
+     *
+     * @param int $gender 性别 1男 2女
+     * @param int $age 年龄
+     * @return string
+     */
+    protected function getPalmAnalysisPrompt(int $gender = 0, int $age = 0): string
+    {
+        return <<<PROMPT
+你是一位资深的中医手诊专家，请根据提供的手掌图片进行中医手相健康分析。
+
+【重要原则】
+1. 基于中医手诊理论，通过手掌形态、色泽、纹理等特征分析健康状况
+2. 中医手诊属于传统医学范畴，分析结果仅供参考健康管理
+3. 使用"倾向""可能""提示"等描述，避免确定性诊断
+4. 强调"治未病"理念，注重健康预防和调理
+5. 如有明显健康问题，建议用户及时就医检查
+
+{$this->userProfileContext($gender, $age)}
+
+请从以下中医手诊角度进行分析：
+
+一、手掌形态分析
+- 手掌厚薄、大小、肌肉丰满度
+- 手掌色泽（红润、苍白、潮红、暗紫等）
+- 对应脏腑：脾胃、气血状态
+
+二、手指形态分析
+- 手指粗细、长短比例
+- 指甲色泽、月牙、纹路
+- 五指对应五脏（拇指-脾、食指-肝、中指-心、无名指-肺、小指-肾）
+
+三、主要掌纹健康分析
+- 生命线：生命力、先天体质、肾精状态
+- 智慧线：心脑血管、神经系统
+- 感情线：心脏功能、情绪状态
+- 健康线：免疫系统与整体健康
+
+请严格按照以下格式输出分析结果：
+
+## 手相健康评分：XX/100
+
+评分依据（中医手诊角度）：
++ 手掌色泽状态 XX +XX分
++ 手指形态健康度 XX +XX分
++ 主要掌纹清晰度 XX +XX分
++ 手掌肌肉丰满度 XX +XX分
+- 异常色泽/形态 XX -XX分
+
+评分说明：基于中医手诊理论分析，反映身体健康状况趋势。
+
+---
+
+## 一句话总结
+用一句话（30字以内）概括手相健康分析的主要结论。
+
+---
+
+## 一、手掌形态分析
+- 形态特征：
+- 色泽分析：
+- 脏腑关联（脾胃、气血）：
+- 健康提示：
+- 调理建议：
+
+---
+
+## 二、手指与指甲分析
+- 手指形态：
+- 指甲色泽/月牙：
+- 五脏对应状态（肝心脾肺肾）：
+- 健康提示：
+- 调理建议：
+
+---
+
+## 三、主要掌纹健康分析
+- 生命线（肾精、体质）：
+- 智慧线（心脑血管）：
+- 感情线（心脏、情绪）：
+- 健康线（免疫力）：
+- 综合健康提示：
+
+---
+
+## 四、中医调理建议
+- 饮食调养（药食同源）：
+- 经络穴位按摩：
+- 起居作息建议：
+- 情志调节：
+
+---
+
+## 温馨提示
+- 中医手诊属于传统医学范畴，分析结果仅供参考健康管理
+- 如有明显不适，建议及时就医检查
+- 治未病，重预防，保持健康生活方式
+
+## 参考来源
+【中医经典参考】
+列出本报告中参考的中医经典或理论（2-3条），格式：
+- 《黄帝内经》：相关理论简述
+- 《望诊遵经》：相关理论简述
+PROMPT;
+    }
+
+    /**
+     * 获取眼部分析提示词（基于图片）
+     *
+     * @param int $gender 性别 1男 2女
+     * @param int $age 年龄
+     * @return string
+     */
+    protected function getEyeAnalysisPrompt(int $gender = 0, int $age = 0): string
+    {
+        return <<<PROMPT
+你是一位资深的中医目诊专家，请根据提供的眼部图片进行中医眼部分析。
+
+【重要原则】
+1. 目诊属于中医传统诊断方法，分析结果仅供参考健康调理参考
+2. 使用"倾向""可能""传统解读"等描述，避免确定性断言
+3. 强调"肝开窍于目"的中医理论，从眼部反映肝胆、气血状态
+4. 避免负面、宿命论的解读，保持正面引导
+5. 如有明显眼部病变症状，建议及时就医诊治
+
+{$this->userProfileContext($gender, $age)}
+
+【中医目诊理论基础】
+中医认为"目者，肝之官也"，眼睛与五脏六腑密切相关：
+- 眼白（白睛）反映肺与大肠状态
+- 眼黑（黑睛）反映肝与胆状态
+- 瞳孔反映肾与膀胱状态
+- 眼睑反映脾与胃状态
+- 两眦血络反映心与小肠状态
+
+请从以下维度进行分析：
+
+一、眼白分析
+- 眼白颜色（是否红、黄、苍白）
+- 血丝分布情况
+- 传统解读中的肺气状态
+
+二、眼部形态分析
+- 眼袋与水肿情况
+- 黑眼圈程度
+- 眼皮浮肿与否
+- 反映的脾肾状态
+
+三、眼神与光泽
+- 眼睛是否有神
+- 湿润度与干涩情况
+- 反映的气血津液状态
+
+请严格按照以下格式输出分析结果：
+
+## 眼部综合评分：XX/100
+
+评分依据（中医目诊角度）：
++ 眼神明亮度 XX +XX分
++ 眼白清亮度 XX +XX分
++ 眼部形态 XX +XX分
+- 异常表现 XX -XX分
+
+评分说明：基于传统中医目诊理论分析，仅供参考。
+
+---
+
+## 一、眼白（白睛）分析
+- 形态特征：
+- 血丝情况：
+- 传统解读（肺与大肠）：
+- 相关建议：
+
+---
+
+## 二、眼部形态分析
+- 眼袋情况：
+- 黑眼圈程度：
+- 眼皮状态：
+- 传统解读（脾肾状态）：
+- 调理建议：
+
+---
+
+## 三、眼神与光泽分析
+- 眼神状态：
+- 湿润程度：
+- 传统解读（气血津液）：
+- 相关建议：
+
+---
+
+## 四、脏腑辨证分析
+- 肝胆状态（肝开窍于目）：
+- 气血盛衰：
+- 肾精状态：
+- 整体体质倾向：
+
+---
+
+## 综合调养建议
+- 饮食调理（养肝明目食物）：
+- 起居调摄（用眼卫生）：
+- 情志调节（避免肝火上炎）：
+- 穴位保健（眼周穴位按摩）：
 
 ---
 
