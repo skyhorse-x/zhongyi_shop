@@ -198,10 +198,23 @@ class AnalysisController extends Controller
             $healthScore = $this->calculateHealthScore($content);
             $summary = $this->extractSummary($content);
 
+            // 保存分析记录到历史
+            $report = AnalysisReport::create([
+                'user_id' => $user->id,
+                'type' => $validated['type'],
+                'gender' => (int) $validated['gender'],
+                'age' => (int) $validated['age'],
+                'health_score' => $healthScore,
+                'summary' => $summary,
+                'content' => ['text' => $content],
+                'is_paid' => true,
+            ]);
+
             return response()->json([
                 'code' => 0,
                 'message' => '分析完成',
                 'data' => [
+                    'id' => $report->id,
                     'type' => $validated['type'],
                     'health_score' => $healthScore,
                     'summary' => $summary,
@@ -213,7 +226,7 @@ class AnalysisController extends Controller
                         'usage' => $result['usage'] ?? [],
                         'mode' => $hasImages ? 'image' : 'text',
                     ],
-                    'created_at' => now(),
+                    'created_at' => $report->created_at,
                 ],
             ]);
         } catch (\Exception $e) {
