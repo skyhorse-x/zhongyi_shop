@@ -38,7 +38,7 @@ const menuItems = shallowRef([
   { title: '订单管理', icon: Tickets, path: '/admin/orders' },
   { title: '套餐管理', icon: Goods, path: '/admin/packages' },
   { title: '闲鱼商品管理', icon: Goods, path: '/admin/xianyu-products' },
-  { title: 'AI管理', icon: Cpu, path: '/admin/ai' },
+  { title: 'AI调用记录', icon: Cpu, path: '/admin/ai' },
   { title: '队列任务管理', icon: List, path: '/admin/queue' },
   { title: '健康管理档案', icon: FirstAidKit, path: '/admin/health-archives' },
   { title: '推广管理', icon: Promotion, path: '/admin/promoters' },
@@ -51,6 +51,7 @@ const menuItems = shallowRef([
   { title: '管理员管理', icon: UserFilled, path: '/admin/admins' },
   { title: '角色管理', icon: Operation, path: '/admin/roles' },
   { title: '操作日志', icon: Document, path: '/admin/operation-logs' },
+  { title: 'API日志', icon: Document, path: '/admin/api-logs' },
   { title: '消息推送', icon: Message, path: '/admin/notification-config' },
   { title: '系统设置', icon: Setting, path: '/admin/settings' },
 ])

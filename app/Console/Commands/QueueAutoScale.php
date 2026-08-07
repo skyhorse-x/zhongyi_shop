@@ -200,7 +200,7 @@ class QueueAutoScale extends Command
     /**
      * 处理信号
      */
-    public function handleSignal(int $signal): void
+    public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
     {
         $this->info("接收到信号 {$signal}，正在停止所有工作者...");
 
