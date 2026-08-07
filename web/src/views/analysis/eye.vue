@@ -2,8 +2,9 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { CameraFilled, ChatLineRound, Delete, User, ArrowDown, ArrowUp } from '@element-plus/icons-vue'
+import { CameraFilled, ChatLineRound, Delete, User, ArrowDown } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
+import InsufficientCredits from '@/components/analysis/InsufficientCredits.vue'
 
 const router = useRouter()
 
@@ -16,20 +17,27 @@ interface ImageItem {
 const imageList = ref<ImageItem[]>([])
 const loading = ref(false)
 const aiText = ref('')
-const analysisTimes = ref(0)
+const analysisTimes = ref<number | null>(null) // null = 未加载
 const gender = ref<number | null>(null)
 const age = ref<number>(18)
 const textExpanded = ref(false)
+const creditsLoaded = ref(false)
 
 // 年龄选项 1-100岁
 const ageOptions = Array.from({ length: 100 }, (_, i) => i + 1)
 
 import { getToken } from '@/utils/auth'
 
+// 积分消耗配置
+const creditsPerAnalysis = 1
+
 // 获取用户剩余分析积分
 const fetchAnalysisTimes = async () => {
   const token = getToken()
-  if (!token) return
+  if (!token) {
+    creditsLoaded.value = true
+    return
+  }
 
   try {
     const res = await safeFetch('/api/v1/user/info', {
@@ -44,6 +52,8 @@ const fetchAnalysisTimes = async () => {
     }
   } catch (e) {
     console.error('获取分析积分失败:', e)
+  } finally {
+    creditsLoaded.value = true
   }
 }
 
@@ -110,9 +120,6 @@ const submitAnalysisDirect = async (imageUrls: string[], type: 'tongue' | 'face'
   throw new Error(data.message || '提交失败')
 }
 
-// 积分消耗配置
-const creditsPerAnalysis = 1
-
 // 显示积分不足弹窗
 const showInsufficientCreditsDialog = () => {
   ElMessageBox.alert(
@@ -129,8 +136,8 @@ const showInsufficientCreditsDialog = () => {
 }
 
 const handleSubmit = async () => {
-  // 检查积分是否充足
-  if (analysisTimes.value < creditsPerAnalysis) {
+  // 检查积分是否充足（双重验证）
+  if (analysisTimes.value !== null && analysisTimes.value < creditsPerAnalysis) {
     showInsufficientCreditsDialog()
     return
   }
@@ -175,6 +182,11 @@ const handleSubmit = async () => {
   }
 }
 
+// 判断是否有足够积分
+const hasEnoughCredits = () => {
+  return analysisTimes.value !== null && analysisTimes.value >= creditsPerAnalysis
+}
+
 onMounted(() => {
   fetchAnalysisTimes()
 })
@@ -182,141 +194,147 @@ onMounted(() => {
 
 <template>
   <div class="eye-page">
-    <!-- 基本信息（必填） -->
-    <div class="profile-section">
-      <div class="ai-text-header">
-        <el-icon><User /></el-icon>
-        <span>基本信息 <span class="required-tip">*</span></span>
-      </div>
-      <div class="profile-row">
-        <span class="profile-label">性别</span>
-        <el-radio-group v-model="gender">
-          <el-radio :value="1">男</el-radio>
-          <el-radio :value="2">女</el-radio>
-        </el-radio-group>
-      </div>
-      <div class="profile-row">
-        <span class="profile-label">年龄</span>
-        <el-select v-model="age" placeholder="请选择年龄" style="width: 120px;">
-          <el-option
-            v-for="ageVal in ageOptions"
-            :key="ageVal"
-            :label="ageVal + '岁'"
-            :value="ageVal"
-          />
-        </el-select>
-      </div>
+    <!-- 加载中 -->
+    <div v-if="!creditsLoaded" class="loading-state">
+      <el-skeleton :rows="6" animated />
     </div>
 
-    <!-- 图片上传区域（必填） -->
-    <div class="upload-section">
-      <div class="upload-tip">
-        <span class="required-tag">必填</span> 拍摄清晰的眼部照片，至少上传一张
+    <!-- 积分不足 - 只显示锁定提示 -->
+    <div v-else-if="creditsLoaded && !hasEnoughCredits()" class="locked-state">
+      <InsufficientCredits :credits="creditsPerAnalysis" :current-credits="analysisTimes ?? 0" />
+    </div>
+
+    <!-- 积分充足 - 只显示表单 -->
+    <template v-else>
+      <!-- 基本信息（必填） -->
+      <div class="profile-section">
+        <div class="ai-text-header">
+          <el-icon><User /></el-icon>
+          <span>基本信息 <span class="required-tip">*</span></span>
+        </div>
+        <div class="profile-row">
+          <span class="profile-label">性别</span>
+          <el-radio-group v-model="gender">
+            <el-radio :value="1">男</el-radio>
+            <el-radio :value="2">女</el-radio>
+          </el-radio-group>
+        </div>
+        <div class="profile-row">
+          <span class="profile-label">年龄</span>
+          <el-select v-model="age" placeholder="请选择年龄" style="width: 120px;">
+            <el-option
+              v-for="ageVal in ageOptions"
+              :key="ageVal"
+              :label="ageVal + '岁'"
+              :value="ageVal"
+            />
+          </el-select>
+        </div>
       </div>
 
-      <!-- 多张图片预览 -->
-      <div v-if="imageList.length > 0" class="image-preview-grid">
-        <div
-          v-for="(img, index) in imageList"
-          :key="index"
-          class="image-preview-item"
+      <!-- 图片上传区域（必填） -->
+      <div class="upload-section">
+        <div class="upload-tip">
+          <span class="required-tag">必填</span> 拍摄清晰的眼部照片，至少上传一张
+        </div>
+
+        <!-- 多张图片预览 -->
+        <div v-if="imageList.length > 0" class="image-preview-grid">
+          <div
+            v-for="(img, index) in imageList"
+            :key="index"
+            class="image-preview-item"
+          >
+            <el-image
+              :src="img.url"
+              :alt="img.name"
+              style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;"
+              fit="cover"
+            />
+            <div class="image-remove" @click="removeImage(index)">
+              <el-icon><Delete /></el-icon>
+            </div>
+          </div>
+        </div>
+
+        <!-- 上传按钮 -->
+        <el-upload
+          ref="uploadRef"
+          action="#"
+          :auto-upload="false"
+          :on-change="handleFileChange"
+          :on-remove="handleRemove"
+          :show-file-list="false"
+          accept="image/*"
+          multiple
         >
-          <el-image
-            :src="img.url"
-            :alt="img.name"
-            style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;"
-            fit="cover"
+          <div class="upload-trigger">
+            <el-icon class="upload-icon"><CameraFilled /></el-icon>
+            <span class="upload-text">{{ imageList.length > 0 ? '继续添加照片' : '点击上传眼部照片' }}</span>
+            <span class="upload-hint">支持多张上传，建议拍摄正面眼部特写</span>
+          </div>
+        </el-upload>
+      </div>
+
+      <!-- 眼部特征描述（可折叠） -->
+      <div class="ai-text-section">
+        <div class="ai-text-header" @click="textExpanded = !textExpanded" style="cursor: pointer;">
+          <el-icon><ChatLineRound /></el-icon>
+          <span>眼部症状描述</span>
+          <span class="optional-tag">可选</span>
+          <el-icon class="expand-icon" :class="{ expanded: textExpanded }">
+            <ArrowDown />
+          </el-icon>
+        </div>
+        <div v-show="textExpanded" class="ai-text-content">
+          <el-input
+            v-model="aiText"
+            type="textarea"
+            :rows="4"
+            placeholder="请描述您关注的眼部症状（如：眼白发红、黑眼圈、眼袋、干涩、视力模糊等），AI将根据您的描述进行分析..."
+            resize="none"
+            maxlength="500"
+            show-word-limit
           />
-          <div class="image-remove" @click="removeImage(index)">
-            <el-icon><Delete /></el-icon>
-          </div>
+        </div>
+        <div v-if="!textExpanded" class="ai-text-hint">
+          点击展开输入眼部症状描述（可选，已上传照片可不填）
         </div>
       </div>
 
-      <!-- 上传按钮 -->
-      <el-upload
-        ref="uploadRef"
-        action="#"
-        :auto-upload="false"
-        :on-change="handleFileChange"
-        :on-remove="handleRemove"
-        :show-file-list="false"
-        accept="image/*"
-        multiple
-      >
-        <div class="upload-trigger">
-          <el-icon class="upload-icon"><CameraFilled /></el-icon>
-          <span class="upload-text">{{ imageList.length > 0 ? '继续添加照片' : '点击上传眼部照片' }}</span>
-          <span class="upload-hint">支持多张上传，建议拍摄正面眼部特写</span>
+      <!-- 免责声明 -->
+      <div class="disclaimer-section">
+        <el-alert
+          title="免责声明"
+          type="warning"
+          :closable="false"
+          show-icon
+        >
+          <template #default>
+            <div class="disclaimer-content">
+              <p>1. 本分析结果仅供参考，不能作为医疗诊断依据。</p>
+              <p>2. 目诊属于中医传统诊断方法，不具备现代医学验证依据。</p>
+              <p>3. 如有眼部不适，请及时就医，遵医嘱治疗。</p>
+            </div>
+          </template>
+        </el-alert>
+      </div>
+
+      <div class="actions">
+        <el-button
+          round
+          type="primary"
+          :loading="loading"
+          @click="handleSubmit"
+          style="width: 100%"
+        >
+          开始分析
+        </el-button>
+        <div class="free-tip">
+          剩余 {{ analysisTimes }} 积分
         </div>
-      </el-upload>
-    </div>
-
-    <!-- 眼部特征描述（可折叠） -->
-    <div class="ai-text-section">
-      <div class="ai-text-header" @click="textExpanded = !textExpanded" style="cursor: pointer;">
-        <el-icon><ChatLineRound /></el-icon>
-        <span>眼部症状描述</span>
-        <span class="optional-tag">可选</span>
-        <el-icon class="expand-icon" :class="{ expanded: textExpanded }">
-          <ArrowDown />
-        </el-icon>
       </div>
-      <div v-show="textExpanded" class="ai-text-content">
-        <el-input
-          v-model="aiText"
-          type="textarea"
-          :rows="4"
-          placeholder="请描述您关注的眼部症状（如：眼白发红、黑眼圈、眼袋、干涩、视力模糊等），AI将根据您的描述进行分析..."
-          resize="none"
-          maxlength="500"
-          show-word-limit
-        />
-      </div>
-      <div v-if="!textExpanded" class="ai-text-hint">
-        点击展开输入眼部症状描述（可选，已上传照片可不填）
-      </div>
-    </div>
-
-    <!-- 免责声明 -->
-    <div class="disclaimer-section">
-      <el-alert
-        title="免责声明"
-        type="warning"
-        :closable="false"
-        show-icon
-      >
-        <template #default>
-          <div class="disclaimer-content">
-            <p>1. 本分析结果仅供参考，不能作为医疗诊断依据。</p>
-            <p>2. 目诊属于中医传统诊断方法，不具备现代医学验证依据。</p>
-            <p>3. 如有眼部不适，请及时就医，遵医嘱治疗。</p>
-          </div>
-        </template>
-      </el-alert>
-    </div>
-
-    <!-- 积分不足遮罩 -->
-    <InsufficientCredits v-if="analysisTimes < creditsPerAnalysis" :credits="creditsPerAnalysis" :current-credits="analysisTimes" />
-
-    <div class="actions">
-      <el-button
-        round
-        type="primary"
-        :loading="loading"
-        :disabled="analysisTimes < creditsPerAnalysis"
-        @click="handleSubmit"
-        style="width: 100%"
-      >
-        {{ analysisTimes >= creditsPerAnalysis ? '开始分析' : '积分不足，无法解锁' }}
-      </el-button>
-      <div v-if="analysisTimes >= creditsPerAnalysis" class="free-tip">
-        剩余 {{ analysisTimes }} 积分
-      </div>
-      <div v-else class="free-tip locked">
-        本次分析需要 {{ creditsPerAnalysis }} 积分，<span class="recharge-link" @click="router.push('/recharge')">去充值解锁 →</span>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -325,262 +343,174 @@ onMounted(() => {
   padding: 16px;
 }
 
-.ai-text-section {
-  margin-top: 16px;
-  margin-bottom: 24px;
+.loading-state {
+  padding: 32px 0;
 }
 
-.profile-section {
-  margin-bottom: 24px;
-}
-
-.profile-row {
+.locked-state {
+  min-height: 60vh;
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 12px;
+  justify-content: center;
 }
 
-.profile-label {
-  font-size: 14px;
-  color: #323233;
-  min-width: 48px;
+.ai-text-section {
+  margin-top: 16px;
 }
 
 .ai-text-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   color: #323233;
+  margin-bottom: 12px;
 }
 
-.ai-text-header .el-icon {
-  font-size: 16px;
-  color: #60a5fa;
+.required-tip {
+  color: #ee0a24;
+  font-size: 12px;
+}
+
+.required-tag {
+  display: inline-block;
+  background: #fef0f0;
+  color: #ee0a24;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 6px;
+}
+
+.optional-tag {
+  display: inline-block;
+  background: #f4f4f5;
+  color: #969799;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: auto;
 }
 
 .expand-icon {
-  margin-left: auto;
-  transition: transform 0.3s;
+  transition: transform 0.2s;
+  margin-left: 4px;
 }
 
 .expand-icon.expanded {
   transform: rotate(180deg);
 }
 
-.ai-text-hint {
-  font-size: 13px;
-  color: #969799;
-  padding: 12px;
-  background: #f7f8fa;
-  border-radius: 8px;
-  text-align: center;
+.profile-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
 }
 
-.ai-text-content {
-  animation: slideDown 0.3s ease-out;
+.profile-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 12px;
 }
 
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    max-height: 0;
-  }
-  to {
-    opacity: 1;
-    max-height: 200px;
-  }
+.profile-row:last-child {
+  margin-bottom: 0;
+}
+
+.profile-label {
+  font-size: 14px;
+  color: #646566;
+  min-width: 40px;
 }
 
 .upload-section {
-  margin-bottom: 24px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
 }
 
 .upload-tip {
   font-size: 14px;
-  color: #969799;
-  margin-bottom: 16px;
-  text-align: center;
-}
-
-.optional-tag {
-  display: inline-block;
-  background: #e8f7ef;
-  color: #07c160;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-right: 6px;
-  font-weight: 500;
-}
-
-.required-tag {
-  display: inline-block;
-  background: #fef0f0;
-  color: #f56c6c;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-right: 6px;
-  font-weight: 500;
-}
-
-.required-tip {
-  color: #f56c6c;
-  font-weight: 600;
-  margin-left: 2px;
-}
-
-.upload-trigger {
-  width: 100%;
-  min-height: 140px;
-  border: 2px dashed #dcdee0;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #969799;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  padding: 24px;
-}
-
-.upload-trigger:hover {
-  border-color: #60a5fa;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.15);
-}
-
-.upload-trigger:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(96, 165, 250, 0.1);
-}
-
-.upload-icon {
-  font-size: 36px;
-  color: #94a3b8;
-  margin-bottom: 8px;
-  transition: color 0.3s ease;
-}
-
-.upload-trigger:hover .upload-icon {
-  color: #60a5fa;
-}
-
-.upload-text {
-  margin-top: 8px;
-  font-size: 15px;
-  font-weight: 500;
-  color: #64748b;
-}
-
-.upload-hint {
-  margin-top: 6px;
-  font-size: 12px;
-  color: #c0c4cc;
+  color: #646566;
+  margin-bottom: 12px;
 }
 
 .image-preview-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .image-preview-item {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 8px;
   overflow: hidden;
+  border-radius: 8px;
 }
 
 .image-remove {
   position: absolute;
   top: 4px;
   right: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
   width: 24px;
   height: 24px;
-  background: rgba(0, 0, 0, 0.5);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #fff;
-  font-size: 12px;
-  transition: background 0.3s;
 }
 
-.image-remove:hover {
-  background: rgba(245, 108, 108, 0.8);
-}
-
-.actions {
-  margin-top: 32px;
-}
-
-.free-tip {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #67c23a;
-  text-align: center;
-}
-
-.free-tip.locked {
-  color: #f56c6c;
-}
-
-.recharge-link {
-  color: #60a5fa;
-  cursor: pointer;
-  font-weight: 500;
-  text-decoration: underline;
-}
-
-.recharge-link:hover {
-  color: #3b82f6;
-}
-
-/* 积分不足遮罩 */
-.locked-overlay {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-radius: 16px;
-  padding: 32px 24px;
-  margin: 24px 0;
-  text-align: center;
+.upload-trigger {
   border: 2px dashed #dcdee0;
+  border-radius: 12px;
+  padding: 32px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.locked-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
+.upload-trigger:hover {
+  border-color: #07c160;
+  background: #f6fdf9;
 }
 
-.locked-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #323233;
-  margin-bottom: 12px;
-}
-
-.locked-desc {
-  font-size: 14px;
+.upload-icon {
+  font-size: 32px;
   color: #969799;
-  line-height: 1.8;
-  margin-bottom: 24px;
+  margin-bottom: 8px;
 }
 
-.unlock-btn {
-  padding: 10px 32px;
+.upload-text {
+  display: block;
+  font-size: 14px;
+  color: #323233;
+  margin-bottom: 4px;
 }
 
-/* 免责声明 */
+.upload-hint {
+  display: block;
+  font-size: 12px;
+  color: #969799;
+}
+
+.ai-text-content {
+  margin-top: 8px;
+}
+
+.ai-text-hint {
+  font-size: 12px;
+  color: #969799;
+  margin-top: 8px;
+}
+
 .disclaimer-section {
   margin: 16px 0;
 }
@@ -593,5 +523,16 @@ onMounted(() => {
 
 .disclaimer-content p {
   margin: 2px 0;
+}
+
+.actions {
+  margin-top: 24px;
+}
+
+.free-tip {
+  text-align: center;
+  font-size: 12px;
+  color: #969799;
+  margin-top: 8px;
 }
 </style>
