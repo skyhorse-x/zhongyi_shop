@@ -107,7 +107,6 @@ class CustomerServiceController extends Controller
             'data' => $messages,
         ]);
     }
-    }
 
     /**
      * 客服发送消息

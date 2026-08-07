@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, defineComponent, h } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, defineComponent, h, computed } from 'vue'
 import { ElMessage, ElNotification } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 import { Picture, ArrowLeft, ChatDotRound, User, Document, Money, Setting, Plus, Search, Refresh, MagicStick, RefreshLeft, Delete } from '@element-plus/icons-vue'
@@ -92,16 +92,25 @@ interface Phrase {
   sort_order: number
   is_public: boolean
   is_auto_reply?: boolean  // 是否为自动回复话术
+  trigger_type?: string   // 触发类型: keyword/manual
+  keywords?: string       // 触发关键词
 }
 const phrases = ref<Phrase[]>([])
 const phraseDialogVisible = ref(false)
 const editingPhrase = ref<Phrase | null>(null)
+
+// 手动触发的话术（用于快速发送面板）
+const manualPhrases = computed(() => {
+  return phrases.value.filter(p => p.trigger_type === 'manual' || !p.trigger_type)
+})
 const phraseForm = ref({
   title: '',
   content: '',
   category: 'common',
   is_public: false,
   is_auto_reply: false,
+  trigger_type: 'manual',
+  keywords: '',
 })
 
 // 系统消息
@@ -713,10 +722,12 @@ const openPhraseDialog = (phrase: Phrase | null = null) => {
       category: phrase.category, 
       is_public: phrase.is_public,
       is_auto_reply: phrase.is_auto_reply || false,
+      trigger_type: (phrase as any).trigger_type || 'manual',
+      keywords: (phrase as any).keywords || '',
     }
   } else {
     editingPhrase.value = null
-    phraseForm.value = { title: '', content: '', category: 'common', is_public: false, is_auto_reply: false }
+    phraseForm.value = { title: '', content: '', category: 'common', is_public: false, is_auto_reply: false, trigger_type: 'manual', keywords: '' }
   }
   phraseDialogVisible.value = true
 }
@@ -1134,20 +1145,23 @@ onUnmounted(() => {
             </div>
 
             <!-- 快速话术区域 -->
-            <div class="quick-phrases" v-if="phrases.length > 0">
+            <div class="quick-phrases" v-if="manualPhrases.length > 0">
               <div class="quick-phrases-header">
                 <el-icon><MagicStick /></el-icon>
                 <span>快速话术</span>
+                <span class="quick-phrases-count">共 {{ manualPhrases.length }} 条</span>
               </div>
               <div class="quick-phrases-list">
                 <button
-                  v-for="phrase in phrases.slice(0, 6)"
+                  v-for="phrase in manualPhrases.slice(0, 8)"
                   :key="phrase.id"
                   class="quick-phrase-btn"
                   :title="phrase.content"
                   @click="quickSendPhrase(phrase.content)"
                 >
-                  {{ phrase.title }}
+                  <span class="phrase-title">{{ phrase.title }}</span>
+                  <span v-if="phrase.trigger_type === 'keyword'" class="phrase-tag keyword">关键词</span>
+                  <span v-else class="phrase-tag manual">手动</span>
                 </button>
               </div>
             </div>
@@ -1405,11 +1419,24 @@ onUnmounted(() => {
               <span>设为公共话术</span>
             </label>
           </div>
+          <div class="form-group">
+            <label>触发方式</label>
+            <select v-model="phraseForm.trigger_type">
+              <option value="manual">手动触发</option>
+              <option value="keyword">关键词触发</option>
+            </select>
+          </div>
+          <div class="form-group" v-if="phraseForm.trigger_type === 'keyword'">
+            <label>触发关键词</label>
+            <input v-model="phraseForm.keywords" placeholder="多个关键词用逗号分隔，如：价格,多少钱,费用" />
+            <small class="form-tip">用户消息包含任一关键词时自动回复此话术</small>
+          </div>
           <div class="form-group inline">
             <label class="checkbox-label">
-              <input type="checkbox" v-model="phraseForm.is_auto_reply" />
+              <input type="checkbox" v-model="phraseForm.is_auto_reply" :disabled="phraseForm.trigger_type === 'keyword'" />
               <span>设为自动回复话术</span>
             </label>
+            <small class="form-tip" v-if="phraseForm.trigger_type === 'keyword'">关键词触发时自动启用</small>
           </div>
         </div>
         <div class="dialog-footer">
@@ -2208,12 +2235,44 @@ onUnmounted(() => {
   color: #606266;
   cursor: pointer;
   transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .quick-phrase-btn:hover {
   background: #ecf5ff;
   border-color: #409eff;
   color: #409eff;
+}
+
+.phrase-title {
+  white-space: nowrap;
+}
+
+.phrase-tag {
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.phrase-tag.keyword {
+  background: #fdf6ec;
+  color: #e6a23c;
+  border: 1px solid #f5dab1;
+}
+
+.phrase-tag.manual {
+  background: #f0f9eb;
+  color: #67c23a;
+  border: 1px solid #c2e7b0;
+}
+
+.quick-phrases-count {
+  font-size: 12px;
+  color: #909399;
+  margin-left: auto;
 }
 
 /* 输入区域 */
@@ -2820,6 +2879,14 @@ onUnmounted(() => {
 .form-group input:focus,
 .form-group textarea:focus,
 .form-group select:focus { border-color: #409eff; }
+
+.form-tip {
+  display: block;
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+  line-height: 1.4;
+}
 
 .checkbox-label {
   display: flex !important;

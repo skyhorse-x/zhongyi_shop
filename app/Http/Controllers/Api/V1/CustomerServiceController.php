@@ -113,10 +113,9 @@ class CustomerServiceController extends Controller
             'data' => $messages,
         ]);
     }
-    }
 
     /**
-     * 发送消息
+     * 发送消息（支持关键词自动回复）
      */
     public function sendMessage(Request $request, $sessionNo)
     {
@@ -159,6 +158,9 @@ class CustomerServiceController extends Controller
             }
             $session->save();
             
+            // 检查关键词自动回复
+            $this->checkAndAutoReply($session, $request->input('content', ''));
+            
             DB::commit();
             
             return response()->json([
@@ -172,6 +174,54 @@ class CustomerServiceController extends Controller
                 'code' => 500,
                 'message' => '发送失败: ' . $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * 检查并执行关键词自动回复
+     */
+    private function checkAndAutoReply(CustomerServiceSession $session, string $userContent): void
+    {
+        // 获取所有启用的关键词触发话术
+        $phrases = \App\Models\CustomerServicePhrase::where('is_enabled', true)
+            ->where('is_auto_reply', true)
+            ->where('trigger_type', 'keyword')
+            ->get();
+
+        foreach ($phrases as $phrase) {
+            $keywords = $phrase->keywords_array;
+            if (empty($keywords)) {
+                continue;
+            }
+
+            // 检查用户消息是否包含任一关键词
+            foreach ($keywords as $keyword) {
+                if (empty($keyword)) {
+                    continue;
+                }
+                // 模糊匹配：用户消息包含关键词即触发
+                if (mb_stripos($userContent, $keyword) !== false) {
+                    // 创建自动回复消息
+                    CustomerServiceMessage::create([
+                        'session_id' => $session->id,
+                        'sender_id' => 0, // 系统自动回复
+                        'sender_type' => 'admin',
+                        'content' => $phrase->content,
+                        'message_type' => 'text',
+                        'is_auto_reply' => true,
+                        'read_at' => now(), // 自动回复默认已读
+                    ]);
+
+                    // 更新会话
+                    $session->message_count += 1;
+                    $session->user_unread += 1;
+                    $session->last_message_at = now();
+                    $session->save();
+
+                    // 只触发第一个匹配的话术
+                    return;
+                }
+            }
         }
     }
 
@@ -366,6 +416,33 @@ class CustomerServiceController extends Controller
         return response()->json([
             'code' => 0,
             'message' => '已标记为已读',
+        ]);
+    }
+
+    /**
+     * 获取消息已读状态（用于前端同步已读状态）
+     */
+    public function readStatus(Request $request, $sessionNo)
+    {
+        $user = $request->user();
+        
+        $session = CustomerServiceSession::where('session_no', $sessionNo)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+        
+        // 获取用户发送的消息的已读状态
+        $readStatus = CustomerServiceMessage::where('session_id', $session->id)
+            ->where('sender_type', 'user')
+            ->whereNotNull('read_at')
+            ->pluck('read_at', 'id')
+            ->map(function ($readAt) {
+                return $readAt->toDateTimeString();
+            });
+        
+        return response()->json([
+            'code' => 0,
+            'message' => 'success',
+            'data' => $readStatus,
         ]);
     }
 

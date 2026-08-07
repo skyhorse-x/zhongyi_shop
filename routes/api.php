@@ -101,6 +101,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::get('session', [V1\CustomerServiceController::class, 'getOrCreateSession']);
             Route::get('sessions', [V1\CustomerServiceController::class, 'sessions']);
             Route::get('sessions/{sessionNo}/messages', [V1\CustomerServiceController::class, 'messages']);
+            Route::get('sessions/{sessionNo}/read-status', [V1\CustomerServiceController::class, 'readStatus']);
             Route::post('sessions/{sessionNo}/messages', [V1\CustomerServiceController::class, 'sendMessage']);
             Route::post('sessions/{sessionNo}/upload-image', [V1\CustomerServiceController::class, 'uploadImage']);
             Route::post('sessions/{sessionNo}/mark-as-read', [V1\CustomerServiceController::class, 'markAsRead']);

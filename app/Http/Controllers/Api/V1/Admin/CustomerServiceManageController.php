@@ -62,12 +62,20 @@ class CustomerServiceManageController extends Controller
             'category' => 'nullable|string|in:common,greeting,promotion',
             'sort_order' => 'nullable|integer',
             'is_public' => 'nullable|boolean',
+            'trigger_type' => 'nullable|string|in:keyword,manual',
+            'keywords' => 'nullable|string|max:500',
         ]);
 
         $data['admin_id'] = $request->user()->id;
         $data['category'] = $data['category'] ?? 'common';
         $data['sort_order'] = $data['sort_order'] ?? 0;
         $data['is_public'] = $data['is_public'] ?? false;
+        $data['trigger_type'] = $data['trigger_type'] ?? 'manual';
+
+        // 如果是关键词触发，自动启用自动回复
+        if ($data['trigger_type'] === 'keyword') {
+            $data['is_auto_reply'] = true;
+        }
 
         $phrase = CustomerServicePhrase::create($data);
 
@@ -93,7 +101,14 @@ class CustomerServiceManageController extends Controller
             'sort_order' => 'nullable|integer',
             'is_enabled' => 'nullable|boolean',
             'is_public' => 'nullable|boolean',
+            'trigger_type' => 'nullable|string|in:keyword,manual',
+            'keywords' => 'nullable|string|max:500',
         ]);
+
+        // 如果是关键词触发，自动启用自动回复
+        if (isset($data['trigger_type']) && $data['trigger_type'] === 'keyword') {
+            $data['is_auto_reply'] = true;
+        }
 
         $phrase->update(array_filter($data, fn($v) => !is_null($v)));
 

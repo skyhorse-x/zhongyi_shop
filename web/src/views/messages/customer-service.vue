@@ -133,6 +133,35 @@ const pollNewMessages = async () => {
       // 播放提示音（可选）
       playNotificationSound()
     }
+
+    // 同步已读状态：更新已读标记（管理员已读的消息）
+    await syncReadStatus()
+  } catch (e) {
+    // 忽略错误
+  }
+}
+
+// 同步已读状态
+const syncReadStatus = async () => {
+  if (!sessionNo.value) return
+  try {
+    // 获取用户发送的消息的已读状态
+    const res = await safeFetch(`/api/v1/customer-service/sessions/${sessionNo.value}/read-status`, {
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Accept': 'application/json',
+      },
+    })
+    const data = await res.json()
+    if (data.code === 0 && data.data) {
+      const readStatusMap = data.data // { message_id: read_at }
+      // 更新本地消息的已读状态
+      messages.value.forEach(msg => {
+        if (msg.sender_type === 'user' && readStatusMap[msg.id]) {
+          msg.read_at = readStatusMap[msg.id]
+        }
+      })
+    }
   } catch (e) {
     // 忽略错误
   }

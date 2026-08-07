@@ -17,6 +17,7 @@ class HealthArchiveController extends Controller
     public function index(Request $request)
     {
         $query = AnalysisReport::with(['user:id,username,email,mobile,gender,birthday', 'task:id,task_no,type,created_at,image_url,image_urls,text'])
+            ->orderBy('created_at', 'desc')
             ->orderBy('id', 'desc');
 
         // 按类型筛选
