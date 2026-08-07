@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, h, onMounted, defineComponent, markRaw } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
+
 import { ArrowRight, Avatar, User, ChatLineRound, FirstAidKit, Money, Wallet, Star, Pointer, View } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import { safeFetch } from '@/utils/fetch'
@@ -26,31 +26,14 @@ const features = ref<FeatureItem[]>(markRaw([
   { icon: ChatLineRound, title: '健康问答', desc: 'AI在线问答，专业指导', path: '/qa/chat' },
 ]))
 
-// 需要消耗积分的分析路径
-const creditRequiredPaths = ['/analysis/tongue', '/analysis/face', '/analysis/palm', '/analysis/eye']
-const creditsPerAnalysis = 1
-
 const goToFeature = (path: string) => {
-  // 检查是否需要消耗积分
-  if (creditRequiredPaths.includes(path)) {
-    // 未登录用户提示登录
-    const token = getToken()
-    if (!token) {
-      ElMessageBox.confirm(
-        '请先登录后再使用分析功能',
-        '需要登录',
-        {
-          confirmButtonText: '去登录',
-          cancelButtonText: '取消',
-          type: 'info',
-        }
-      ).then(() => {
-        router.push('/login')
-      }).catch(() => {})
-      return
-    }
+  // 未登录用户直接跳转登录页
+  const token = getToken()
+  if (!token) {
+    router.push('/auth/login')
+    return
   }
-  
+
   router.push(path)
 }
 
@@ -113,7 +96,30 @@ const fetchSiteConfig = async () => {
 }
 
 const goRecharge = () => {
+  const token = getToken()
+  if (!token) {
+    router.push('/auth/login')
+    return
+  }
   router.push('/recharge')
+}
+
+const goHealthHistory = () => {
+  const token = getToken()
+  if (!token) {
+    router.push('/auth/login')
+    return
+  }
+  router.push('/health/history')
+}
+
+const goPromoter = () => {
+  const token = getToken()
+  if (!token) {
+    router.push('/auth/login')
+    return
+  }
+  router.push('/promoter')
 }
 
 // 滚动活动数据
@@ -250,7 +256,7 @@ onMounted(() => {
     </div>
 
     <!-- 健康档案入口 -->
-    <div class="health-entry" @click="router.push('/health/history')">
+    <div class="health-entry" @click="goHealthHistory">
       <div class="entry-icon">
         <el-icon><FirstAidKit /></el-icon>
       </div>
@@ -262,7 +268,7 @@ onMounted(() => {
     </div>
 
     <!-- 推广入口 -->
-    <div class="promote-entry" @click="router.push('/promoter')">
+    <div class="promote-entry" @click="goPromoter">
       <div class="entry-icon">
         <el-icon><Money /></el-icon>
       </div>
