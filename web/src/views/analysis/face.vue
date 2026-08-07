@@ -172,13 +172,8 @@ const hasEnoughCredits = () => {
 
 <template>
   <div class="face-page">
-    <!-- 加载中 -->
-    <div v-if="!creditsLoaded" class="loading-state">
-      <div class="loading-text">加载中...</div>
-    </div>
-
     <!-- 分析结果 -->
-    <div v-else-if="showResult && analysisResult" class="result-section">
+    <div v-if="showResult && analysisResult" class="result-section">
       <div class="result-header">
         <h2 class="result-title">面诊分析报告</h2>
         <el-button type="primary" @click="backToForm">再次分析</el-button>
@@ -198,7 +193,7 @@ const hasEnoughCredits = () => {
     </div>
 
     <!-- 积分不足 - 只显示锁定提示 -->
-    <div v-else-if="creditsLoaded && !hasEnoughCredits()" class="locked-state">
+    <div v-if="creditsLoaded && !hasEnoughCredits()" class="locked-state">
       <InsufficientCredits :credits="creditsPerAnalysis" :current-credits="analysisTimes ?? 0" />
     </div>
 
@@ -323,18 +318,6 @@ const hasEnoughCredits = () => {
   padding: 16px;
   background: #fff;
   min-height: 100vh;
-}
-
-.loading-state {
-  min-height: 60vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.loading-text {
-  font-size: 14px;
-  color: #969799;
 }
 
 .locked-state {
