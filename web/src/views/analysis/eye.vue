@@ -297,24 +297,7 @@ onMounted(() => {
     </div>
 
     <!-- 积分不足遮罩 -->
-    <div v-if="analysisTimes < creditsPerAnalysis" class="locked-overlay">
-      <div class="locked-content">
-        <div class="locked-icon">🔒</div>
-        <div class="locked-title">积分不足，无法解锁</div>
-        <div class="locked-desc">
-          本次分析需要 {{ creditsPerAnalysis }} 积分<br/>
-          请充值后解锁
-        </div>
-        <el-button
-          round
-          type="primary"
-          @click="router.push('/recharge')"
-          class="unlock-btn"
-        >
-          去充值解锁
-        </el-button>
-      </div>
-    </div>
+    <InsufficientCredits v-if="analysisTimes < creditsPerAnalysis" :credits="creditsPerAnalysis" :current-credits="analysisTimes" />
 
     <div class="actions">
       <el-button

@@ -39,6 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // 全局API请求日志中间件
         $middleware->append(\App\Http\Middleware\RequestLogMiddleware::class);
+        $middleware->append(\App\Http\Middleware\ApiLogMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // API请求返回JSON格式错误
