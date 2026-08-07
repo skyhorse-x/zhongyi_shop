@@ -22,8 +22,26 @@ const gender = ref<number | null>(null)
 const age = ref<number>(18)
 const textExpanded = ref(false)
 const creditsLoaded = ref(false)
+const showResult = ref(false)
+const analysisResult = ref<any>(null)
 
-// 年龄选项 1-100岁
+// 返回表单
+const backToForm = () => {
+  showResult.value = false
+  analysisResult.value = null
+  imageList.value = []
+  aiText.value = ''
+}
+
+// 格式化分析内容
+const formatContent = (content: string) => {
+  if (!content) return ''
+  return content
+    .replace(/##\s*(.+)/g, '<h3>$1</h3>')
+    .replace(/###\s*(.+)/g, '<h4>$1</h4>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>')
+}
 const ageOptions = Array.from({ length: 100 }, (_, i) => i + 1)
 
 import { getToken } from '@/utils/auth'
@@ -166,10 +184,12 @@ const handleSubmit = async () => {
     // 2. 提交分析任务
     const result = await submitAnalysisDirect(uploadedUrls, 'eye', aiText.value, gender.value, age.value)
 
-    // 立即跳转到分析结果页面
-    router.push({
-      path: `/analysis/result/${result.task_no}`,
-    })
+    analysisResult.value = result
+    showResult.value = true
+    // 更新剩余积分
+    if (analysisTimes.value !== null) {
+      analysisTimes.value -= creditsPerAnalysis
+    }
   } catch (e: any) {
     const msg = e.message || '提交失败'
     if (msg.includes('次数不足') || msg.includes('积分不足') || msg.includes('先购买')) {
@@ -197,6 +217,26 @@ onMounted(() => {
     <!-- 加载中 -->
     <div v-if="!creditsLoaded" class="loading-state">
       <el-skeleton :rows="6" animated />
+    </div>
+
+    <!-- 分析结果 -->
+    <div v-else-if="showResult && analysisResult" class="result-section">
+      <div class="result-header">
+        <h2 class="result-title">眼部分析报告</h2>
+        <el-button type="primary" @click="backToForm">再次分析</el-button>
+      </div>
+      <div class="result-score">
+        <span class="score-label">健康评分</span>
+        <span class="score-value">{{ analysisResult.health_score || 85 }}</span>
+      </div>
+      <div class="result-summary">
+        <h3>分析摘要</h3>
+        <p>{{ analysisResult.summary || '分析完成' }}</p>
+      </div>
+      <div class="result-content" v-if="analysisResult.result?.content">
+        <h3>详细分析</h3>
+        <div class="content-text" v-html="formatContent(analysisResult.result.content)"></div>
+      </div>
     </div>
 
     <!-- 积分不足 - 只显示锁定提示 -->
