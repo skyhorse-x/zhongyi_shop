@@ -4,7 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { safeFetch } from '@/utils/fetch'
 import { getAdminToken, clearAdminToken } from '@/utils/auth'
-import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service, FirstAidKit, Wallet, CreditCard, RefreshLeft, Close, List, Message } from '@element-plus/icons-vue'
+import { Operation, ArrowRight, ArrowLeft, SwitchButton, TrendCharts, UserFilled, Tickets, Document, Setting, Cpu, Promotion, Money, Goods, EditPen, Service, FirstAidKit, Wallet, CreditCard, RefreshLeft, Close, Message } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -75,7 +75,6 @@ const menuGroups = shallowRef([
   {
     title: '系统管理',
     items: [
-      { title: '队列任务管理', icon: List, path: '/admin/queue' },
       { title: '管理员管理', icon: UserFilled, path: '/admin/admins' },
       { title: '角色管理', icon: Operation, path: '/admin/roles' },
       { title: '操作日志', icon: Document, path: '/admin/operation-logs' },

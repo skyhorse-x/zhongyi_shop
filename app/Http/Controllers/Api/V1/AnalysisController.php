@@ -121,7 +121,7 @@ class AnalysisController extends Controller
     }
 
     /**
-     * 提交分析任务（同步处理AI分析，完成后扣除积分）
+     * 提交分析（直接请求AI接口，完成后扣除积分）
      */
     public function submit(Request $request)
     {
@@ -144,46 +144,79 @@ class AnalysisController extends Controller
             ], 400);
         }
 
-        // 创建任务
-        $imageUrls = $validated['image_urls'] ?? [];
-        $task = AnalysisTask::create([
-            'task_no' => 'TK' . date('Ymd') . substr(md5(uniqid()), 0, 8),
-            'user_id' => $request->user()->id,
-            'type' => $validated['type'],
-            'gender' => (int) $validated['gender'],
-            'age' => (int) $validated['age'],
-            'image_url' => $imageUrls[0] ?? null,
-            'image_urls' => $imageUrls ?: null,
-            'text' => $validated['text'] ?? null,
-            'image_md5' => $hasImages ? md5(implode(',', $imageUrls)) : null,
-            'status' => 1, // 处理中
-            'is_paid' => 0,
-            'started_at' => now(),
-        ]);
+        // 先检查积分是否充足
+        $timesService = app(AnalysisTimesService::class);
+        $user = $request->user();
+        $checkResult = $timesService->checkTimes($user, $validated['type']);
+        if (!$checkResult) {
+            return response()->json([
+                'code' => 402,
+                'message' => '积分不足，请先充值',
+                'error_type' => 'insufficient_times',
+            ], 402);
+        }
 
-        // 同步处理AI分析
+        // 直接调用AI接口
         try {
-            $result = $this->processAnalysisSync($task, $validated, $hasImages, $hasText);
+            $aiService = app(AiService::class);
+            $result = match ($validated['type']) {
+                'tongue' => $hasImages
+                    ? $aiService->analyzeTongue($validated['image_urls'] ?? [], (int) $validated['gender'], (int) $validated['age'])
+                    : $aiService->analyzeTongueByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
+                'face' => $hasImages
+                    ? $aiService->analyzeFace($validated['image_urls'][0] ?? '', (int) $validated['gender'], (int) $validated['age'])
+                    : $aiService->analyzeFaceByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
+                'palm' => $hasImages
+                    ? $aiService->analyzePalm($validated['image_urls'] ?? [], (int) $validated['gender'], (int) $validated['age'])
+                    : $aiService->analyzePalmByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
+                'eye' => $hasImages
+                    ? $aiService->analyzeEye($validated['image_urls'] ?? [], (int) $validated['gender'], (int) $validated['age'])
+                    : $aiService->analyzeEyeByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
+                default => throw new \InvalidArgumentException("未知的分析类型: {$validated['type']}"),
+            };
+
+            // 扣除积分
+            $analysisType = match($validated['type']) {
+                'tongue' => '舌诊分析',
+                'face' => '面部分析',
+                'palm' => '手相分析',
+                'eye' => '眼部分析',
+                default => 'AI分析',
+            };
+            $deductResult = $timesService->deductTimes(
+                $user,
+                1,
+                'use',
+                "AI{$analysisType}"
+            );
+            if (!$deductResult) {
+                throw new \RuntimeException('积分扣除失败');
+            }
+
+            // 计算健康评分
+            $content = $result['content'] ?? '';
+            $healthScore = $this->calculateHealthScore($content);
+            $summary = $this->extractSummary($content);
+
             return response()->json([
                 'code' => 0,
                 'message' => '分析完成',
                 'data' => [
-                    'task_no' => $task->task_no,
-                    'status' => 2, // 已完成
-                    'type' => $task->type,
-                    'health_score' => $result['health_score'],
-                    'summary' => $result['summary'],
-                    'result' => $task->result,
-                    'created_at' => $task->created_at,
+                    'type' => $validated['type'],
+                    'health_score' => $healthScore,
+                    'summary' => $summary,
+                    'result' => [
+                        'content' => $content,
+                        'summary' => $summary,
+                        'health_score' => $healthScore,
+                        'model' => $result['model'] ?? '',
+                        'usage' => $result['usage'] ?? [],
+                        'mode' => $hasImages ? 'image' : 'text',
+                    ],
+                    'created_at' => now(),
                 ],
             ]);
         } catch (\Exception $e) {
-            // 更新任务状态为失败
-            $task->update([
-                'status' => 3,
-                'error_message' => substr($e->getMessage(), 0, 500),
-            ]);
-
             $message = $e->getMessage();
             $isConfigError = str_contains($message, 'API Key')
                 || str_contains($message, 'API key')
@@ -195,131 +228,8 @@ class AnalysisController extends Controller
                     ? $message
                     : '分析失败，请稍后重试',
                 'error_type' => $isConfigError ? 'ai_not_configured' : 'internal_error',
-                'data' => [
-                    'task_no' => $task->task_no,
-                    'status' => 3, // 失败
-                ],
             ], $isConfigError ? 503 : 500);
         }
-    }
-
-    /**
-     * 同步处理AI分析
-     */
-    private function processAnalysisSync($task, array $validated, bool $hasImages, bool $hasText): array
-    {
-        $aiService = app(AiService::class);
-
-        $result = match ($validated['type']) {
-            'tongue' => $hasImages
-                ? $aiService->analyzeTongue($validated['image_urls'] ?? [], (int) $validated['gender'], (int) $validated['age'])
-                : $aiService->analyzeTongueByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
-            'face' => $hasImages
-                ? $aiService->analyzeFace($validated['image_urls'][0] ?? '', (int) $validated['gender'], (int) $validated['age'])
-                : $aiService->analyzeFaceByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
-            'palm' => $hasImages
-                ? $aiService->analyzePalm($validated['image_urls'] ?? [], (int) $validated['gender'], (int) $validated['age'])
-                : $aiService->analyzePalmByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
-            'eye' => $hasImages
-                ? $aiService->analyzeEye($validated['image_urls'] ?? [], (int) $validated['gender'], (int) $validated['age'])
-                : $aiService->analyzeEyeByText($validated['text'] ?? '', (int) $validated['gender'], (int) $validated['age']),
-            default => throw new \InvalidArgumentException("未知的分析类型: {$validated['type']}"),
-        };
-
-        // 计算健康评分
-        $content = $result['content'] ?? '';
-        $healthScore = $this->calculateHealthScore($content);
-        $summary = $this->extractSummary($content);
-
-        // AI分析完成后扣除积分
-        try {
-            $timesService = app(AnalysisTimesService::class);
-            $deductResult = $timesService->deductTimes($task->user_id, $task->type);
-
-            if (!$deductResult) {
-                // 积分不足，标记任务为失败
-                $task->update([
-                    'status' => 3, // 失败
-                    'error_message' => '积分不足，无法完成分析',
-                ]);
-                throw new \RuntimeException('积分不足，请先充值');
-            }
-
-            Log::info('Analysis credit deducted', [
-                'user_id' => $task->user_id,
-                'task_no' => $task->task_no,
-                'type' => $task->type,
-            ]);
-        } catch (\RuntimeException $e) {
-            // 积分不足或其他扣除失败
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('Failed to deduct credit', [
-                'user_id' => $task->user_id,
-                'task_no' => $task->task_no,
-                'error' => $e->getMessage(),
-            ]);
-            throw new \RuntimeException('积分扣除失败，请稍后重试');
-        }
-
-        // 更新任务为已完成
-        $task->update([
-            'status' => 2, // 已完成
-            'is_paid' => 1,
-            'result' => [
-                'content' => $content,
-                'summary' => $summary,
-                'health_score' => $healthScore,
-                'model' => $result['model'] ?? '',
-                'usage' => $result['usage'] ?? [],
-                'mode' => $hasImages ? 'image' : 'text',
-            ],
-            'completed_at' => now(),
-        ]);
-
-        // 创建健康档案报告
-        $reportData = [
-            'task_id' => $task->id,
-            'user_id' => $task->user_id,
-            'type' => $task->type,
-            'gender' => $task->gender,
-            'age' => $task->age,
-            'health_score' => $healthScore,
-            'summary' => $summary,
-            'content' => ['text' => $content],
-            'is_paid' => $task->is_paid ?? false,
-        ];
-
-        // 根据类型提取特定的分析字段
-        if ($task->type === 'tongue') {
-            $reportData['tongue_color'] = $this->extractField($content, '舌色');
-            $reportData['tongue_shape'] = $this->extractField($content, '舌形');
-            $reportData['tongue_coating'] = $this->extractField($content, '舌苔');
-            $reportData['sublingual_vein'] = $this->extractField($content, '舌下');
-            $reportData['tongue_analysis'] = $content;
-        } elseif ($task->type === 'face') {
-            $reportData['face_color'] = $this->extractField($content, '面色');
-            $reportData['lip_color'] = $this->extractField($content, '唇色');
-            $reportData['eye_analysis'] = $this->extractField($content, '眼部');
-            $reportData['face_analysis'] = $content;
-        } elseif ($task->type === 'palm') {
-            $reportData['life_line'] = $this->extractField($content, '生命线');
-            $reportData['career_line'] = $this->extractField($content, '事业线');
-            $reportData['marriage_line'] = $this->extractField($content, '婚姻线');
-            $reportData['palm_analysis'] = $content;
-        } elseif ($task->type === 'eye') {
-            $reportData['eye_color'] = $this->extractField($content, '眼色');
-            $reportData['eye_white'] = $this->extractField($content, '眼白');
-            $reportData['dark_circle'] = $this->extractField($content, '黑眼圈');
-            $reportData['eye_analysis'] = $content;
-        }
-
-        AnalysisReport::create($reportData);
-
-        return [
-            'health_score' => $healthScore,
-            'summary' => $summary,
-        ];
     }
 
     /**

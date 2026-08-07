@@ -87,6 +87,27 @@ class AnalysisTimesService
     }
 
     /**
+     * 检查用户是否有足够的分析次数
+     */
+    public function checkTimes(User $user, string $type): bool
+    {
+        $required = $this->getRequiredTimes($type);
+        $remaining = $this->getRemaining($user);
+        return $remaining >= $required;
+    }
+
+    /**
+     * 根据分析类型获取所需次数
+     */
+    private function getRequiredTimes(string $type): int
+    {
+        return match ($type) {
+            'tongue', 'face', 'palm', 'eye' => 1,
+            default => 1,
+        };
+    }
+
+    /**
      * 返还分析次数（AI 失败 / 退款 / 异常补偿）
      *
      * @return bool
