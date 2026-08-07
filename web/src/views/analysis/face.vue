@@ -4,26 +4,34 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CameraFilled, ChatLineRound, User, ArrowDown } from '@element-plus/icons-vue'
 import { safeFetch } from '@/utils/fetch'
+import InsufficientCredits from '@/components/analysis/InsufficientCredits.vue'
 
 const router = useRouter()
 const imageUrl = ref('')
 const fileName = ref('')
 const loading = ref(false)
 const aiText = ref('')
-const analysisTimes = ref(0)
+const analysisTimes = ref<number | null>(null)
 const gender = ref<number | null>(null)
 const age = ref<number>(18)
-const textExpanded = ref(false) // 症状描述是否展开
+const textExpanded = ref(false)
+const creditsLoaded = ref(false)
 
 // 年龄选项 1-100岁
 const ageOptions = Array.from({ length: 100 }, (_, i) => i + 1)
 
 import { getToken } from '@/utils/auth'
 
-// 获取用户剩余分析次数
+// 积分消耗配置
+const creditsPerAnalysis = 1
+
+// 获取用户剩余分析积分
 const fetchAnalysisTimes = async () => {
   const token = getToken()
-  if (!token) return
+  if (!token) {
+    creditsLoaded.value = true
+    return
+  }
 
   try {
     const res = await safeFetch('/api/v1/user/info', {
@@ -37,7 +45,9 @@ const fetchAnalysisTimes = async () => {
       analysisTimes.value = data.data?.analysis_times ?? 0
     }
   } catch (e) {
-    console.error('获取分析次数失败:', e)
+    console.error('获取分析积分失败:', e)
+  } finally {
+    creditsLoaded.value = true
   }
 }
 
@@ -71,7 +81,7 @@ const uploadImage = async (blob: Blob, name: string): Promise<string> => {
   throw new Error(data.message || '图片上传失败')
 }
 
-// 提交分析任务（直接返回完整结果）
+// 提交分析任务
 const submitAnalysisDirect = async (imageUrls: string[], type: 'tongue' | 'face' | 'palm', text: string, gender: number, age: number) => {
   const res = await safeFetch('/api/v1/analysis/submit', {
     method: 'POST',
@@ -95,9 +105,6 @@ const submitAnalysisDirect = async (imageUrls: string[], type: 'tongue' | 'face'
   throw new Error(data.message || '提交失败')
 }
 
-// 积分消耗配置
-const creditsPerAnalysis = 1
-
 // 显示积分不足弹窗
 const showInsufficientCreditsDialog = () => {
   ElMessageBox.alert(
@@ -114,8 +121,8 @@ const showInsufficientCreditsDialog = () => {
 }
 
 const handleSubmit = async () => {
-  // 检查积分是否充足
-  if (analysisTimes.value < creditsPerAnalysis) {
+  // 检查积分是否充足（双重验证）
+  if (analysisTimes.value !== null && analysisTimes.value < creditsPerAnalysis) {
     showInsufficientCreditsDialog()
     return
   }
@@ -134,7 +141,6 @@ const handleSubmit = async () => {
   }
   loading.value = true
   try {
-    // 1. 上传图片（如果有）
     let uploadedUrls: string[] = []
     if (imageUrl.value) {
       const response = await fetch(imageUrl.value)
@@ -143,10 +149,7 @@ const handleSubmit = async () => {
       uploadedUrls = [url]
     }
 
-    // 2. 提交分析任务（立即返回任务号，后台异步处理）
     const result = await submitAnalysisDirect(uploadedUrls, 'face', aiText.value, gender.value, age.value)
-
-    // 立即跳转到分析结果页面（结果页面会轮询获取结果）
     router.push({
       path: `/analysis/result/${result.task_no}`,
     })
@@ -161,127 +164,138 @@ const handleSubmit = async () => {
     loading.value = false
   }
 }
+
+// 判断是否有足够积分
+const hasEnoughCredits = () => {
+  return analysisTimes.value !== null && analysisTimes.value >= creditsPerAnalysis
+}
 </script>
 
 <template>
   <div class="face-page">
-    <!-- 基本信息（必填） -->
-    <div class="profile-section">
-      <div class="ai-text-header">
-        <el-icon><User /></el-icon>
-        <span>基本信息 <span class="required-tip">*</span></span>
+    <!-- 加载中 -->
+    <div v-if="!creditsLoaded" class="loading-state">
+      <el-skeleton :rows="6" animated />
+    </div>
+
+    <!-- 积分不足 - 只显示锁定提示 -->
+    <div v-else-if="creditsLoaded && !hasEnoughCredits()" class="locked-state">
+      <InsufficientCredits :credits="creditsPerAnalysis" :current-credits="analysisTimes ?? 0" />
+    </div>
+
+    <!-- 积分充足 - 只显示表单 -->
+    <template v-else>
+      <!-- 基本信息（必填） -->
+      <div class="profile-section">
+        <div class="ai-text-header">
+          <el-icon><User /></el-icon>
+          <span>基本信息 <span class="required-tip">*</span></span>
+        </div>
+        <div class="profile-row">
+          <span class="profile-label">性别</span>
+          <el-radio-group v-model="gender">
+            <el-radio :value="1">男</el-radio>
+            <el-radio :value="2">女</el-radio>
+          </el-radio-group>
+        </div>
+        <div class="profile-row">
+          <span class="profile-label">年龄</span>
+          <el-select v-model="age" placeholder="请选择年龄" style="width: 120px;">
+            <el-option
+              v-for="ageVal in ageOptions"
+              :key="ageVal"
+              :label="ageVal + '岁'"
+              :value="ageVal"
+            />
+          </el-select>
+        </div>
       </div>
-      <div class="profile-row">
-        <span class="profile-label">性别</span>
-        <el-radio-group v-model="gender">
-          <el-radio :value="1">男</el-radio>
-          <el-radio :value="2">女</el-radio>
-        </el-radio-group>
+
+      <!-- 图片上传区域（必填） -->
+      <div class="upload-section">
+        <div class="upload-tip">
+          <span class="required-tag">必填</span> 上传清晰的面部照片，至少一张
+        </div>
+
+        <div v-if="imageUrl" class="image-preview">
+          <el-image :src="imageUrl" alt="面部照片" style="max-width: 100%; border-radius:12px;" />
+        </div>
+
+        <el-upload
+          :auto-upload="false"
+          accept="image/*"
+          capture="user"
+          :show-file-list="false"
+          @change="handleFileChange"
+        >
+          <template #trigger>
+            <div class="upload-area">
+              <el-icon :size="48"><CameraFilled /></el-icon>
+              <div class="upload-text">{{ imageUrl ? '重新上传' : '点击拍摄或上传' }}</div>
+            </div>
+          </template>
+        </el-upload>
       </div>
-      <div class="profile-row">
-        <span class="profile-label">年龄</span>
-        <el-select v-model="age" placeholder="请选择年龄" style="width: 120px;">
-          <el-option
-            v-for="ageVal in ageOptions"
-            :key="ageVal"
-            :label="ageVal + '岁'"
-            :value="ageVal"
+
+      <!-- 症状描述（可折叠） -->
+      <div class="ai-text-section">
+        <div class="ai-text-header" @click="textExpanded = !textExpanded" style="cursor: pointer;">
+          <el-icon><ChatLineRound /></el-icon>
+          <span>症状描述</span>
+          <span class="optional-tag">可选</span>
+          <el-icon class="expand-icon" :class="{ expanded: textExpanded }">
+            <ArrowDown />
+          </el-icon>
+        </div>
+        <div v-show="textExpanded" class="ai-text-content">
+          <el-input
+            v-model="aiText"
+            type="textarea"
+            :rows="4"
+            placeholder="请详细描述您想了解的面部问题（如：面色萎黄、皮肤暗沉、有黑眼圈等），AI将根据您的描述进行分析..."
+            resize="none"
+            maxlength="500"
+            show-word-limit
           />
-        </el-select>
-      </div>
-    </div>
-
-    <!-- 图片上传区域（必填） -->
-    <div class="upload-section">
-      <div class="upload-tip">
-        <span class="required-tag">必填</span> 上传清晰的面部照片，至少一张
+        </div>
+        <div v-if="!textExpanded" class="ai-text-hint">
+          点击展开输入症状描述（可选，已上传照片可不填）
+        </div>
       </div>
 
-      <div v-if="imageUrl" class="image-preview">
-        <el-image :src="imageUrl" alt="面部照片" style="max-width: 100%; border-radius:12px;" />
+      <!-- 免责声明 -->
+      <div class="disclaimer-section">
+        <el-alert
+          title="免责声明"
+          type="warning"
+          :closable="false"
+          show-icon
+        >
+          <template #default>
+            <div class="disclaimer-content">
+              <p>1. 本分析结果仅供参考，不能作为医疗诊断依据。</p>
+              <p>2. 如有健康问题，请咨询专业医疗机构或医师。</p>
+              <p>3. AI分析存在局限性，不能替代专业医疗建议。</p>
+            </div>
+          </template>
+        </el-alert>
       </div>
 
-      <el-upload
-        :auto-upload="false"
-        accept="image/*"
-        capture="user"
-        :show-file-list="false"
-        @change="handleFileChange"
-      >
-        <template #trigger>
-          <div class="upload-area">
-            <el-icon :size="48"><CameraFilled /></el-icon>
-            <div class="upload-text">{{ imageUrl ? '重新上传' : '点击拍摄或上传' }}</div>
-          </div>
-        </template>
-      </el-upload>
-    </div>
-
-    <!-- 症状描述（可折叠） -->
-    <div class="ai-text-section">
-      <div class="ai-text-header" @click="textExpanded = !textExpanded" style="cursor: pointer;">
-        <el-icon><ChatLineRound /></el-icon>
-        <span>症状描述</span>
-        <span class="optional-tag">可选</span>
-        <el-icon class="expand-icon" :class="{ expanded: textExpanded }">
-          <ArrowDown />
-        </el-icon>
+      <div class="actions">
+        <el-button
+          round
+          type="primary"
+          :loading="loading"
+          @click="handleSubmit"
+          style="width: 100%"
+        >
+          开始分析
+        </el-button>
+        <div class="free-tip">
+          剩余 {{ analysisTimes }} 积分
+        </div>
       </div>
-      <div v-show="textExpanded" class="ai-text-content">
-        <el-input
-          v-model="aiText"
-          type="textarea"
-          :rows="4"
-          placeholder="请详细描述您想了解的面部问题（如：面色萎黄、皮肤暗沉、有黑眼圈等），AI将根据您的描述进行分析..."
-          resize="none"
-          maxlength="500"
-          show-word-limit
-        />
-      </div>
-      <div v-if="!textExpanded" class="ai-text-hint">
-        点击展开输入症状描述（可选，已上传照片可不填）
-      </div>
-    </div>
-
-    <!-- 免责声明 -->
-    <div class="disclaimer-section">
-      <el-alert
-        title="免责声明"
-        type="warning"
-        :closable="false"
-        show-icon
-      >
-        <template #default>
-          <div class="disclaimer-content">
-            <p>1. 本分析结果仅供参考，不能作为医疗诊断依据。</p>
-            <p>2. 如有健康问题，请咨询专业医疗机构或医师。</p>
-            <p>3. AI分析存在局限性，不能替代专业医疗建议。</p>
-          </div>
-        </template>
-      </el-alert>
-    </div>
-
-    <!-- 积分不足遮罩 -->
-    <InsufficientCredits v-if="analysisTimes < creditsPerAnalysis" :credits="creditsPerAnalysis" :current-credits="analysisTimes" />
-
-    <div class="actions">
-      <el-button
-        round
-        type="primary"
-        :loading="loading"
-        :disabled="analysisTimes < creditsPerAnalysis"
-        @click="handleSubmit"
-        style="width: 100%"
-      >
-        {{ analysisTimes >= creditsPerAnalysis ? '开始分析' : '积分不足，无法解锁' }}
-      </el-button>
-      <div v-if="analysisTimes >= creditsPerAnalysis" class="free-tip">
-        剩余 {{ analysisTimes }} 积分
-      </div>
-      <div v-else class="free-tip locked">
-        本次分析需要 {{ creditsPerAnalysis }} 积分，<span class="recharge-link" @click="router.push('/recharge')">去充值解锁 →</span>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -290,12 +304,21 @@ const handleSubmit = async () => {
   padding: 16px;
 }
 
-/* 文本输入区 */
+.loading-state {
+  padding: 32px 0;
+}
+
+.locked-state {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .ai-text-section {
   margin-bottom: 24px;
 }
 
-/* 基本信息区 */
 .profile-section {
   margin-bottom: 24px;
 }
@@ -447,59 +470,10 @@ const handleSubmit = async () => {
 .free-tip {
   text-align: center;
   font-size: 12px;
-  color: #969799;
+  color: #67c23a;
   margin-top: 8px;
 }
 
-.free-tip.locked {
-  color: #f56c6c;
-}
-
-.recharge-link {
-  color: #60a5fa;
-  cursor: pointer;
-  font-weight: 500;
-  text-decoration: underline;
-}
-
-.recharge-link:hover {
-  color: #3b82f6;
-}
-
-/* 积分不足遮罩 */
-.locked-overlay {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-radius: 16px;
-  padding: 32px 24px;
-  margin: 24px 0;
-  text-align: center;
-  border: 2px dashed #dcdee0;
-}
-
-.locked-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.locked-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #323233;
-  margin-bottom: 12px;
-}
-
-.locked-desc {
-  font-size: 14px;
-  color: #969799;
-  line-height: 1.8;
-  margin-bottom: 24px;
-}
-
-.unlock-btn {
-  padding: 10px 32px;
-}
-
-/* 免责声明 */
 .disclaimer-section {
   margin: 16px 0;
 }
