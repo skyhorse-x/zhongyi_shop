@@ -147,8 +147,8 @@ const handleSubmit = async () => {
     return
   }
 
-  if (!imageUrl.value && !aiText.value.trim()) {
-    ElMessage.warning('请上传一张面部照片或输入症状描述')
+  if (!imageUrl.value) {
+    ElMessage.warning('请上传一张面部照片')
     return
   }
   if (!gender.value) {

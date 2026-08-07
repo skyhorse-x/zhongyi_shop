@@ -160,8 +160,8 @@ const handleSubmit = async () => {
     return
   }
 
-  if (imageList.value.length === 0 && !aiText.value.trim()) {
-    ElMessage.warning('请至少上传一张手掌照片或输入描述')
+  if (imageList.value.length === 0) {
+    ElMessage.warning('请至少上传一张手掌照片')
     return
   }
   if (!gender.value) {
