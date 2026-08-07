@@ -73,6 +73,23 @@ const viewDetail = (record: AnalysisRecord) => {
   }
 }
 
+// 格式化日期时间
+const formatDateTime = (dateStr: string) => {
+  if (!dateStr || dateStr === '-') return '-'
+  try {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return dateStr
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    const h = String(date.getHours()).padStart(2, '0')
+    const min = String(date.getMinutes()).padStart(2, '0')
+    return `${y}-${m}-${d} ${h}:${min}`
+  } catch {
+    return dateStr
+  }
+}
+
 onMounted(() => {
   fetchHistory()
 })
@@ -102,7 +119,7 @@ onMounted(() => {
         <div class="record-summary">{{ record.summary }}</div>
 
         <div class="record-footer">
-          <span class="record-date">{{ record.created_at }}</span>
+          <span class="record-date">{{ formatDateTime(record.created_at) }}</span>
         </div>
       </div>
     </div>
