@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import html2canvas from 'html2canvas'
 import { safeFetch } from '@/utils/fetch'
 import {
-  Loading, Refresh, Check, Calendar, Document, Histogram,
-  Promotion, Sunny, ChatLineRound, Star, Trophy, Share, Download, Picture, InfoFilled, CircleCheck, CircleClose
+  Refresh, Check, Calendar, Document, Histogram,
+  Sunny, ChatLineRound, Star, Trophy, Promotion, Share, Download, Picture, InfoFilled, CircleCheck, CircleClose
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 
-const taskNo = ref('')
+const reportId = ref(0)
 const loading = ref(true)
 const analysisMode = ref<'image' | 'text'>('image')
 
@@ -30,7 +30,7 @@ interface ReportSection {
 
 interface AnalysisResult {
   title: string
-  type: 'tongue' | 'face' | 'palm'
+  type: 'tongue' | 'face' | 'palm' | 'eye'
   summary: string
   content: string
   healthScore: number
@@ -48,47 +48,42 @@ const downloading = ref(false)
 
 import { getToken } from '@/utils/auth'
 
-// 轮询相关
-const polling = ref(false)
-const pollingInterval = ref<ReturnType<typeof setInterval> | null>(null)
-const pollCount = ref(0)
-const maxPollCount = 60 // 最多轮询60次（约3分钟）
-
 // 反馈相关
 const feedbackType = ref<'useful' | 'useless' | null>(null)
 const feedbackLoading = ref(false)
 const showFeedbackSuccess = ref(false)
 
 // 渲染报告数据
-const renderReport = (task: any) => {
-  const isTongue = task.type === 'tongue'
-  const isPalm = task.type === 'palm'
-  analysisMode.value = task.result?.mode || 'image'
+const renderReport = (report: any) => {
+  const isTongue = report.type === 'tongue'
+  const isPalm = report.type === 'palm'
+  const isEye = report.type === 'eye'
+  analysisMode.value = report.result?.mode || 'image'
 
-  const typeLabel = isTongue ? '舌诊分析' : (isPalm ? '手相分析' : '面诊分析')
-  const titleLabel = isTongue ? '舌诊分析报告' : (isPalm ? '手相分析报告' : '面诊分析报告')
+  const typeLabel = isTongue ? '舌诊分析' : (isPalm ? '手相分析' : (isEye ? '眼部分析' : '面诊分析'))
+  const titleLabel = isTongue ? '舌诊分析报告' : (isPalm ? '手相分析报告' : (isEye ? '眼部分析报告' : '面诊分析报告'))
 
   result.value = {
     title: titleLabel,
-    type: task.type,
-    summary: task.result?.summary || '分析完成',
-    content: task.result?.content || '',
-    healthScore: task.health_score || 85,
-    mode: task.result?.mode || 'image',
-    createdAt: task.created_at || '-',
+    type: report.type,
+    summary: report.result?.summary || report.summary || '分析完成',
+    content: report.result?.content || '',
+    healthScore: report.health_score || 85,
+    mode: report.result?.mode || 'image',
+    createdAt: report.created_at || '-',
     details: [
       { label: '分析类型', value: typeLabel, icon: Histogram },
       { label: '分析方式', value: analysisMode.value === 'text' ? '症状描述' : '图像分析', icon: Document },
-      { label: '分析编号', value: task.task_no, icon: Promotion },
-      { label: '完成时间', value: formatDateTime(task.created_at), icon: Calendar },
+      { label: '档案编号', value: `#${report.id}`, icon: InfoFilled },
+      { label: '完成时间', value: formatDateTime(report.created_at), icon: Calendar },
     ],
-    suggestions: parseSuggestions(task.result?.content || ''),
+    suggestions: parseSuggestions(report.result?.content || ''),
   }
 }
 
 const fetchReport = async () => {
   try {
-    const res = await safeFetch(`/api/v1/analysis/report/${taskNo.value}`, {
+    const res = await safeFetch(`/api/v1/analysis/detail/${reportId.value}`, {
       headers: {
         'Authorization': `Bearer ${getToken()}`,
         'Accept': 'application/json',
@@ -96,88 +91,18 @@ const fetchReport = async () => {
     })
     const data = await res.json()
     if (data.code === 0) {
-      // 分析完成
       renderReport(data.data)
-      stopPolling()
       loading.value = false
-    } else if (data.code === 1) {
-      // 任务处理中，保持加载状态并开始轮询
-      loading.value = true
-      if (!polling.value) {
-        startPolling()
-      }
-    } else if (data.code === 402) {
-      ElMessage.warning(data.message || '请先支付查看报告')
-      stopPolling()
+    } else if (data.code === 404) {
+      ElMessage.error('档案不存在')
       loading.value = false
     } else {
       ElMessage.error(data.message || '获取报告失败')
-      stopPolling()
       loading.value = false
     }
   } catch (e: any) {
     ElMessage.error(e.message || '获取报告失败')
-    stopPolling()
     loading.value = false
-  }
-}
-
-// 开始轮询
-const startPolling = () => {
-  if (polling.value) return
-  polling.value = true
-  pollCount.value = 0
-
-  pollingInterval.value = setInterval(async () => {
-    pollCount.value++
-
-    // 超过最大轮询次数，停止
-    if (pollCount.value > maxPollCount) {
-      stopPolling()
-      loading.value = false
-      ElMessage.error('分析超时，请稍后重试')
-      return
-    }
-
-    try {
-      const res = await safeFetch(`/api/v1/analysis/report/${taskNo.value}`, {
-        headers: {
-          'Authorization': `Bearer ${getToken()}`,
-          'Accept': 'application/json',
-        },
-      })
-      const data = await res.json()
-
-      if (data.code === 0) {
-        // 分析完成
-        renderReport(data.data)
-        stopPolling()
-        loading.value = false
-      } else if (data.code === 402) {
-        stopPolling()
-        loading.value = false
-        ElMessage.warning(data.message || '请先支付查看报告')
-      } else if (data.code === 500 || data.code === 3) {
-        // 分析失败
-        stopPolling()
-        loading.value = false
-        ElMessage.error(data.message || '分析失败，请稍后重试')
-      }
-      // code === 1 继续轮询
-    } catch (e: any) {
-      stopPolling()
-      loading.value = false
-      ElMessage.error('网络错误，请检查网络连接')
-    }
-  }, 3000) // 每3秒轮询一次
-}
-
-// 停止轮询
-const stopPolling = () => {
-  polling.value = false
-  if (pollingInterval.value) {
-    clearInterval(pollingInterval.value)
-    pollingInterval.value = null
   }
 }
 
@@ -482,7 +407,7 @@ const submitFeedback = async (type: 'useful' | 'useless') => {
   if (feedbackLoading.value) return
   feedbackLoading.value = true
   try {
-    const res = await safeFetch(`/api/v1/analysis/feedback/${taskNo.value}`, {
+    const res = await safeFetch(`/api/v1/analysis/feedback/${reportId.value}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getToken()}`,
@@ -537,7 +462,7 @@ const handleShare = async () => {
     if (navigator.share && navigator.canShare) {
       const response = await fetch(dataUrl)
       const blob = await response.blob()
-      const file = new File([blob], `${result.value.title}-${taskNo.value}.png`, { type: 'image/png' })
+      const file = new File([blob], `${result.value.title}-${reportId.value}.png`, { type: 'image/png' })
 
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({
@@ -602,7 +527,7 @@ const showShareOptions = (dataUrl: string) => {
       const action = (opt as HTMLElement).dataset.action
       if (action === 'download') {
         const link = document.createElement('a')
-        link.download = `${result.value?.title}-${taskNo.value}.png`
+        link.download = `${result.value?.title}-${reportId.value}.png`
         link.href = dataUrl
         link.click()
         ElMessage.success('图片已下载')
@@ -626,7 +551,7 @@ const handleDownload = () => {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${result.value.title}-${result.value.details[2]?.value || taskNo.value}.txt`
+  link.download = `${result.value.title}-${result.value.details[2]?.value || reportId.value}.txt`
   link.click()
   URL.revokeObjectURL(url)
   ElMessage.success('报告已下载')
@@ -661,7 +586,7 @@ const handleDownloadImage = async () => {
     // 转换为图片并下载
     const imageUrl = canvas.toDataURL('image/png', 1.0)
     const link = document.createElement('a')
-    const fileName = result.value.details[2]?.value || taskNo.value
+    const fileName = result.value.details[2]?.value || reportId.value
     link.href = imageUrl
     link.download = `${result.value.title}-${fileName}.png`
     document.body.appendChild(link)
@@ -678,20 +603,13 @@ const handleDownloadImage = async () => {
 }
 
 onMounted(() => {
-  taskNo.value = route.params.taskNo as string
-  if (!taskNo.value) {
-    ElMessage.error('任务编号无效')
-    router.replace('/')
+  reportId.value = Number(route.params.id) || 0
+  if (!reportId.value) {
+    ElMessage.error('档案编号无效')
+    router.replace('/health/history')
     return
   }
-
-  // 获取报告（若分析未完成会自动轮询）
   fetchReport()
-})
-
-// 组件卸载时停止轮询
-onBeforeUnmount(() => {
-  stopPolling()
 })
 </script>
 
@@ -1033,7 +951,7 @@ onBeforeUnmount(() => {
         <div class="export-footer">
           <div class="export-divider"></div>
           <div class="export-footer-row">
-            <span>任务编号：{{ result.details[2]?.value || taskNo }}</span>
+            <span>档案编号：{{ result.details[2]?.value || reportId }}</span>
             <span>分析类型：{{ result.details[0]?.value }}</span>
           </div>
           <div class="export-footer-tip">

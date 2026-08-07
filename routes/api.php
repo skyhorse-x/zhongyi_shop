@@ -75,10 +75,7 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
             Route::post('upload-url', [V1\AnalysisController::class, 'getUploadUrl']);
             Route::post('upload-image', [V1\AnalysisController::class, 'uploadImage']);
             Route::post('submit', [V1\AnalysisController::class, 'submit']);
-            Route::get('status/{taskNo}', [V1\AnalysisController::class, 'status']);
-            Route::get('report/{taskNo}', [V1\AnalysisController::class, 'report']);
-            Route::get('history', [V1\AnalysisController::class, 'history']);
-            Route::post('feedback/{taskNo}', [V1\AnalysisController::class, 'feedback']);
+            Route::get('detail/{id}', [V1\AnalysisController::class, 'show']);
         });
 
         // 体质测试

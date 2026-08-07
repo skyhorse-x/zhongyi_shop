@@ -325,63 +325,46 @@ class AnalysisController extends Controller
     }
 
     /**
-     * 获取完整报告
+     * 获取报告详情（通过档案ID）
      */
-    public function report(Request $request, string $taskNo)
+    public function show(Request $request, int $id)
     {
-        $task = AnalysisTask::where('task_no', $taskNo)
+        $report = AnalysisReport::where('id', $id)
             ->where('user_id', $request->user()->id)
             ->first();
 
-        if (!$task) {
+        if (!$report) {
             return response()->json([
                 'code' => 404,
-                'message' => '任务不存在',
+                'message' => '档案不存在',
             ], 404);
         }
 
-        // 任务仍在处理中：返回 code=1，前端继续轮询
-        if ($task->status === 1) {
-            return response()->json([
-                'code' => 1,
-                'message' => '分析中，请稍候',
-                'data' => [
-                    'task_no' => $task->task_no,
-                    'status' => 1,
-                    'type' => $task->type,
-                    'created_at' => $task->created_at,
-                ],
-            ]);
-        }
+        $content = $report->content ?? [];
 
-        // 任务失败
-        if ($task->status === 3) {
-            return response()->json([
-                'code' => 500,
-                'message' => $task->error_message ?: '分析失败，请稍后重试',
-                'data' => [
-                    'task_no' => $task->task_no,
-                    'status' => 3,
-                ],
-            ], 500);
-        }
-
-        // 报告已完成，直接返回结果（积分已在分析完成时扣除）
         return response()->json([
             'code' => 0,
             'message' => 'success',
             'data' => [
-                'task_no' => $task->task_no,
-                'type' => $task->type,
-                'health_score' => $task->result['health_score'] ?? 85,
-                'result' => $task->result,
-                'created_at' => $task->created_at,
+                'id' => $report->id,
+                'type' => $report->type,
+                'gender' => $report->gender,
+                'age' => $report->age,
+                'health_score' => $report->health_score ?? 85,
+                'summary' => $report->summary,
+                'result' => [
+                    'content' => is_string($content) ? $content : ($content['text'] ?? ''),
+                    'summary' => $report->summary,
+                    'health_score' => $report->health_score ?? 85,
+                    'mode' => $report->type,
+                ],
+                'created_at' => $report->created_at,
             ],
         ]);
     }
 
     /**
-     * 获取分析历史
+     * 获取分析历史（已废弃，使用HealthController）
      */
     public function history(Request $request)
     {

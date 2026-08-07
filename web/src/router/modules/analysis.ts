@@ -32,10 +32,10 @@ const analysisRoutes: RouteRecordRaw[] = [
     meta: { title: '眼部分析', needAuth: true },
   },
   {
-    path: '/analysis/result/:taskNo',
-    name: 'AnalysisResult',
+    path: '/analysis/detail/:id',
+    name: 'AnalysisDetail',
     component: () => import('@/views/analysis/result.vue'),
-    meta: { title: '分析结果', needAuth: true },
+    meta: { title: '分析详情', needAuth: true },
   },
   // 体质测试
   {
