@@ -8,7 +8,6 @@ use App\Models\AnalysisTask;
 use App\Models\SystemConfig;
 use App\Services\AiService;
 use App\Services\AnalysisTimesService;
-use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -122,7 +121,7 @@ class AnalysisController extends Controller
     }
 
     /**
-     * 提交分析任务（立即返回任务号，后台异步处理AI分析）
+     * 提交分析任务（同步处理AI分析，完成后扣除积分）
      */
     public function submit(Request $request)
     {
@@ -145,9 +144,7 @@ class AnalysisController extends Controller
             ], 400);
         }
 
-        // 初始状态为未支付，积分将在报告生成后扣除
-        $isPaid = 0;
-
+        // 创建任务
         $imageUrls = $validated['image_urls'] ?? [];
         $task = AnalysisTask::create([
             'task_no' => 'TK' . date('Ymd') . substr(md5(uniqid()), 0, 8),
@@ -160,122 +157,49 @@ class AnalysisController extends Controller
             'text' => $validated['text'] ?? null,
             'image_md5' => $hasImages ? md5(implode(',', $imageUrls)) : null,
             'status' => 1, // 处理中
-            'is_paid' => $isPaid,
+            'is_paid' => 0,
             'started_at' => now(),
         ]);
 
-        // 立即返回任务号，后台异步处理AI分析
-        $taskNo = $task->task_no;
-        $taskId = $task->id;
-
-        // 使用 fastcgi_finish_request 实现异步处理
-        if (function_exists('fastcgi_finish_request')) {
-            // 立即返回响应给前端
-            $response = response()->json([
+        // 同步处理AI分析
+        try {
+            $result = $this->processAnalysisSync($task, $validated, $hasImages, $hasText);
+            return response()->json([
                 'code' => 0,
-                'message' => '分析任务已提交',
+                'message' => '分析完成',
                 'data' => [
-                    'task_no' => $taskNo,
-                    'status' => 1, // 处理中
+                    'task_no' => $task->task_no,
+                    'status' => 2, // 已完成
                     'type' => $task->type,
+                    'health_score' => $result['health_score'],
+                    'summary' => $result['summary'],
+                    'result' => $task->result,
                     'created_at' => $task->created_at,
                 ],
             ]);
-
-            // 发送响应并关闭连接
-            $response->send();
-            fastcgi_finish_request();
-
-            // 后台继续处理AI分析
-            $this->processAnalysisAsync($taskId, $validated, $hasImages, $hasText);
-        } else {
-            // 非 FastCGI 环境（如 artisan serve），同步处理但快速返回
-            try {
-                $result = $this->processAnalysisSync($task, $validated, $hasImages, $hasText);
-                return response()->json([
-                    'code' => 0,
-                    'message' => '分析完成',
-                    'data' => [
-                        'task_no' => $taskNo,
-                        'status' => 2, // 已完成
-                        'type' => $task->type,
-                        'health_score' => $result['health_score'],
-                        'summary' => $result['summary'],
-                        'result' => $task->result,
-                        'created_at' => $task->created_at,
-                    ],
-                ]);
-            } catch (\Exception $e) {
-                // 更新任务状态为失败
-                $task->update([
-                    'status' => 3,
-                    'error_message' => substr($e->getMessage(), 0, 500),
-                ]);
-
-                $message = $e->getMessage();
-                $isConfigError = str_contains($message, 'API Key')
-                    || str_contains($message, 'API key')
-                    || str_contains($message, '未配置');
-
-                return response()->json([
-                    'code' => $isConfigError ? 503 : 500,
-                    'message' => $isConfigError
-                        ? $message
-                        : '分析失败，请稍后重试',
-                    'error_type' => $isConfigError ? 'ai_not_configured' : 'internal_error',
-                    'data' => [
-                        'task_no' => $taskNo,
-                        'status' => 3, // 失败
-                    ],
-                ], $isConfigError ? 503 : 500);
-            }
-        }
-
-        // FastCGI 环境下已经返回了响应，这里不会执行到
-        exit;
-    }
-
-    /**
-     * 异步处理AI分析（FastCGI 环境）
-     */
-    private function processAnalysisAsync(int $taskId, array $validated, bool $hasImages, bool $hasText): void
-    {
-        try {
-            $task = AnalysisTask::find($taskId);
-            if (!$task) {
-                Log::error('Task not found for async processing', ['task_id' => $taskId]);
-                return;
-            }
-
-            $result = $this->processAnalysisSync($task, $validated, $hasImages, $hasText);
-
-            Log::info('Async analysis completed', [
-                'task_no' => $task->task_no,
-                'type' => $task->type,
-            ]);
         } catch (\Exception $e) {
-            $task = AnalysisTask::find($taskId);
-            if ($task) {
-                $task->update([
-                    'status' => 3,
-                    'error_message' => substr($e->getMessage(), 0, 500),
-                ]);
-
-                // 通知用户
-                try {
-                    app(NotificationService::class)->sendSystemMessage(
-                        $task->user_id,
-                        'AI 分析失败',
-                        "您的分析任务（{$task->task_no}）失败，请稍后重试。",
-                        ['type' => 'reminder']
-                    );
-                } catch (\Throwable $ne) {}
-            }
-
-            Log::error('Async analysis failed', [
-                'task_id' => $taskId,
-                'error' => $e->getMessage(),
+            // 更新任务状态为失败
+            $task->update([
+                'status' => 3,
+                'error_message' => substr($e->getMessage(), 0, 500),
             ]);
+
+            $message = $e->getMessage();
+            $isConfigError = str_contains($message, 'API Key')
+                || str_contains($message, 'API key')
+                || str_contains($message, '未配置');
+
+            return response()->json([
+                'code' => $isConfigError ? 503 : 500,
+                'message' => $isConfigError
+                    ? $message
+                    : '分析失败，请稍后重试',
+                'error_type' => $isConfigError ? 'ai_not_configured' : 'internal_error',
+                'data' => [
+                    'task_no' => $task->task_no,
+                    'status' => 3, // 失败
+                ],
+            ], $isConfigError ? 503 : 500);
         }
     }
 
@@ -307,9 +231,41 @@ class AnalysisController extends Controller
         $healthScore = $this->calculateHealthScore($content);
         $summary = $this->extractSummary($content);
 
+        // AI分析完成后扣除积分
+        try {
+            $timesService = app(AnalysisTimesService::class);
+            $deductResult = $timesService->deductTimes($task->user_id, $task->type);
+
+            if (!$deductResult) {
+                // 积分不足，标记任务为失败
+                $task->update([
+                    'status' => 3, // 失败
+                    'error_message' => '积分不足，无法完成分析',
+                ]);
+                throw new \RuntimeException('积分不足，请先充值');
+            }
+
+            Log::info('Analysis credit deducted', [
+                'user_id' => $task->user_id,
+                'task_no' => $task->task_no,
+                'type' => $task->type,
+            ]);
+        } catch (\RuntimeException $e) {
+            // 积分不足或其他扣除失败
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Failed to deduct credit', [
+                'user_id' => $task->user_id,
+                'task_no' => $task->task_no,
+                'error' => $e->getMessage(),
+            ]);
+            throw new \RuntimeException('积分扣除失败，请稍后重试');
+        }
+
         // 更新任务为已完成
         $task->update([
             'status' => 2, // 已完成
+            'is_paid' => 1,
             'result' => [
                 'content' => $content,
                 'summary' => $summary,
@@ -487,40 +443,7 @@ class AnalysisController extends Controller
             ], 500);
         }
 
-        // 报告已完成，扣除积分（仅首次查看时扣除）
-        if ($task->is_paid === 0) {
-            $timesService = app(AnalysisTimesService::class);
-            $analysisType = match($task->type) {
-                'tongue' => '舌诊分析',
-                'face' => '面部分析',
-                'palm' => '手相分析',
-                'eye' => '眼部分析',
-                default => 'AI分析',
-            };
-            
-            $deducted = $timesService->deductTimes(
-                $request->user(),
-                1,
-                'use',
-                "AI{$analysisType}"
-            );
-
-            if (!$deducted) {
-                return response()->json([
-                    'code' => 402,
-                    'message' => '分析次数不足，请先购买次数包',
-                    'error_type' => 'insufficient_times',
-                    'data' => [
-                        'task_no' => $task->task_no,
-                        'status' => 2,
-                    ],
-                ], 402);
-            }
-
-            // 标记为已支付
-            $task->update(['is_paid' => 1]);
-        }
-
+        // 报告已完成，直接返回结果（积分已在分析完成时扣除）
         return response()->json([
             'code' => 0,
             'message' => 'success',
