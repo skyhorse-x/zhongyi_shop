@@ -1171,10 +1171,25 @@ PROMPT;
                 return null;
             }
 
-            // 构建本地文件路径
-            $filePath = public_path('storage/' . $relativePath);
-            if (!file_exists($filePath)) {
-                Log::warning('Local image file not found', ['path' => $filePath, 'url' => $url]);
+            // 尝试多个可能的路径
+            $possiblePaths = [
+                public_path('storage/' . $relativePath),           // public/storage/ (symlink)
+                storage_path('app/public/' . $relativePath),       // storage/app/public/ (actual storage)
+            ];
+
+            $filePath = null;
+            foreach ($possiblePaths as $testPath) {
+                if (file_exists($testPath)) {
+                    $filePath = $testPath;
+                    break;
+                }
+            }
+
+            if (!$filePath) {
+                Log::warning('Local image file not found', [
+                    'paths' => $possiblePaths,
+                    'url' => $url,
+                ]);
                 return null;
             }
 
