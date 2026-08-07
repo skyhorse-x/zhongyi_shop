@@ -30,30 +30,73 @@ const pollingInterval = ref<ReturnType<typeof setInterval> | null>(null)
 const unreadMessageCount = ref(0) // 未读消息总数
 const showNotificationPanel = ref(false) // 通知面板是否显示
 
-// 使用 shallowRef 避免图标组件被 reactive 包裹，消除 Vue 警告
-const menuItems = shallowRef([
-  { title: '仪表盘', icon: TrendCharts, path: '/admin/dashboard' },
-  { title: '客服管理', icon: Service, path: '/admin/customer-service', badge: () => activeCount.value },
-  { title: '用户管理', icon: UserFilled, path: '/admin/users' },
-  { title: '订单管理', icon: Tickets, path: '/admin/orders' },
-  { title: '套餐管理', icon: Goods, path: '/admin/packages' },
-  { title: '闲鱼商品管理', icon: Goods, path: '/admin/xianyu-products' },
-  { title: 'AI调用记录', icon: Cpu, path: '/admin/ai' },
-  { title: '队列任务管理', icon: List, path: '/admin/queue' },
-  { title: '健康管理档案', icon: FirstAidKit, path: '/admin/health-archives' },
-  { title: '推广管理', icon: Promotion, path: '/admin/promoters' },
-  { title: '提现审核', icon: Money, path: '/admin/withdraws' },
-  { title: '用户余额', icon: Wallet, path: '/admin/user-balances' },
-  { title: '支付流水', icon: CreditCard, path: '/admin/payment-logs' },
-  { title: '退款流水', icon: RefreshLeft, path: '/admin/refund-logs' },
-  { title: '文章管理', icon: Document, path: '/admin/articles' },
-  { title: '体质题目', icon: EditPen, path: '/admin/constitution' },
-  { title: '管理员管理', icon: UserFilled, path: '/admin/admins' },
-  { title: '角色管理', icon: Operation, path: '/admin/roles' },
-  { title: '操作日志', icon: Document, path: '/admin/operation-logs' },
-  { title: 'API日志', icon: Document, path: '/admin/api-logs' },
-  { title: '系统设置', icon: Setting, path: '/admin/settings' },
+// 二级导航菜单
+const menuGroups = shallowRef([
+  {
+    title: '首页',
+    items: [
+      { title: '仪表盘', icon: TrendCharts, path: '/admin/dashboard' },
+    ]
+  },
+  {
+    title: '用户与客服',
+    items: [
+      { title: '客服管理', icon: Service, path: '/admin/customer-service', badge: () => activeCount.value },
+      { title: '用户管理', icon: UserFilled, path: '/admin/users' },
+      { title: '用户余额', icon: Wallet, path: '/admin/user-balances' },
+    ]
+  },
+  {
+    title: '订单与财务',
+    items: [
+      { title: '订单管理', icon: Tickets, path: '/admin/orders' },
+      { title: '套餐管理', icon: Goods, path: '/admin/packages' },
+      { title: '闲鱼商品管理', icon: Goods, path: '/admin/xianyu-products' },
+      { title: '支付流水', icon: CreditCard, path: '/admin/payment-logs' },
+      { title: '退款流水', icon: RefreshLeft, path: '/admin/refund-logs' },
+      { title: '提现审核', icon: Money, path: '/admin/withdraws' },
+    ]
+  },
+  {
+    title: '内容与AI',
+    items: [
+      { title: 'AI调用记录', icon: Cpu, path: '/admin/ai' },
+      { title: '健康管理档案', icon: FirstAidKit, path: '/admin/health-archives' },
+      { title: '文章管理', icon: Document, path: '/admin/articles' },
+      { title: '体质题目', icon: EditPen, path: '/admin/constitution' },
+    ]
+  },
+  {
+    title: '推广与营销',
+    items: [
+      { title: '推广管理', icon: Promotion, path: '/admin/promoters' },
+    ]
+  },
+  {
+    title: '系统管理',
+    items: [
+      { title: '队列任务管理', icon: List, path: '/admin/queue' },
+      { title: '管理员管理', icon: UserFilled, path: '/admin/admins' },
+      { title: '角色管理', icon: Operation, path: '/admin/roles' },
+      { title: '操作日志', icon: Document, path: '/admin/operation-logs' },
+      { title: 'API日志', icon: Document, path: '/admin/api-logs' },
+      { title: '系统设置', icon: Setting, path: '/admin/settings' },
+    ]
+  },
 ])
+
+// 展开的菜单组
+const expandedGroups = ref<Set<string>>(new Set(['首页']))
+
+const toggleGroup = (groupTitle: string) => {
+  if (expandedGroups.value.has(groupTitle)) {
+    expandedGroups.value.delete(groupTitle)
+  } else {
+    expandedGroups.value.add(groupTitle)
+  }
+}
+
+const isGroupExpanded = (groupTitle: string) => expandedGroups.value.has(groupTitle)
 
 // 加载正在服务的人数
 const loadActiveCount = async () => {
@@ -349,19 +392,36 @@ const handleClickOutside = (event: MouseEvent) => {
       </div>
 
       <nav class="sidebar-nav">
-        <div
-          v-for="item in menuItems"
-          :key="item.path"
-          class="nav-item"
-          :class="{ active: route.path === item.path || (item.path !== '/admin/dashboard' && route.path.startsWith(item.path)) }"
-          @click="navigateTo(item.path)"
-        >
-          <div class="nav-icon-wrap">
-            <el-icon class="nav-icon"><component :is="item.icon" /></el-icon>
-            <span v-if="item.badge && item.badge() > 0" class="nav-badge">{{ item.badge() > 99 ? '99+' : item.badge() }}</span>
+        <div v-for="group in menuGroups" :key="group.title" class="nav-group">
+          <!-- 分组标题 -->
+          <div
+            class="nav-group-title"
+            :class="{ expanded: isGroupExpanded(group.title) }"
+            @click="toggleGroup(group.title)"
+          >
+            <span class="group-title-text">{{ group.title }}</span>
+            <el-icon class="group-arrow"><ArrowRight /></el-icon>
           </div>
-          <span v-if="!sidebarCollapsed" class="nav-label">{{ item.title }}</span>
-          <span v-if="sidebarCollapsed && item.badge && item.badge() > 0" class="collapsed-badge">{{ item.badge() > 99 ? '99+' : item.badge() }}</span>
+          <!-- 子菜单项 -->
+          <div
+            v-show="isGroupExpanded(group.title)"
+            class="nav-group-items"
+          >
+            <div
+              v-for="item in group.items"
+              :key="item.path"
+              class="nav-item"
+              :class="{ active: route.path === item.path || (item.path !== '/admin/dashboard' && route.path.startsWith(item.path)) }"
+              @click="navigateTo(item.path)"
+            >
+              <div class="nav-icon-wrap">
+                <el-icon class="nav-icon"><component :is="item.icon" /></el-icon>
+                <span v-if="item.badge && item.badge() > 0" class="nav-badge">{{ item.badge() > 99 ? '99+' : item.badge() }}</span>
+              </div>
+              <span v-if="!sidebarCollapsed" class="nav-label">{{ item.title }}</span>
+              <span v-if="sidebarCollapsed && item.badge && item.badge() > 0" class="collapsed-badge">{{ item.badge() > 99 ? '99+' : item.badge() }}</span>
+            </div>
+          </div>
         </div>
       </nav>
 
@@ -559,10 +619,50 @@ const handleClickOutside = (event: MouseEvent) => {
   overflow-y: auto;
 }
 
+.nav-group {
+  margin-bottom: 4px;
+}
+
+.nav-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+.nav-group-title:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.group-title-text {
+  flex: 1;
+}
+
+.group-arrow {
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
+.nav-group-title.expanded .group-arrow {
+  transform: rotate(90deg);
+}
+
+.nav-group-items {
+  overflow: hidden;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
-  padding: 12px 20px;
+  padding: 12px 20px 12px 32px;
   cursor: pointer;
   transition: all 0.2s;
   gap: 12px;
