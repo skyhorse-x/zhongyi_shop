@@ -38,7 +38,6 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'settings',        name: 'AdminSettings',        component: () => import('@/views/admin/settings.vue'),        meta: { title: '系统设置' } },
       { path: 'operation-logs',  name: 'AdminOperationLogs',   component: () => import('@/views/admin/operation-logs.vue'),  meta: { title: '操作日志' } },
       { path: 'api-logs',       name: 'AdminApiLogs',        component: () => import('@/views/admin/api-logs.vue'),       meta: { title: 'API日志' } },
-      { path: 'notification-config', name: 'AdminNotificationConfig', component: () => import('@/views/admin/notification-config.vue'), meta: { title: '消息推送' } },
       { path: 'customer-service',name: 'AdminCustomerService', component: () => import('@/views/admin/customer-service.vue'),meta: { title: '客服管理' } },
       { path: 'health-archives',name: 'AdminHealthArchives', component: () => import('@/views/admin/health-archives.vue'),meta: { title: '健康管理档案' } },
     ],

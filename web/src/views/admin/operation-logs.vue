@@ -222,7 +222,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Delete } from '@element-plus/icons-vue'
-import axios from 'axios'
+import request from '@/api/request'
 
 // 日志数据
 const logs = ref<any[]>([])
@@ -275,7 +275,7 @@ const fetchLogs = async () => {
       }
     })
 
-    const { data } = await axios.get('/api/v1/admin/operation-logs', { params })
+    const { data } = await request.get('/admin/operation-logs', { params })
     if (data.code === 0) {
       logs.value = data.data.data
       pagination.total = data.data.total
@@ -290,7 +290,7 @@ const fetchLogs = async () => {
 // 获取模块列表
 const fetchModules = async () => {
   try {
-    const { data } = await axios.get('/api/v1/admin/operation-logs/modules')
+    const { data } = await request.get('/admin/operation-logs/modules')
     if (data.code === 0) {
       modules.value = data.data
     }
@@ -302,7 +302,7 @@ const fetchModules = async () => {
 // 获取统计
 const fetchStatistics = async () => {
   try {
-    const { data } = await axios.get('/api/v1/admin/operation-logs/statistics')
+    const { data } = await request.get('/admin/operation-logs/statistics')
     if (data.code === 0) {
       statistics.value = data.data
     }
@@ -358,7 +358,7 @@ const handleClean = async () => {
       }
     )
 
-    const { data } = await axios.delete('/api/v1/admin/operation-logs/clean', {
+    const { data } = await request.delete('/admin/operation-logs/clean', {
       params: { days: 90 },
     })
 

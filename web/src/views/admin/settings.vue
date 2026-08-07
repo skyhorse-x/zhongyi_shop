@@ -47,10 +47,14 @@ const form = ref({
   alipayAppId: '',
   alipayPrivateKey: '',
   alipayPublicKey: '',
-  // 短信宝配置
-  smsProvider: 'smsbao',
-  smsBaoUser: '',
-  smsBaoPass: '',
+  // 阿里云短信配置
+  smsEnabled: '0',
+  smsAccessKeyId: '',
+  smsAccessKeySecret: '',
+  smsSignName: '',
+  smsTemplatePayment: '',
+  smsTemplateCommission: '',
+  smsTemplateWithdraw: '',
 })
 
 const loading = ref(false)
@@ -192,9 +196,13 @@ const loadConfigs = async () => {
             alipay_app_id: 'alipayAppId',
             alipay_private_key: 'alipayPrivateKey',
             alipay_public_key: 'alipayPublicKey',
-            sms_provider: 'smsProvider',
-            sms_bao_user: 'smsBaoUser',
-            sms_bao_pass: 'smsBaoPass',
+            sms_enabled: 'smsEnabled',
+            sms_access_key_id: 'smsAccessKeyId',
+            sms_access_key_secret: 'smsAccessKeySecret',
+            sms_sign_name: 'smsSignName',
+            sms_template_payment: 'smsTemplatePayment',
+            sms_template_commission: 'smsTemplateCommission',
+            sms_template_withdraw: 'smsTemplateWithdraw',
           }
           const formKey = keyMap[item.key] || item.key
           if (form.value.hasOwnProperty(formKey)) {
@@ -254,9 +262,14 @@ const handleSave = async () => {
       alipay_app_id: form.value.alipayAppId,
       alipay_private_key: form.value.alipayPrivateKey,
       alipay_public_key: form.value.alipayPublicKey,
-      sms_provider: form.value.smsProvider,
-      sms_bao_user: form.value.smsBaoUser,
-      sms_bao_pass: form.value.smsBaoPass,
+      // 阿里云短信配置
+      sms_enabled: form.value.smsEnabled,
+      sms_access_key_id: form.value.smsAccessKeyId,
+      sms_access_key_secret: form.value.smsAccessKeySecret,
+      sms_sign_name: form.value.smsSignName,
+      sms_template_payment: form.value.smsTemplatePayment,
+      sms_template_commission: form.value.smsTemplateCommission,
+      sms_template_withdraw: form.value.smsTemplateWithdraw,
     }
 
     const res = await safeFetch('/api/v1/admin/configs', {
@@ -595,7 +608,7 @@ onMounted(() => {
         </el-form>
       </el-tab-pane>
 
-      <!-- 短信宝配置 -->
+      <!-- 短信配置 -->
       <el-tab-pane label="短信配置" name="sms">
         <template #label>
           <span class="tab-label">
@@ -604,17 +617,39 @@ onMounted(() => {
           </span>
         </template>
         <el-form :model="form" label-width="140px" class="settings-form">
-          <el-form-item label="短信服务商">
-            <el-select v-model="form.smsProvider" style="width: 200px">
-              <el-option label="短信宝" value="smsbao" />
-            </el-select>
+          <el-form-item label="启用短信推送">
+            <el-switch
+              v-model="form.smsEnabled"
+              active-value="1"
+              inactive-value="0"
+              inline-prompt
+              active-text="开启"
+              inactive-text="关闭"
+            />
           </el-form-item>
-          <el-form-item label="短信宝账号">
-            <el-input v-model="form.smsBaoUser" placeholder="请输入短信宝账号" />
+          <el-form-item label="AccessKey ID">
+            <el-input v-model="form.smsAccessKeyId" placeholder="请输入阿里云AccessKey ID" maxlength="100" />
           </el-form-item>
-          <el-form-item label="短信宝密码">
-            <el-input v-model="form.smsBaoPass" placeholder="请输入短信宝密码" type="text" />
-            <div class="form-tip">系统使用MD5(密码) 调用短信宝API，密码本身不传输</div>
+          <el-form-item label="AccessKey Secret">
+            <el-input v-model="form.smsAccessKeySecret" type="password" placeholder="请输入AccessKey Secret（已存在时无需重复填写）" maxlength="200" show-password />
+          </el-form-item>
+          <el-form-item label="短信签名">
+            <el-input v-model="form.smsSignName" placeholder="例如：中医智能" maxlength="50" />
+          </el-form-item>
+
+          <el-divider content-position="left">短信模板配置</el-divider>
+
+          <el-form-item label="支付成功模板">
+            <el-input v-model="form.smsTemplatePayment" placeholder="SMS_xxxxx" maxlength="50" />
+            <div class="form-tip">模板变量：package-商品名, amount-金额</div>
+          </el-form-item>
+          <el-form-item label="佣金到账模板">
+            <el-input v-model="form.smsTemplateCommission" placeholder="SMS_xxxxx" maxlength="50" />
+            <div class="form-tip">模板变量：amount-佣金金额</div>
+          </el-form-item>
+          <el-form-item label="提现结果模板">
+            <el-input v-model="form.smsTemplateWithdraw" placeholder="SMS_xxxxx" maxlength="50" />
+            <div class="form-tip">模板变量：result-审核结果, amount-金额</div>
           </el-form-item>
         </el-form>
       </el-tab-pane>

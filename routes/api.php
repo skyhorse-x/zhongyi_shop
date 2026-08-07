@@ -443,14 +443,6 @@ Route::prefix('v1')->middleware([\App\Http\Middleware\VisitCounterMiddleware::cl
                 Route::get('/{id}',        [V1\Admin\ApiLogController::class, 'show']);
                 Route::delete('/clean',    [V1\Admin\ApiLogController::class, 'clean']);
             });
-
-            // 消息推送配置
-            Route::prefix('notification-config')->group(function () {
-                Route::get('/',              [V1\Admin\NotificationConfigController::class, 'index']);
-                Route::post('/',             [V1\Admin\NotificationConfigController::class, 'store']);
-                Route::post('/test-sms',     [V1\Admin\NotificationConfigController::class, 'testSms']);
-                Route::post('/test-wechat',  [V1\Admin\NotificationConfigController::class, 'testWechat']);
-            });
         });
         });
     });
