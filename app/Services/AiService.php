@@ -356,7 +356,7 @@ class AiService
                 
                 // 检查远程图片URL是否可访问
                 if (!$this->isImageUrlAccessible($url)) {
-                    throw new \Exception("图片URL无法访问（404或其他错误）：{$url}，请检查图片是否存在");
+                    throw new \Exception("图片URL无法访问或下载超时：{$url}，请检查图片是否存在或稍后重试");
                 }
                 
                 $content[] = [
@@ -1100,13 +1100,18 @@ PROMPT;
 
     /**
      * 检查远程图片URL是否可访问
+     * 使用 GET 请求 + Range 头，只下载前1KB验证可访问性
      */
     protected function isImageUrlAccessible(string $url): bool
     {
         try {
+            // 使用 GET 请求 + Range 头，只下载前1KB，避免下载整个大文件
             $response = Http::withOptions(['verify' => false])
-                ->timeout(10)
-                ->head($url);
+                ->timeout(30)
+                ->withHeaders(['Range' => 'bytes=0-1023'])
+                ->get($url);
+            
+            // 200 或 206 (Partial Content) 都表示可访问
             return $response->successful();
         } catch (\Exception $e) {
             Log::warning('Image URL accessibility check failed', [
