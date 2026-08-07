@@ -215,7 +215,7 @@ onMounted(() => {
     </div>
 
     <!-- 积分充足 - 只显示表单 -->
-    <template v-else>
+    <div v-if="creditsLoaded && hasEnoughCredits()">
       <!-- 基本信息（必填） -->
       <div class="profile-section">
         <div class="ai-text-header">
@@ -344,7 +344,7 @@ onMounted(() => {
           剩余 {{ analysisTimes }} 积分
         </div>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
