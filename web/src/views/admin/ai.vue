@@ -94,22 +94,23 @@ const loadStats = async () => {
       list.forEach((item: any) => {
         const itemDate = item.created_at?.substring(0, 10)
         const itemMonth = item.created_at?.substring(0, 7)
+        const cost = Number(item.cost) || 0
 
         if (itemDate === today) {
           todayCalls++
-          todayCost += item.cost || 0
+          todayCost += cost
         }
         if (itemMonth === currentMonth) {
           monthCalls++
-          monthCost += item.cost || 0
+          monthCost += cost
         }
       })
 
       callStats.value = {
         todayCalls,
-        todayCost: parseFloat((todayCost || 0).toFixed(2)) || 0,
+        todayCost: parseFloat(todayCost.toFixed(2)) || 0,
         monthCalls,
-        monthCost: parseFloat((monthCost || 0).toFixed(2)) || 0,
+        monthCost: parseFloat(monthCost.toFixed(2)) || 0,
       }
     }
   } catch (e) {
