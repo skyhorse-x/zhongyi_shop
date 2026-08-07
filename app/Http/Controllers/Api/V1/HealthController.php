@@ -3,29 +3,30 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\AnalysisTask;
+use App\Models\AnalysisReport;
 use Illuminate\Http\Request;
 
 class HealthController extends Controller
 {
     /**
-     * 获取分析历史
+     * 获取健康档案历史
      */
     public function history(Request $request)
     {
-        $query = AnalysisTask::where('user_id', $request->user()->id);
+        $query = AnalysisReport::where('user_id', $request->user()->id)
+            ->where('is_paid', true);
 
         if ($request->has('type')) {
             $query->where('type', $request->type);
         }
 
-        $tasks = $query->orderBy('created_at', 'desc')
-            ->paginate($request->get('limit', 10));
+        $reports = $query->orderBy('created_at', 'desc')
+            ->paginate($request->get('limit', 20));
 
         return response()->json([
             'code' => 0,
             'message' => 'success',
-            'data' => $tasks,
+            'data' => $reports,
         ]);
     }
 
@@ -36,8 +37,8 @@ class HealthController extends Controller
     {
         $days = $request->get('days', 30);
 
-        $tasks = AnalysisTask::where('user_id', $request->user()->id)
-            ->where('status', 2)
+        $reports = AnalysisReport::where('user_id', $request->user()->id)
+            ->where('is_paid', true)
             ->where('created_at', '>=', now()->subDays($days))
             ->orderBy('created_at')
             ->get();
@@ -47,9 +48,9 @@ class HealthController extends Controller
         $dates = [];
         $scores = [];
 
-        foreach ($tasks as $task) {
-            $dates[] = $task->created_at->format('Y-m-d');
-            $scores[] = $task->result['health_score'] ?? $defaultScore;
+        foreach ($reports as $report) {
+            $dates[] = $report->created_at->format('Y-m-d');
+            $scores[] = $report->health_score ?? $defaultScore;
         }
 
         return response()->json([
@@ -67,27 +68,28 @@ class HealthController extends Controller
      */
     public function constitution(Request $request)
     {
-        $tasks = AnalysisTask::where('user_id', $request->user()->id)
+        $reports = AnalysisReport::where('user_id', $request->user()->id)
             ->where('type', 'constitution')
-            ->where('status', 2)
+            ->where('is_paid', true)
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $latestType = $tasks->first()?->result['constitution_type'] ?? '未知';
+        $latestType = $reports->first()?->constitution_type ?? '未知';
 
         return response()->json([
             'code' => 0,
             'message' => 'success',
             'data' => [
                 'constitution_type' => $latestType,
-                'test_count' => $tasks->count(),
-                'last_test_at' => $tasks->first()?->created_at,
-                'history' => $tasks->map(function ($task) {
+                'test_count' => $reports->count(),
+                'last_test_at' => $reports->first()?->created_at,
+                'history' => $reports->map(function ($report) {
+                    $content = $report->content ?? [];
                     return [
-                        'task_no' => $task->task_no,
-                        'constitution_type' => $task->result['constitution_type'] ?? '',
-                        'scores' => $task->result['scores'] ?? [],
-                        'created_at' => $task->created_at,
+                        'id' => $report->id,
+                        'constitution_type' => $report->constitution_type ?? $content['constitution_type'] ?? '',
+                        'scores' => $content['scores'] ?? [],
+                        'created_at' => $report->created_at,
                     ];
                 }),
             ],

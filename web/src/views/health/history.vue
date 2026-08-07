@@ -8,13 +8,13 @@ import { User, Sunny, Histogram } from '@element-plus/icons-vue'
 const router = useRouter()
 
 interface AnalysisRecord {
-  task_no: string
+  id: number
   type: 'face' | 'tongue' | 'constitution' | 'palm' | 'eye'
   type_name: string
   created_at: string
   summary: string
-  status: number
-  is_paid: boolean
+  health_score: number
+  content: any
 }
 
 const records = ref<AnalysisRecord[]>([])
@@ -24,7 +24,7 @@ import { getToken } from '@/utils/auth'
 
 const getAuthToken = (): string => getToken() || ''
 
-// 从后端加载历史记录（无任何硬编码）
+// 从后端加载健康档案记录
 const fetchHistory = async () => {
   loading.value = true
   try {
@@ -38,20 +38,20 @@ const fetchHistory = async () => {
     if (data.code === 0) {
       const list = data.data?.data || data.data || []
       records.value = list.map((r: any) => {
-        const result = r.result || {}
+        const content = r.content || {}
         const typeName = r.type === 'face' ? '面诊分析'
           : r.type === 'tongue' ? '舌诊分析'
           : r.type === 'palm' ? '手相分析'
           : r.type === 'eye' ? '眼部分析'
           : r.type === 'constitution' ? '体质测试' : '分析'
         return {
-          task_no: r.task_no,
+          id: r.id,
           type: r.type,
           type_name: typeName,
           created_at: r.created_at,
-          summary: result.summary || result.diagnosis || '分析完成',
-          status: r.status,
-          is_paid: r.is_paid,
+          summary: r.summary || content.summary || '分析完成',
+          health_score: r.health_score || 85,
+          content: content,
         }
       })
     } else {
@@ -65,29 +65,12 @@ const fetchHistory = async () => {
 }
 
 const viewDetail = (record: AnalysisRecord) => {
-  // status: 0=待处理 1=处理中 2=已完成
-  if (record.status !== 2) {
-    ElMessage.info('分析进行中，请稍后再查看')
-    return
-  }
-  // 根据类型跳转到不同的结果页面
+  // 跳转到分析详情页
   if (record.type === 'constitution') {
-    router.push(`/constitution/result/${record.task_no}`)
+    router.push(`/constitution/result/${record.id}`)
   } else {
-    router.push(`/analysis/result/${record.task_no}`)
+    router.push(`/analysis/detail/${record.id}`)
   }
-}
-
-const getStatusTagType = (status: number) => {
-  if (status === 2) return 'success' as const
-  if (status === 1) return 'warning' as const
-  return 'info' as const
-}
-
-const getStatusText = (status: number) => {
-  if (status === 2) return '已完成'
-  if (status === 1) return '分析中'
-  return '待处理'
 }
 
 onMounted(() => {
@@ -102,7 +85,7 @@ onMounted(() => {
 
       <div
         v-for="record in records"
-        :key="record.task_no"
+        :key="record.id"
         class="record-card"
         @click="viewDetail(record)"
       >
@@ -113,16 +96,13 @@ onMounted(() => {
             <el-icon v-else color="#07c160"><Sunny /></el-icon>
             <span>{{ record.type_name }}</span>
           </div>
-          <el-tag :type="getStatusTagType(record.status)" size="small">
-            {{ getStatusText(record.status) }}
-          </el-tag>
+          <span class="health-score">健康评分: {{ record.health_score }}</span>
         </div>
 
         <div class="record-summary">{{ record.summary }}</div>
 
         <div class="record-footer">
           <span class="record-date">{{ record.created_at }}</span>
-          <span class="record-task-no">{{ record.task_no }}</span>
         </div>
       </div>
     </div>
@@ -165,6 +145,12 @@ onMounted(() => {
   gap: 6px;
 }
 
+.health-score {
+  font-size: 14px;
+  color: #07c160;
+  font-weight: 500;
+}
+
 .record-summary {
   font-size: 14px;
   color: #646566;
@@ -183,9 +169,5 @@ onMounted(() => {
 .record-date {
   display: flex;
   align-items: center;
-}
-
-.record-task-no {
-  font-family: monospace;
 }
 </style>
