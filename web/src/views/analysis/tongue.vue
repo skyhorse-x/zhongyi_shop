@@ -338,7 +338,7 @@ onMounted(() => {
           开始分析
         </el-button>
         <div class="free-tip">
-          剩余 {{ analysisTimes }} 积分
+          本次消费积分 {{ creditsPerAnalysis }}，剩余 {{ analysisTimes }} 积分
         </div>
       </div>
     </div>
