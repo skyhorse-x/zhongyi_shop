@@ -158,6 +158,12 @@ const handleSubmit = async () => {
     }
 
     const result = await submitAnalysisAsync(uploadedUrls, 'tongue', aiText.value, gender.value, age.value)
+    // 跳转到独立的报告页面，避免与提交页面同页显示
+    if (result?.id) {
+      router.push(`/analysis/detail/${result.id}`)
+      return
+    }
+    // 兼容旧逻辑：兜底展示
     analysisResult.value = result
     showResult.value = true
     // 更新剩余积分
@@ -265,12 +271,12 @@ onMounted(() => {
     </div>
 
     <!-- 积分不足 - 只显示锁定提示 -->
-    <div v-if="creditsLoaded && !hasEnoughCredits()" class="locked-state">
+    <div v-if="creditsLoaded && !hasEnoughCredits() && !showResult" class="locked-state">
       <InsufficientCredits :credits="creditsPerAnalysis" :current-credits="analysisTimes ?? 0" />
     </div>
 
     <!-- 积分充足 - 只显示表单 -->
-    <div v-else class="page-content">
+    <div v-else-if="!showResult" class="page-content">
       <!-- 基本信息卡片 -->
       <div class="card profile-card">
         <div class="card-title">

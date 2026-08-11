@@ -210,12 +210,12 @@ onMounted(() => {
     </div>
 
     <!-- 积分不足 - 只显示锁定提示 -->
-    <div v-if="creditsLoaded && !hasEnoughCredits()" class="locked-state">
+    <div v-if="creditsLoaded && !hasEnoughCredits() && !showResult" class="locked-state">
       <InsufficientCredits :credits="creditsPerAnalysis" :current-credits="analysisTimes ?? 0" />
     </div>
 
     <!-- 积分充足 - 只显示表单 -->
-    <div v-else>
+    <div v-else-if="!showResult">
       <!-- 基本信息（必填） -->
       <div class="profile-section">
         <div class="ai-text-header">

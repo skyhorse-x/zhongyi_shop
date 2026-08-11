@@ -161,6 +161,12 @@ const handleSubmit = async () => {
     }
 
     const result = await submitAnalysisDirect(uploadedUrls, 'palm', aiText.value, gender.value, age.value)
+    // 跳转到独立的报告页面，避免与提交页面同页显示
+    if (result?.id) {
+      router.push(`/analysis/detail/${result.id}`)
+      return
+    }
+    // 兼容旧逻辑：兜底展示
     analysisResult.value = result
     showResult.value = true
     // 更新剩余积分
